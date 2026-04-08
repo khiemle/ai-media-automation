@@ -3,6 +3,8 @@ import { getToken, setToken, clearToken, authApi } from './api/client.js'
 import LoginPage from './pages/LoginPage.jsx'
 import ScraperPage from './pages/ScraperPage.jsx'
 import ScriptsPage from './pages/ScriptsPage.jsx'
+import ProductionPage from './pages/ProductionPage.jsx'
+import PipelinePage from './pages/PipelinePage.jsx'
 
 // ── Tab icons (inline SVG) ────────────────────────────────────────────────────
 const Icons = {
@@ -99,6 +101,8 @@ export default function App() {
     switch (activeTab) {
       case 'scraper':    return <ScraperPage />
       case 'scripts':    return <ScriptsPage />
+      case 'production': return <ProductionPage />
+      case 'pipeline':   return <PipelinePage />
       default:           return <ComingSoon name={ALL_TABS.find(t => t.id === activeTab)?.label ?? activeTab} />
     }
   }
