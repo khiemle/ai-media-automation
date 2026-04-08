@@ -114,7 +114,7 @@ export function Textarea({ label, value, onChange, placeholder, rows = 3, classN
 }
 
 // ─── Select ───────────────────────────────────────────────────────────────────
-export function Select({ label, value, onChange, options = [], placeholder, className = '' }) {
+export function Select({ label, value, onChange, options = [], placeholder, className = '', children }) {
   return (
     <div className={`flex flex-col gap-1 ${className}`}>
       {label && <label className="text-xs text-[#9090a8] font-medium">{label}</label>}
@@ -124,9 +124,12 @@ export function Select({ label, value, onChange, options = [], placeholder, clas
         className="bg-[#16161a] border border-[#2a2a32] rounded-lg px-3 py-1.5 text-sm text-[#e8e8f0] focus:outline-none focus:border-[#7c6af7] transition-colors appearance-none cursor-pointer"
       >
         {placeholder && <option value="">{placeholder}</option>}
-        {options.map(o => (
-          <option key={o.value ?? o} value={o.value ?? o}>{o.label ?? o}</option>
-        ))}
+        {children
+          ? children
+          : options.map(o => (
+              <option key={o.value ?? o} value={o.value ?? o}>{o.label ?? o}</option>
+            ))
+        }
       </select>
     </div>
   )

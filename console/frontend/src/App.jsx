@@ -5,6 +5,7 @@ import ScraperPage from './pages/ScraperPage.jsx'
 import ScriptsPage from './pages/ScriptsPage.jsx'
 import ProductionPage from './pages/ProductionPage.jsx'
 import PipelinePage from './pages/PipelinePage.jsx'
+import UploadsPage from './pages/UploadsPage.jsx'
 
 // ── Tab icons (inline SVG) ────────────────────────────────────────────────────
 const Icons = {
@@ -103,6 +104,7 @@ export default function App() {
       case 'scripts':    return <ScriptsPage />
       case 'production': return <ProductionPage />
       case 'pipeline':   return <PipelinePage />
+      case 'uploads':    return <UploadsPage />
       default:           return <ComingSoon name={ALL_TABS.find(t => t.id === activeTab)?.label ?? activeTab} />
     }
   }
