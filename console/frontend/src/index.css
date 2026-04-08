@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Global base ── */
+:root {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  background-color: #0d0d0f;
+  color: #e8e8f0;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar       { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #16161a; }
+::-webkit-scrollbar-thumb { background: #2a2a32; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #3a3a46; }
+
+/* ── Monospace text utility ── */
+.font-mono { font-family: 'IBM Plex Mono', ui-monospace, monospace; }
+
+/* ── Focus ring ── */
+*:focus-visible {
+  outline: 2px solid #7c6af7;
+  outline-offset: 2px;
+}
+
+/* ── Transition defaults ── */
+button, a, [role="button"] {
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease, opacity 120ms ease;
+}
