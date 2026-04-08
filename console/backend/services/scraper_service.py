@@ -62,12 +62,11 @@ class ScraperService:
         page: int = 1,
         per_page: int = 50,
     ) -> PaginatedResponse[ScrapedVideoResponse]:
-        # Import the existing core model dynamically (it lives in database/)
         try:
             from database.models import ViralVideo
         except ImportError:
-            # Fallback: try lowercase module name
-            from database.models import ViralVideo
+            # Core pipeline not present — return empty results
+            return PaginatedResponse(items=[], total=0, page=page, pages=0, per_page=per_page)
 
         filters = []
         if niche:
@@ -84,9 +83,9 @@ class ScraperService:
         total = query.count()
 
         sort_col = {
-            "play_count": ViralVideo.play_count,
+            "play_count":      ViralVideo.play_count,
             "engagement_rate": ViralVideo.engagement_rate,
-            "likes": ViralVideo.play_count,  # fallback if no likes col
+            "likes":           ViralVideo.play_count,
         }.get(sort_by, ViralVideo.play_count)
 
         if sort_dir == "desc":
@@ -110,8 +109,10 @@ class ScraperService:
     def index_to_chromadb(self, video_ids: list[str]) -> int:
         try:
             from database.models import ViralVideo
+        except ImportError:
+            raise RuntimeError("Core pipeline database module not available") from None
+        try:
             from vector_db.indexer import index_videos
-
             index_videos(video_ids)
             self.db.query(ViralVideo).filter(
                 ViralVideo.id.in_(video_ids)

@@ -50,6 +50,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ─── Audit middleware ─────────────────────────────────────────────────────────
+
+try:
+    from console.backend.middleware.audit import AuditMiddleware
+    app.add_middleware(AuditMiddleware)
+except Exception:
+    pass
+
 # ─── Routers ──────────────────────────────────────────────────────────────────
 
 def register_routers():
