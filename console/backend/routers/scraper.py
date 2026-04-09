@@ -45,8 +45,11 @@ def trigger_scrape(
     db: Session = Depends(get_db),
     _user=Depends(require_editor_or_admin),
 ):
-    task_id = ScraperService(db).trigger_scrape(body.source_id)
-    return {"task_id": task_id, "status": "queued"}
+    try:
+        task_id = ScraperService(db).trigger_scrape(body.source_id)
+        return {"task_id": task_id, "status": "queued"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/videos", response_model=PaginatedResponse[ScrapedVideoResponse])

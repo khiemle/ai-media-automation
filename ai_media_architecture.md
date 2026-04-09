@@ -300,7 +300,7 @@ script.json
 ```python
 TTS_CONFIG = {
     "engine":        "kokoro",
-    "model":         "kokoro-v0_19.onnx",
+    "model":         "kokoro.onnx",
     "voice":         "af_heart",        # female Vietnamese voice
     "speed":         1.1,               # slightly faster for social media
     "sample_rate":   44100,

@@ -51,8 +51,13 @@ def trigger_upload(
     db: Session = Depends(get_db),
     _user=Depends(require_editor_or_admin),
 ):
-    task_ids = UploadService(db).trigger_upload(video_id)
-    return {"task_ids": task_ids, "queued": len(task_ids)}
+    try:
+        task_ids = UploadService(db).trigger_upload(video_id)
+        return {"task_ids": task_ids, "queued": len(task_ids)}
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/upload-all")

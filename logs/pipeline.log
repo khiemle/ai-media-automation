@@ -1,0 +1,249 @@
+2026-04-09 06:27:08,964 INFO [batch_runner] ============================================================
+2026-04-09 06:27:08,964 INFO [batch_runner] Batch Runner started at 2026-04-08T23:27:08.964745+00:00
+2026-04-09 06:27:08,964 INFO [batch_runner] Options: dry_run=True scrape_only=False
+2026-04-09 06:27:08,964 INFO [batch_runner] ============================================================
+2026-04-09 06:27:09,117 INFO [daily_pipeline] [Pipeline] Generating 10 scripts: ['5 thói quen sống khỏe mỗi ngày', '5 động tác gym cho người mới bắt đầu', 'Cách xây dựng thói quen tốt trong 21 ngày', '5 sai lầm tài chính người trẻ hay mắc', '5 thói quen sống khỏe mỗi ngày', '5 động tác gym cho người mới bắt đầu', 'Cách xây dựng thói quen tốt trong 21 ngày', '5 sai lầm tài chính người trẻ hay mắc', '5 thói quen sống khỏe mỗi ngày', '5 động tác gym cho người mới bắt đầu']
+2026-04-09 06:27:09,117 INFO [daily_pipeline] [Pipeline] Daily run complete: {'started_at': '2026-04-08T23:27:08.976653+00:00', 'errors': [], 'steps': {'generate': {'scripts_created': 0, 'script_ids': []}, 'produce': {'produced': 0, 'failed': 0, 'script_ids': []}}, 'completed_at': '2026-04-08T23:27:09.117858+00:00', 'duration_s': 0.141211}
+2026-04-09 06:27:09,117 INFO [batch_runner] ────────────────────────────────────────
+2026-04-09 06:27:09,117 INFO [batch_runner] PIPELINE SUMMARY
+2026-04-09 06:27:09,117 INFO [batch_runner] ────────────────────────────────────────
+2026-04-09 06:27:09,118 INFO [batch_runner]   Generate: 0 scripts
+2026-04-09 06:27:09,118 INFO [batch_runner]   Produce: 0 videos (failed: 0)
+2026-04-09 06:27:09,118 INFO [batch_runner]   Duration: 0.1s
+2026-04-09 06:27:09,118 INFO [batch_runner] ────────────────────────────────────────
+2026-04-09 06:27:09,419 INFO [batch_runner] ============================================================
+2026-04-09 06:27:09,419 INFO [batch_runner] Batch Runner started at 2026-04-08T23:27:09.419683+00:00
+2026-04-09 06:27:09,419 INFO [batch_runner] Options: dry_run=False scrape_only=False
+2026-04-09 06:27:09,419 INFO [batch_runner] ============================================================
+2026-04-09 06:27:09,431 INFO [scraper.main] [Scraper] Running source: tiktok_research
+2026-04-09 06:27:10,117 INFO [httpx] HTTP Request: POST https://open.tiktokapis.com/v2/oauth/token/ "HTTP/1.1 200 OK"
+2026-04-09 06:27:10,588 INFO [httpx] HTTP Request: POST https://open.tiktokapis.com/v2/research/video/query/ "HTTP/1.1 401 Unauthorized"
+2026-04-09 06:27:10,590 WARNING [scraper.tiktok_research_api] TikTok Research API error 401: {"data":{},"error":{"code":"access_token_invalid","message":"The access token is invalid or not found in the request.","log_id":"20260408232710663D3F841BCD4C301708"}}
+2026-04-09 06:27:10,590 INFO [scraper.tiktok_research_api] [TikTok Research] niche=health hashtag=suckhoe → 0 videos
+2026-04-09 06:27:12,158 INFO [httpx] HTTP Request: POST https://open.tiktokapis.com/v2/research/video/query/ "HTTP/1.1 401 Unauthorized"
+2026-04-09 06:27:12,159 WARNING [scraper.tiktok_research_api] TikTok Research API error 401: {"data":{},"error":{"code":"access_token_invalid","message":"The access token is invalid or not found in the request.","log_id":"20260408232711EFC69056A869D6351200"}}
+2026-04-09 06:27:12,159 INFO [scraper.tiktok_research_api] [TikTok Research] niche=health hashtag=suckhoetotday → 0 videos
+2026-04-09 06:27:13,691 INFO [httpx] HTTP Request: POST https://open.tiktokapis.com/v2/research/video/query/ "HTTP/1.1 401 Unauthorized"
+2026-04-09 06:27:13,692 WARNING [scraper.tiktok_research_api] TikTok Research API error 401: {"data":{},"error":{"code":"access_token_invalid","message":"The access token is invalid or not found in the request.","log_id":"202604082327135E05958922E1BD2FBA55"}}
+2026-04-09 06:27:13,693 INFO [scraper.tiktok_research_api] [TikTok Research] niche=health hashtag=health → 0 videos
+2026-04-09 06:27:15,149 INFO [httpx] HTTP Request: POST https://open.tiktokapis.com/v2/research/video/query/ "HTTP/1.1 401 Unauthorized"
+2026-04-09 06:27:15,150 WARNING [scraper.tiktok_research_api] TikTok Research API error 401: {"data":{},"error":{"code":"access_token_invalid","message":"The access token is invalid or not found in the request.","log_id":"2026040823271486DDE6B6891D82305F10"}}
+2026-04-09 06:27:15,151 INFO [scraper.tiktok_research_api] [TikTok Research] niche=health hashtag=wellness → 0 videos
+2026-04-09 06:27:16,661 INFO [httpx] HTTP Request: POST https://open.tiktokapis.com/v2/research/video/query/ "HTTP/1.1 401 Unauthorized"
+2026-04-09 06:27:16,662 WARNING [scraper.tiktok_research_api] TikTok Research API error 401: {"error":{"code":"access_token_invalid","message":"The access token is invalid or not found in the request.","log_id":"2026040823271639FB8DAFF8E718308D55"},"data":{}}
+2026-04-09 06:27:16,662 INFO [scraper.tiktok_research_api] [TikTok Research] niche=fitness hashtag=fitness → 0 videos
+2026-04-09 06:27:18,386 INFO [httpx] HTTP Request: POST https://open.tiktokapis.com/v2/research/video/query/ "HTTP/1.1 401 Unauthorized"
+2026-04-09 06:27:18,387 WARNING [scraper.tiktok_research_api] TikTok Research API error 401: {"data":{},"error":{"code":"access_token_invalid","message":"The access token is invalid or not found in the request.","log_id":"20260408232717BEF0E40B929E703017A1"}}
+2026-04-09 06:27:18,387 INFO [scraper.tiktok_research_api] [TikTok Research] niche=fitness hashtag=gymlife → 0 videos
+2026-04-09 06:27:19,836 INFO [httpx] HTTP Request: POST https://open.tiktokapis.com/v2/research/video/query/ "HTTP/1.1 401 Unauthorized"
+2026-04-09 06:27:19,837 WARNING [scraper.tiktok_research_api] TikTok Research API error 401: {"data":{},"error":{"code":"access_token_invalid","message":"The access token is invalid or not found in the request.","log_id":"20260408232719B88652F5F23B5A308D8E"}}
+2026-04-09 06:27:19,837 INFO [scraper.tiktok_research_api] [TikTok Research] niche=fitness hashtag=workout → 0 videos
+2026-04-09 06:27:21,692 INFO [httpx] HTTP Request: POST https://open.tiktokapis.com/v2/research/video/query/ "HTTP/1.1 401 Unauthorized"
+2026-04-09 06:27:21,693 WARNING [scraper.tiktok_research_api] TikTok Research API error 401: {"data":{},"error":{"code":"access_token_invalid","message":"The access token is invalid or not found in the request.","log_id":"20260408232721135160C17BB5FC301B69"}}
+2026-04-09 06:27:21,693 INFO [scraper.tiktok_research_api] [TikTok Research] niche=fitness hashtag=thehinh → 0 videos
+2026-04-09 06:27:23,215 INFO [httpx] HTTP Request: POST https://open.tiktokapis.com/v2/research/video/query/ "HTTP/1.1 401 Unauthorized"
+2026-04-09 06:27:23,216 WARNING [scraper.tiktok_research_api] TikTok Research API error 401: {"error":{"code":"access_token_invalid","message":"The access token is invalid or not found in the request.","log_id":"20260408232722EAC4F3CAABF9C430A54E"},"data":{}}
+2026-04-09 06:27:23,217 INFO [scraper.tiktok_research_api] [TikTok Research] niche=lifestyle hashtag=lifestyle → 0 videos
+2026-04-09 06:27:24,649 INFO [httpx] HTTP Request: POST https://open.tiktokapis.com/v2/research/video/query/ "HTTP/1.1 401 Unauthorized"
+2026-04-09 06:27:24,650 WARNING [scraper.tiktok_research_api] TikTok Research API error 401: {"data":{},"error":{"code":"access_token_invalid","message":"The access token is invalid or not found in the request.","log_id":"202604082327248EEB422D6E575C30A4CD"}}
+2026-04-09 06:27:24,650 INFO [scraper.tiktok_research_api] [TikTok Research] niche=lifestyle hashtag=cuocsong → 0 videos
+2026-04-09 06:27:26,185 INFO [httpx] HTTP Request: POST https://open.tiktokapis.com/v2/research/video/query/ "HTTP/1.1 401 Unauthorized"
+2026-04-09 06:27:26,186 WARNING [scraper.tiktok_research_api] TikTok Research API error 401: {"data":{},"error":{"code":"access_token_invalid","message":"The access token is invalid or not found in the request.","log_id":"20260408232725B2A9F107DEA55A3011F1"}}
+2026-04-09 06:27:26,186 INFO [scraper.tiktok_research_api] [TikTok Research] niche=lifestyle hashtag=dailyvlog → 0 videos
+2026-04-09 06:27:28,193 INFO [httpx] HTTP Request: POST https://open.tiktokapis.com/v2/research/video/query/ "HTTP/1.1 401 Unauthorized"
+2026-04-09 06:27:28,194 WARNING [scraper.tiktok_research_api] TikTok Research API error 401: {"data":{},"error":{"code":"access_token_invalid","message":"The access token is invalid or not found in the request.","log_id":"2026040823272788697C96933D3C30A87D"}}
+2026-04-09 06:27:28,194 INFO [scraper.tiktok_research_api] [TikTok Research] niche=finance hashtag=taichinhcanhan → 0 videos
+2026-04-09 06:27:29,626 INFO [httpx] HTTP Request: POST https://open.tiktokapis.com/v2/research/video/query/ "HTTP/1.1 401 Unauthorized"
+2026-04-09 06:27:29,626 WARNING [scraper.tiktok_research_api] TikTok Research API error 401: {"data":{},"error":{"code":"access_token_invalid","message":"The access token is invalid or not found in the request.","log_id":"202604082327292D568FCEDFB1632F851C"}}
+2026-04-09 06:27:29,626 INFO [scraper.tiktok_research_api] [TikTok Research] niche=finance hashtag=dautu → 0 videos
+2026-04-09 06:27:31,614 INFO [httpx] HTTP Request: POST https://open.tiktokapis.com/v2/research/video/query/ "HTTP/1.1 401 Unauthorized"
+2026-04-09 06:27:31,615 WARNING [scraper.tiktok_research_api] TikTok Research API error 401: {"data":{},"error":{"code":"access_token_invalid","message":"The access token is invalid or not found in the request.","log_id":"20260408232731F13C5E4DC2B8E635E685"}}
+2026-04-09 06:27:31,615 INFO [scraper.tiktok_research_api] [TikTok Research] niche=finance hashtag=finance → 0 videos
+2026-04-09 06:27:33,150 INFO [httpx] HTTP Request: POST https://open.tiktokapis.com/v2/research/video/query/ "HTTP/1.1 401 Unauthorized"
+2026-04-09 06:27:33,151 WARNING [scraper.tiktok_research_api] TikTok Research API error 401: {"data":{},"error":{"code":"access_token_invalid","message":"The access token is invalid or not found in the request.","log_id":"2026040823273288840C7C3246512FEA52"}}
+2026-04-09 06:27:33,151 INFO [scraper.tiktok_research_api] [TikTok Research] niche=finance hashtag=money → 0 videos
+2026-04-09 06:27:34,686 INFO [httpx] HTTP Request: POST https://open.tiktokapis.com/v2/research/video/query/ "HTTP/1.1 401 Unauthorized"
+2026-04-09 06:27:34,687 WARNING [scraper.tiktok_research_api] TikTok Research API error 401: {"data":{},"error":{"code":"access_token_invalid","message":"The access token is invalid or not found in the request.","log_id":"202604082327344AD570BC848808301AE8"}}
+2026-04-09 06:27:34,687 INFO [scraper.tiktok_research_api] [TikTok Research] niche=food hashtag=amthuc → 0 videos
+2026-04-09 06:27:36,560 INFO [httpx] HTTP Request: POST https://open.tiktokapis.com/v2/research/video/query/ "HTTP/1.1 401 Unauthorized"
+2026-04-09 06:27:36,561 WARNING [scraper.tiktok_research_api] TikTok Research API error 401: {"data":{},"error":{"code":"access_token_invalid","message":"The access token is invalid or not found in the request.","log_id":"202604082327367B11ACFB1E64F230C5DE"}}
+2026-04-09 06:27:36,561 INFO [scraper.tiktok_research_api] [TikTok Research] niche=food hashtag=monan → 0 videos
+2026-04-09 06:27:38,033 INFO [httpx] HTTP Request: POST https://open.tiktokapis.com/v2/research/video/query/ "HTTP/1.1 401 Unauthorized"
+2026-04-09 06:27:38,034 WARNING [scraper.tiktok_research_api] TikTok Research API error 401: {"data":{},"error":{"code":"access_token_invalid","message":"The access token is invalid or not found in the request.","log_id":"2026040823273725DA2178FC676B3CEE9F"}}
+2026-04-09 06:27:38,035 INFO [scraper.tiktok_research_api] [TikTok Research] niche=food hashtag=food → 0 videos
+2026-04-09 06:27:39,498 INFO [httpx] HTTP Request: POST https://open.tiktokapis.com/v2/research/video/query/ "HTTP/1.1 401 Unauthorized"
+2026-04-09 06:27:39,499 WARNING [scraper.tiktok_research_api] TikTok Research API error 401: {"data":{},"error":{"code":"access_token_invalid","message":"The access token is invalid or not found in the request.","log_id":"20260408232739CD376FE5C18482304BEA"}}
+2026-04-09 06:27:39,499 INFO [scraper.tiktok_research_api] [TikTok Research] niche=food hashtag=cooking → 0 videos
+2026-04-09 06:27:40,501 INFO [scraper.main] [Scraper] tiktok_research → 0 new videos
+2026-04-09 06:27:40,501 INFO [scraper.main] [Scraper] Running source: tiktok_playwright
+2026-04-09 06:27:55,724 INFO [scraper.tiktok_playwright] [Playwright] https://www.tiktok.com/explore → 0 items
+2026-04-09 06:28:13,211 INFO [scraper.tiktok_playwright] [Playwright] https://www.tiktok.com/tag/suckhoe → 0 items
+2026-04-09 06:28:29,386 INFO [scraper.tiktok_playwright] [Playwright] https://www.tiktok.com/tag/fitness → 0 items
+2026-04-09 06:28:45,245 INFO [scraper.tiktok_playwright] [Playwright] https://www.tiktok.com/tag/lifestyle → 0 items
+2026-04-09 06:29:00,062 INFO [scraper.tiktok_playwright] [Playwright] https://www.tiktok.com/tag/taichinhcanhan → 0 items
+2026-04-09 06:29:02,078 INFO [scraper.main] [Scraper] tiktok_playwright → 0 new videos
+2026-04-09 06:29:02,078 INFO [scraper.main] [Scraper] Running source: tiktok_apify
+2026-04-09 06:29:03,313 INFO [httpx] HTTP Request: POST https://api.apify.com/v2/acts/GdWCkxBtKWOsKjdch/runs?timeout=300 "HTTP/1.1 403 Forbidden"
+2026-04-09 06:29:03,314 ERROR [scraper.apify_scraper] [Apify] actor run failed: Monthly usage hard limit exceeded
+2026-04-09 06:29:03,315 INFO [scraper.apify_scraper] [Apify] scraped 0 videos across 17 hashtags
+2026-04-09 06:29:03,315 INFO [scraper.main] [Scraper] tiktok_apify → 0 new videos
+2026-04-09 06:29:03,315 INFO [daily_pipeline] [Pipeline] Scrape: 0 new videos
+2026-04-09 06:29:03,315 INFO [daily_pipeline] [Pipeline] Generating 3 scripts: ['5 thói quen buổi sáng giúp bạn thành công', 'Bí quyết tiết kiệm 10 triệu mỗi tháng', 'Bài tập giảm cân hiệu quả tại nhà']
+2026-04-09 06:29:06,937 INFO [sentence_transformers.SentenceTransformer] Load pretrained SentenceTransformer: keepitreal/vietnamese-sbert
+2026-04-09 06:29:07,345 INFO [httpx] HTTP Request: HEAD https://huggingface.co/keepitreal/vietnamese-sbert/resolve/main/modules.json "HTTP/1.1 307 Temporary Redirect"
+2026-04-09 06:29:07,395 INFO [httpx] HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/keepitreal/vietnamese-sbert/a9467ef2ef47caa6448edeabfd8e5e5ce0fa2a23/modules.json "HTTP/1.1 200 OK"
+2026-04-09 06:29:07,661 INFO [httpx] HTTP Request: HEAD https://huggingface.co/keepitreal/vietnamese-sbert/resolve/main/config_sentence_transformers.json "HTTP/1.1 307 Temporary Redirect"
+2026-04-09 06:29:07,711 INFO [httpx] HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/keepitreal/vietnamese-sbert/a9467ef2ef47caa6448edeabfd8e5e5ce0fa2a23/config_sentence_transformers.json "HTTP/1.1 200 OK"
+2026-04-09 06:29:07,977 INFO [httpx] HTTP Request: HEAD https://huggingface.co/keepitreal/vietnamese-sbert/resolve/main/config_sentence_transformers.json "HTTP/1.1 307 Temporary Redirect"
+2026-04-09 06:29:08,027 INFO [httpx] HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/keepitreal/vietnamese-sbert/a9467ef2ef47caa6448edeabfd8e5e5ce0fa2a23/config_sentence_transformers.json "HTTP/1.1 200 OK"
+2026-04-09 06:29:08,282 INFO [httpx] HTTP Request: HEAD https://huggingface.co/keepitreal/vietnamese-sbert/resolve/main/README.md "HTTP/1.1 307 Temporary Redirect"
+2026-04-09 06:29:08,331 INFO [httpx] HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/keepitreal/vietnamese-sbert/a9467ef2ef47caa6448edeabfd8e5e5ce0fa2a23/README.md "HTTP/1.1 200 OK"
+2026-04-09 06:29:08,607 INFO [httpx] HTTP Request: HEAD https://huggingface.co/keepitreal/vietnamese-sbert/resolve/main/modules.json "HTTP/1.1 307 Temporary Redirect"
+2026-04-09 06:29:08,655 INFO [httpx] HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/keepitreal/vietnamese-sbert/a9467ef2ef47caa6448edeabfd8e5e5ce0fa2a23/modules.json "HTTP/1.1 200 OK"
+2026-04-09 06:29:08,923 INFO [httpx] HTTP Request: HEAD https://huggingface.co/keepitreal/vietnamese-sbert/resolve/main/sentence_bert_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-04-09 06:29:08,972 INFO [httpx] HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/keepitreal/vietnamese-sbert/a9467ef2ef47caa6448edeabfd8e5e5ce0fa2a23/sentence_bert_config.json "HTTP/1.1 200 OK"
+2026-04-09 06:29:09,235 INFO [httpx] HTTP Request: HEAD https://huggingface.co/keepitreal/vietnamese-sbert/resolve/main/adapter_config.json "HTTP/1.1 404 Not Found"
+2026-04-09 06:29:09,609 INFO [httpx] HTTP Request: HEAD https://huggingface.co/keepitreal/vietnamese-sbert/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-04-09 06:29:09,657 INFO [httpx] HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/keepitreal/vietnamese-sbert/a9467ef2ef47caa6448edeabfd8e5e5ce0fa2a23/config.json "HTTP/1.1 200 OK"
+2026-04-09 06:29:09,962 INFO [httpx] HTTP Request: HEAD https://huggingface.co/keepitreal/vietnamese-sbert/resolve/main/model.safetensors "HTTP/1.1 404 Not Found"
+2026-04-09 06:29:10,226 INFO [httpx] HTTP Request: GET https://huggingface.co/api/models/keepitreal/vietnamese-sbert "HTTP/1.1 200 OK"
+2026-04-09 06:29:10,417 INFO [httpx] HTTP Request: HEAD https://huggingface.co/keepitreal/vietnamese-sbert/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-04-09 06:29:10,468 INFO [httpx] HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/keepitreal/vietnamese-sbert/a9467ef2ef47caa6448edeabfd8e5e5ce0fa2a23/config.json "HTTP/1.1 200 OK"
+2026-04-09 06:29:10,511 INFO [httpx] HTTP Request: GET https://huggingface.co/api/models/keepitreal/vietnamese-sbert/commits/main "HTTP/1.1 200 OK"
+2026-04-09 06:29:10,735 INFO [httpx] HTTP Request: HEAD https://huggingface.co/keepitreal/vietnamese-sbert/resolve/main/tokenizer_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-04-09 06:29:10,782 INFO [httpx] HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/keepitreal/vietnamese-sbert/a9467ef2ef47caa6448edeabfd8e5e5ce0fa2a23/tokenizer_config.json "HTTP/1.1 200 OK"
+2026-04-09 06:29:10,788 INFO [httpx] HTTP Request: GET https://huggingface.co/api/models/keepitreal/vietnamese-sbert/discussions?p=0 "HTTP/1.1 200 OK"
+2026-04-09 06:29:11,050 INFO [httpx] HTTP Request: HEAD https://huggingface.co/keepitreal/vietnamese-sbert/resolve/main/tokenizer_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-04-09 06:29:11,050 WARNING [huggingface_hub.utils._http] Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+2026-04-09 06:29:11,072 INFO [httpx] HTTP Request: GET https://huggingface.co/api/models/keepitreal/vietnamese-sbert/commits/refs%2Fpr%2F8 "HTTP/1.1 200 OK"
+2026-04-09 06:29:11,099 INFO [httpx] HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/keepitreal/vietnamese-sbert/a9467ef2ef47caa6448edeabfd8e5e5ce0fa2a23/tokenizer_config.json "HTTP/1.1 200 OK"
+2026-04-09 06:29:11,406 INFO [httpx] HTTP Request: HEAD https://huggingface.co/keepitreal/vietnamese-sbert/resolve/refs%2Fpr%2F8/model.safetensors.index.json "HTTP/1.1 404 Not Found"
+2026-04-09 06:29:11,472 INFO [httpx] HTTP Request: GET https://huggingface.co/api/models/keepitreal/vietnamese-sbert/tree/main/additional_chat_templates?recursive=false&expand=false "HTTP/1.1 404 Not Found"
+2026-04-09 06:29:11,676 INFO [httpx] HTTP Request: HEAD https://huggingface.co/keepitreal/vietnamese-sbert/resolve/refs%2Fpr%2F8/model.safetensors "HTTP/1.1 302 Found"
+2026-04-09 06:29:11,855 INFO [httpx] HTTP Request: GET https://huggingface.co/api/models/keepitreal/vietnamese-sbert/tree/main?recursive=true&expand=false "HTTP/1.1 200 OK"
+2026-04-09 06:29:12,169 INFO [httpx] HTTP Request: HEAD https://huggingface.co/keepitreal/vietnamese-sbert/resolve/main/tokenizer_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-04-09 06:29:12,218 INFO [httpx] HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/keepitreal/vietnamese-sbert/a9467ef2ef47caa6448edeabfd8e5e5ce0fa2a23/tokenizer_config.json "HTTP/1.1 200 OK"
+2026-04-09 06:29:12,489 INFO [httpx] HTTP Request: GET https://huggingface.co/api/models/keepitreal/vietnamese-sbert/tree/main/additional_chat_templates?recursive=false&expand=false "HTTP/1.1 404 Not Found"
+2026-04-09 06:29:12,756 INFO [httpx] HTTP Request: GET https://huggingface.co/api/models/keepitreal/vietnamese-sbert/tree/main?recursive=true&expand=false "HTTP/1.1 200 OK"
+2026-04-09 06:29:13,082 INFO [httpx] HTTP Request: HEAD https://huggingface.co/keepitreal/vietnamese-sbert/resolve/main/1_Pooling/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-04-09 06:29:13,133 INFO [httpx] HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/keepitreal/vietnamese-sbert/a9467ef2ef47caa6448edeabfd8e5e5ce0fa2a23/1_Pooling%2Fconfig.json "HTTP/1.1 200 OK"
+2026-04-09 06:29:13,391 INFO [httpx] HTTP Request: GET https://huggingface.co/api/models/keepitreal/vietnamese-sbert "HTTP/1.1 200 OK"
+2026-04-09 06:29:13,490 INFO [rag.llm_router] [LLMRouter] mode=local backend=ollama template=tiktok_viral
+2026-04-09 06:29:39,123 INFO [httpx] HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-04-09 06:29:39,136 WARNING [rag.script_writer] [ScriptWriter] Attempt 1 validation failed: ["scenes[0] missing keys: {'duration'}", 'scenes[0].duration must be > 0', "scenes[1] missing keys: {'duration'}"]
+2026-04-09 06:29:39,138 INFO [rag.llm_router] [LLMRouter] mode=local backend=ollama template=tiktok_viral
+2026-04-09 06:30:04,169 INFO [httpx] HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-04-09 06:30:04,171 WARNING [rag.script_writer] [ScriptWriter] Attempt 2 validation failed: ['scenes[6].narration is empty', 'scenes[7].visual_hint is empty']
+2026-04-09 06:30:04,171 INFO [rag.llm_router] [LLMRouter] mode=local backend=ollama template=tiktok_viral
+2026-04-09 06:30:11,326 INFO [httpx] HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-04-09 06:30:11,327 WARNING [rag.script_writer] [ScriptWriter] Attempt 3 validation failed: ["Missing required key: 'scenes'"]
+2026-04-09 06:30:11,327 ERROR [rag.script_writer] [ScriptWriter] All 3 attempts failed. Last errors: ["Missing required key: 'scenes'"]
+2026-04-09 06:30:11,333 ERROR [daily_pipeline] [Pipeline] Script generation failed for '5 thói quen buổi sáng giúp bạn thành công': Foreign key associated with column 'generated_scripts.edited_by' could not find table 'console_users' with which to generate a foreign key to target column 'id'
+2026-04-09 06:30:11,343 INFO [rag.llm_router] [LLMRouter] mode=local backend=ollama template=tiktok_viral
+2026-04-09 06:30:35,602 INFO [httpx] HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-04-09 06:30:35,603 WARNING [rag.script_writer] [ScriptWriter] Attempt 1 validation failed: ["scenes[0] missing keys: {'duration'}", 'scenes[0].duration must be > 0', "scenes[1] missing keys: {'duration'}"]
+2026-04-09 06:30:35,603 INFO [rag.llm_router] [LLMRouter] mode=local backend=ollama template=tiktok_viral
+2026-04-09 06:31:01,624 INFO [httpx] HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-04-09 06:31:01,630 INFO [rag.script_writer] [ScriptWriter] Generated valid script on attempt 2
+2026-04-09 06:31:01,632 ERROR [daily_pipeline] [Pipeline] Script generation failed for 'Bí quyết tiết kiệm 10 triệu mỗi tháng': Foreign key associated with column 'generated_scripts.edited_by' could not find table 'console_users' with which to generate a foreign key to target column 'id'
+2026-04-09 06:31:01,637 INFO [rag.llm_router] [LLMRouter] mode=local backend=ollama template=tiktok_viral
+2026-04-09 06:31:10,119 INFO [batch_runner] ============================================================
+2026-04-09 06:31:10,119 INFO [batch_runner] Batch Runner started at 2026-04-08T23:31:10.119823+00:00
+2026-04-09 06:31:10,120 INFO [batch_runner] Options: dry_run=False scrape_only=True
+2026-04-09 06:31:10,120 INFO [batch_runner] ============================================================
+2026-04-09 06:31:10,134 INFO [scraper.main] [Scraper] Running source: tiktok_research
+2026-04-09 06:31:11,027 INFO [httpx] HTTP Request: POST https://open.tiktokapis.com/v2/oauth/token/ "HTTP/1.1 200 OK"
+2026-04-09 06:31:11,538 INFO [httpx] HTTP Request: POST https://open.tiktokapis.com/v2/research/video/query/ "HTTP/1.1 401 Unauthorized"
+2026-04-09 06:31:11,539 WARNING [scraper.tiktok_research_api] TikTok Research API error 401: {"data":{},"error":{"code":"access_token_invalid","message":"The access token is invalid or not found in the request.","log_id":"202604082331118E1711B5B704F5303AAD"}}
+2026-04-09 06:31:11,539 INFO [scraper.tiktok_research_api] [TikTok Research] niche=health hashtag=suckhoe → 0 videos
+2026-04-09 06:31:13,826 INFO [httpx] HTTP Request: POST https://open.tiktokapis.com/v2/research/video/query/ "HTTP/1.1 401 Unauthorized"
+2026-04-09 06:31:13,827 WARNING [scraper.tiktok_research_api] TikTok Research API error 401: {"data":{},"error":{"code":"access_token_invalid","message":"The access token is invalid or not found in the request.","log_id":"202604082331139D3280A866BF5E2F7406"}}
+2026-04-09 06:31:13,827 INFO [scraper.tiktok_research_api] [TikTok Research] niche=health hashtag=suckhoetotday → 0 videos
+2026-04-09 06:31:15,323 INFO [httpx] HTTP Request: POST https://open.tiktokapis.com/v2/research/video/query/ "HTTP/1.1 401 Unauthorized"
+2026-04-09 06:31:15,324 WARNING [scraper.tiktok_research_api] TikTok Research API error 401: {"error":{"code":"access_token_invalid","message":"The access token is invalid or not found in the request.","log_id":"202604082331159238E4B11E536931063F"},"data":{}}
+2026-04-09 06:31:15,324 INFO [scraper.tiktok_research_api] [TikTok Research] niche=health hashtag=health → 0 videos
+2026-04-09 06:31:17,203 INFO [httpx] HTTP Request: POST https://open.tiktokapis.com/v2/research/video/query/ "HTTP/1.1 401 Unauthorized"
+2026-04-09 06:31:17,204 WARNING [scraper.tiktok_research_api] TikTok Research API error 401: {"data":{},"error":{"code":"access_token_invalid","message":"The access token is invalid or not found in the request.","log_id":"202604082331165B6A7B94DA4DE22FC256"}}
+2026-04-09 06:31:17,204 INFO [scraper.tiktok_research_api] [TikTok Research] niche=health hashtag=wellness → 0 videos
+2026-04-09 06:31:19,150 INFO [httpx] HTTP Request: POST https://open.tiktokapis.com/v2/research/video/query/ "HTTP/1.1 401 Unauthorized"
+2026-04-09 06:31:19,151 WARNING [scraper.tiktok_research_api] TikTok Research API error 401: {"data":{},"error":{"code":"access_token_invalid","message":"The access token is invalid or not found in the request.","log_id":"20260408233118415A3EFF3F2641308646"}}
+2026-04-09 06:31:19,151 INFO [scraper.tiktok_research_api] [TikTok Research] niche=fitness hashtag=fitness → 0 videos
+2026-04-09 06:31:21,095 INFO [httpx] HTTP Request: POST https://open.tiktokapis.com/v2/research/video/query/ "HTTP/1.1 401 Unauthorized"
+2026-04-09 06:31:21,095 WARNING [scraper.tiktok_research_api] TikTok Research API error 401: {"error":{"code":"access_token_invalid","message":"The access token is invalid or not found in the request.","log_id":"202604082331204278ED709D26D6355CA3"},"data":{}}
+2026-04-09 06:31:21,096 INFO [scraper.tiktok_research_api] [TikTok Research] niche=fitness hashtag=gymlife → 0 videos
+2026-04-09 06:31:22,631 INFO [httpx] HTTP Request: POST https://open.tiktokapis.com/v2/research/video/query/ "HTTP/1.1 401 Unauthorized"
+2026-04-09 06:31:22,632 WARNING [scraper.tiktok_research_api] TikTok Research API error 401: {"data":{},"error":{"code":"access_token_invalid","message":"The access token is invalid or not found in the request.","log_id":"202604082331220E7EDF8E933D2E311D53"}}
+2026-04-09 06:31:22,632 INFO [scraper.tiktok_research_api] [TikTok Research] niche=fitness hashtag=workout → 0 videos
+2026-04-09 06:31:24,576 INFO [httpx] HTTP Request: POST https://open.tiktokapis.com/v2/research/video/query/ "HTTP/1.1 401 Unauthorized"
+2026-04-09 06:31:24,577 WARNING [scraper.tiktok_research_api] TikTok Research API error 401: {"data":{},"error":{"code":"access_token_invalid","message":"The access token is invalid or not found in the request.","log_id":"20260408233124445B725384A49D31A111"}}
+2026-04-09 06:31:24,577 INFO [scraper.tiktok_research_api] [TikTok Research] niche=fitness hashtag=thehinh → 0 videos
+2026-04-09 06:31:26,114 INFO [httpx] HTTP Request: POST https://open.tiktokapis.com/v2/research/video/query/ "HTTP/1.1 401 Unauthorized"
+2026-04-09 06:31:26,115 WARNING [scraper.tiktok_research_api] TikTok Research API error 401: {"data":{},"error":{"code":"access_token_invalid","message":"The access token is invalid or not found in the request.","log_id":"202604082331251BC20BEB8211593036A0"}}
+2026-04-09 06:31:26,115 INFO [scraper.tiktok_research_api] [TikTok Research] niche=lifestyle hashtag=lifestyle → 0 videos
+2026-04-09 06:31:27,953 INFO [httpx] HTTP Request: POST https://open.tiktokapis.com/v2/research/video/query/ "HTTP/1.1 401 Unauthorized"
+2026-04-09 06:31:27,954 WARNING [scraper.tiktok_research_api] TikTok Research API error 401: {"data":{},"error":{"code":"access_token_invalid","message":"The access token is invalid or not found in the request.","log_id":"202604082331275BD7564E6AD5B230863D"}}
+2026-04-09 06:31:27,954 INFO [scraper.tiktok_research_api] [TikTok Research] niche=lifestyle hashtag=cuocsong → 0 videos
+2026-04-09 06:31:28,493 INFO [httpx] HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-04-09 06:31:28,494 WARNING [rag.script_writer] [ScriptWriter] Attempt 1 validation failed: ["scenes[0] missing keys: {'duration'}", 'scenes[0].duration must be > 0', "scenes[1] missing keys: {'duration'}"]
+2026-04-09 06:31:28,494 INFO [rag.llm_router] [LLMRouter] mode=local backend=ollama template=tiktok_viral
+2026-04-09 06:31:29,429 INFO [httpx] HTTP Request: POST https://open.tiktokapis.com/v2/research/video/query/ "HTTP/1.1 401 Unauthorized"
+2026-04-09 06:31:29,430 WARNING [scraper.tiktok_research_api] TikTok Research API error 401: {"data":{},"error":{"code":"access_token_invalid","message":"The access token is invalid or not found in the request.","log_id":"20260408233129B71C6F57E82F632B2EED"}}
+2026-04-09 06:31:29,430 INFO [scraper.tiktok_research_api] [TikTok Research] niche=lifestyle hashtag=dailyvlog → 0 videos
+2026-04-09 06:31:31,421 INFO [httpx] HTTP Request: POST https://open.tiktokapis.com/v2/research/video/query/ "HTTP/1.1 401 Unauthorized"
+2026-04-09 06:31:31,421 WARNING [scraper.tiktok_research_api] TikTok Research API error 401: {"data":{},"error":{"code":"access_token_invalid","message":"The access token is invalid or not found in the request.","log_id":"20260408233131C1AA2CDCB42815308610"}}
+2026-04-09 06:31:31,422 INFO [scraper.tiktok_research_api] [TikTok Research] niche=finance hashtag=taichinhcanhan → 0 videos
+2026-04-09 06:31:32,871 INFO [httpx] HTTP Request: POST https://open.tiktokapis.com/v2/research/video/query/ "HTTP/1.1 401 Unauthorized"
+2026-04-09 06:31:32,872 WARNING [scraper.tiktok_research_api] TikTok Research API error 401: {"data":{},"error":{"code":"access_token_invalid","message":"The access token is invalid or not found in the request.","log_id":"20260408233132A8856A1FCD87842FD049"}}
+2026-04-09 06:31:32,872 INFO [scraper.tiktok_research_api] [TikTok Research] niche=finance hashtag=dautu → 0 videos
+2026-04-09 06:31:34,341 INFO [httpx] HTTP Request: POST https://open.tiktokapis.com/v2/research/video/query/ "HTTP/1.1 401 Unauthorized"
+2026-04-09 06:31:34,342 WARNING [scraper.tiktok_research_api] TikTok Research API error 401: {"data":{},"error":{"code":"access_token_invalid","message":"The access token is invalid or not found in the request.","log_id":"20260408233134924EF593396D3131518B"}}
+2026-04-09 06:31:34,342 INFO [scraper.tiktok_research_api] [TikTok Research] niche=finance hashtag=finance → 0 videos
+2026-04-09 06:31:36,119 INFO [httpx] HTTP Request: POST https://open.tiktokapis.com/v2/research/video/query/ "HTTP/1.1 401 Unauthorized"
+2026-04-09 06:31:36,121 WARNING [scraper.tiktok_research_api] TikTok Research API error 401: {"data":{},"error":{"code":"access_token_invalid","message":"The access token is invalid or not found in the request.","log_id":"202604082331368538931068CBCB305833"}}
+2026-04-09 06:31:36,121 INFO [scraper.tiktok_research_api] [TikTok Research] niche=finance hashtag=money → 0 videos
+2026-04-09 06:31:37,597 INFO [httpx] HTTP Request: POST https://open.tiktokapis.com/v2/research/video/query/ "HTTP/1.1 401 Unauthorized"
+2026-04-09 06:31:37,598 WARNING [scraper.tiktok_research_api] TikTok Research API error 401: {"data":{},"error":{"code":"access_token_invalid","message":"The access token is invalid or not found in the request.","log_id":"2026040823313724AE5D78834796305FD5"}}
+2026-04-09 06:31:37,598 INFO [scraper.tiktok_research_api] [TikTok Research] niche=food hashtag=amthuc → 0 videos
+2026-04-09 06:31:39,414 INFO [httpx] HTTP Request: POST https://open.tiktokapis.com/v2/research/video/query/ "HTTP/1.1 401 Unauthorized"
+2026-04-09 06:31:39,415 WARNING [scraper.tiktok_research_api] TikTok Research API error 401: {"data":{},"error":{"code":"access_token_invalid","message":"The access token is invalid or not found in the request.","log_id":"20260408233139B0B52555D9D0D72FDDAD"}}
+2026-04-09 06:31:39,415 INFO [scraper.tiktok_research_api] [TikTok Research] niche=food hashtag=monan → 0 videos
+2026-04-09 06:31:40,842 INFO [httpx] HTTP Request: POST https://open.tiktokapis.com/v2/research/video/query/ "HTTP/1.1 401 Unauthorized"
+2026-04-09 06:31:40,843 WARNING [scraper.tiktok_research_api] TikTok Research API error 401: {"data":{},"error":{"code":"access_token_invalid","message":"The access token is invalid or not found in the request.","log_id":"2026040823314057D7B1E96E0F1030A389"}}
+2026-04-09 06:31:40,843 INFO [scraper.tiktok_research_api] [TikTok Research] niche=food hashtag=food → 0 videos
+2026-04-09 06:31:42,394 INFO [httpx] HTTP Request: POST https://open.tiktokapis.com/v2/research/video/query/ "HTTP/1.1 401 Unauthorized"
+2026-04-09 06:31:42,394 WARNING [scraper.tiktok_research_api] TikTok Research API error 401: {"data":{},"error":{"code":"access_token_invalid","message":"The access token is invalid or not found in the request.","log_id":"202604082331421D37EBC661CF1030950B"}}
+2026-04-09 06:31:42,394 INFO [scraper.tiktok_research_api] [TikTok Research] niche=food hashtag=cooking → 0 videos
+2026-04-09 06:31:43,395 INFO [scraper.main] [Scraper] tiktok_research → 0 new videos
+2026-04-09 06:31:43,395 INFO [scraper.main] [Scraper] Running source: tiktok_playwright
+2026-04-09 06:31:55,818 INFO [httpx] HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-04-09 06:31:55,825 WARNING [rag.script_writer] [ScriptWriter] Attempt 2 validation failed: ["scenes[2].type 'solution' not in {'hook', 'outro', 'body', 'proof', 'transition', 'cta', 'intro'}", "scenes[3].type 'solution' not in {'hook', 'outro', 'body', 'proof', 'transition', 'cta', 'intro'}", "scenes[4].type 'solution' not in {'hook', 'outro', 'body', 'proof', 'transition', 'cta', 'intro'}"]
+2026-04-09 06:31:55,825 INFO [rag.llm_router] [LLMRouter] mode=local backend=ollama template=tiktok_viral
+2026-04-09 06:31:59,346 INFO [scraper.tiktok_playwright] [Playwright] https://www.tiktok.com/explore → 0 items
+2026-04-09 06:32:16,229 INFO [scraper.tiktok_playwright] [Playwright] https://www.tiktok.com/tag/suckhoe → 0 items
+2026-04-09 06:32:22,659 INFO [httpx] HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2026-04-09 06:32:22,660 WARNING [rag.script_writer] [ScriptWriter] Attempt 3 validation failed: ["scenes[0] missing keys: {'duration'}", 'scenes[0].duration must be > 0', "scenes[1] missing keys: {'duration'}"]
+2026-04-09 06:32:22,660 ERROR [rag.script_writer] [ScriptWriter] All 3 attempts failed. Last errors: ["scenes[0] missing keys: {'duration'}", 'scenes[0].duration must be > 0', "scenes[1] missing keys: {'duration'}", 'scenes[1].duration must be > 0', "scenes[2] missing keys: {'duration'}", "scenes[2].type 'solution' not in {'hook', 'outro', 'body', 'proof', 'transition', 'cta', 'intro'}", 'scenes[2].duration must be > 0', "scenes[3] missing keys: {'duration'}", "scenes[3].type 'solution' not in {'hook', 'outro', 'body', 'proof', 'transition', 'cta', 'intro'}", 'scenes[3].duration must be > 0', "scenes[4] missing keys: {'duration'}", "scenes[4].type 'solution' not in {'hook', 'outro', 'body', 'proof', 'transition', 'cta', 'intro'}", 'scenes[4].duration must be > 0', "scenes[5] missing keys: {'duration'}", 'scenes[5].duration must be > 0', "scenes[6] missing keys: {'narration', 'visual_hint'}", 'scenes[6].narration is empty', 'scenes[6].visual_hint is empty', "scenes[7] missing keys: {'duration'}", 'scenes[7].duration must be > 0', 'Total duration 2.0s too short (min 20s)']
+2026-04-09 06:32:22,663 ERROR [daily_pipeline] [Pipeline] Script generation failed for 'Bài tập giảm cân hiệu quả tại nhà': Foreign key associated with column 'generated_scripts.edited_by' could not find table 'console_users' with which to generate a foreign key to target column 'id'
+2026-04-09 06:32:22,663 INFO [daily_pipeline] [Pipeline] Daily run complete: {'started_at': '2026-04-08T23:27:09.429293+00:00', 'errors': ["Script generation failed for '5 thói quen buổi sáng giúp bạn thành công': Foreign key associated with column 'generated_scripts.edited_by' could not find table 'console_users' with which to generate a foreign key to target column 'id'", "Script generation failed for 'Bí quyết tiết kiệm 10 triệu mỗi tháng': Foreign key associated with column 'generated_scripts.edited_by' could not find table 'console_users' with which to generate a foreign key to target column 'id'", "Script generation failed for 'Bài tập giảm cân hiệu quả tại nhà': Foreign key associated with column 'generated_scripts.edited_by' could not find table 'console_users' with which to generate a foreign key to target column 'id'"], 'steps': {'scrape': {'sources_run': 3, 'videos_inserted': 0, 'inserted_ids': [], 'errors': []}, 'generate': {'scripts_created': 0, 'script_ids': []}, 'produce': {'produced': 0, 'failed': 0, 'script_ids': []}}, 'completed_at': '2026-04-08T23:32:22.663466+00:00', 'duration_s': 313.234199}
+2026-04-09 06:32:22,663 INFO [batch_runner] ────────────────────────────────────────
+2026-04-09 06:32:22,663 INFO [batch_runner] PIPELINE SUMMARY
+2026-04-09 06:32:22,663 INFO [batch_runner] ────────────────────────────────────────
+2026-04-09 06:32:22,663 INFO [batch_runner]   Scrape: 0 new videos
+2026-04-09 06:32:22,664 INFO [batch_runner]   Generate: 0 scripts
+2026-04-09 06:32:22,664 INFO [batch_runner]   Produce: 0 videos (failed: 0)
+2026-04-09 06:32:22,664 INFO [batch_runner]   Duration: 313.2s
+2026-04-09 06:32:22,664 WARNING [batch_runner]   Errors (3):
+2026-04-09 06:32:22,664 WARNING [batch_runner]     - Script generation failed for '5 thói quen buổi sáng giúp bạn thành công': Foreign key associated with column 'generated_scripts.edited_by' could not find table 'console_users' with which to generate a foreign key to target column 'id'
+2026-04-09 06:32:22,664 WARNING [batch_runner]     - Script generation failed for 'Bí quyết tiết kiệm 10 triệu mỗi tháng': Foreign key associated with column 'generated_scripts.edited_by' could not find table 'console_users' with which to generate a foreign key to target column 'id'
+2026-04-09 06:32:22,664 WARNING [batch_runner]     - Script generation failed for 'Bài tập giảm cân hiệu quả tại nhà': Foreign key associated with column 'generated_scripts.edited_by' could not find table 'console_users' with which to generate a foreign key to target column 'id'
+2026-04-09 06:32:22,664 INFO [batch_runner] ────────────────────────────────────────
+2026-04-09 06:32:31,344 INFO [scraper.tiktok_playwright] [Playwright] https://www.tiktok.com/tag/fitness → 0 items
+2026-04-09 06:32:45,875 INFO [scraper.tiktok_playwright] [Playwright] https://www.tiktok.com/tag/lifestyle → 0 items
+2026-04-09 06:33:02,289 INFO [scraper.tiktok_playwright] [Playwright] https://www.tiktok.com/tag/taichinhcanhan → 0 items
+2026-04-09 06:33:04,294 INFO [scraper.main] [Scraper] tiktok_playwright → 0 new videos
+2026-04-09 06:33:04,300 INFO [scraper.main] [Scraper] Running source: tiktok_apify
+2026-04-09 06:33:05,546 INFO [httpx] HTTP Request: POST https://api.apify.com/v2/acts/GdWCkxBtKWOsKjdch/runs?timeout=300 "HTTP/1.1 403 Forbidden"
+2026-04-09 06:33:05,547 ERROR [scraper.apify_scraper] [Apify] actor run failed: Monthly usage hard limit exceeded
+2026-04-09 06:33:05,548 INFO [scraper.apify_scraper] [Apify] scraped 0 videos across 17 hashtags
+2026-04-09 06:33:05,548 INFO [scraper.main] [Scraper] tiktok_apify → 0 new videos
+2026-04-09 06:33:05,548 INFO [batch_runner] Scrape complete: {'sources_run': 3, 'videos_inserted': 0, 'inserted_ids': [], 'errors': []}

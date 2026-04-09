@@ -20,6 +20,7 @@ def refresh_expiring_tokens():
     errors = 0
 
     try:
+        settings.validate_fernet_key()
         soon = datetime.now(timezone.utc) + timedelta(hours=1)
         expiring = (
             db.query(PlatformCredential)

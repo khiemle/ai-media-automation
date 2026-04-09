@@ -19,6 +19,34 @@ else
   exit 1
 fi
 
+# Validate Fernet key early so OAuth/token refresh paths don't fail later at runtime.
+if [ -z "$FERNET_KEY" ]; then
+  echo ""
+  echo "❌  FERNET_KEY is not set in console/.env"
+  echo ""
+  echo "   Generate one with:"
+  echo "     python3 -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'"
+  echo ""
+  echo "   Then set FERNET_KEY in console/.env and re-run: ./console/start.sh"
+  exit 1
+fi
+
+if ! python3 - <<'PY' >/dev/null 2>&1
+from cryptography.fernet import Fernet
+import os
+Fernet(os.environ["FERNET_KEY"].encode())
+PY
+then
+  echo ""
+  echo "❌  FERNET_KEY in console/.env is invalid"
+  echo ""
+  echo "   It must be a Fernet-generated url-safe base64 key. Generate one with:"
+  echo "     python3 -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'"
+  echo ""
+  echo "   Then update console/.env and re-run: ./console/start.sh"
+  exit 1
+fi
+
 # 2. Check PostgreSQL is installed and running
 echo "🔄  Checking PostgreSQL..."
 

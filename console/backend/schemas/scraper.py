@@ -31,7 +31,7 @@ class ScrapedVideoResponse(BaseModel):
 
 
 class TriggerScrapeRequest(BaseModel):
-    source_id: str
+    source_id: str | None = None
 
 
 class IndexVideosRequest(BaseModel):

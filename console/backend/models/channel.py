@@ -2,6 +2,7 @@ from datetime import datetime
 from sqlalchemy import Integer, String, Boolean, DateTime, ForeignKey, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from console.backend.database import Base
+from console.backend.models.credentials import PlatformCredential
 
 
 class Channel(Base):
@@ -20,7 +21,7 @@ class Channel(Base):
     video_count: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    credential = relationship("PlatformCredential", foreign_keys=[credential_id])
+    credential = relationship(PlatformCredential, foreign_keys=[credential_id])
 
 
 class TemplateChannelDefault(Base):

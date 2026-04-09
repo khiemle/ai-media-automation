@@ -156,11 +156,8 @@ class ProductionService:
         return result.id
 
     def generate_scene_veo(self, script_id: int, scene_index: int) -> str:
-        """Dispatch Veo video generation Celery task, return task_id."""
-        from console.backend.tasks.production_tasks import render_video_task
-
-        result = render_video_task.delay(script_id)
-        return result.id
+        """Veo scene generation is not wired yet for the console."""
+        raise NotImplementedError("Scene-level Veo generation is not integrated yet")
 
     def start_production(self, script_id: int, user_id: int) -> str:
         """Validate script status, set to 'producing', create a job, dispatch render task."""

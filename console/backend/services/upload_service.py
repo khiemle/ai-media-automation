@@ -1,12 +1,12 @@
 """UploadService — list production videos, manage targets, dispatch upload tasks."""
 import math
 import logging
-from datetime import datetime, timezone
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from console.backend.models.channel import Channel, TemplateChannelDefault, UploadTarget
+from console.backend.models.pipeline_job import PipelineJob
 from console.backend.schemas.common import PaginatedResponse
 
 logger = logging.getLogger(__name__)
@@ -161,6 +161,17 @@ class UploadService:
 
     def trigger_upload(self, video_id: str) -> list[str]:
         """Dispatch Celery upload tasks for all pending targets. Returns task IDs."""
+        video_row = self.db.execute(
+            text("SELECT id, status, output_path FROM generated_scripts WHERE id = :id"),
+            {"id": video_id},
+        ).fetchone()
+        if not video_row:
+            raise KeyError(f"Video {video_id} not found")
+        if video_row.status != "completed":
+            raise ValueError(f"Video {video_id} is not ready for upload (status: {video_row.status})")
+        if not video_row.output_path:
+            raise ValueError(f"Video {video_id} has no rendered output yet")
+
         targets = (
             self.db.query(UploadTarget, Channel)
             .join(Channel, UploadTarget.channel_id == Channel.id)
@@ -175,7 +186,21 @@ class UploadService:
         for ut, ch in targets:
             try:
                 from console.backend.tasks.upload_tasks import upload_to_channel_task
+                job = PipelineJob(
+                    job_type="upload",
+                    status="queued",
+                    script_id=int(video_id) if str(video_id).isdigit() else None,
+                    details={
+                        "channel_id": ch.id,
+                        "platform": ch.platform,
+                        "step": "queued",
+                    },
+                )
+                self.db.add(job)
+                self.db.flush()
+
                 result = upload_to_channel_task.delay(str(video_id), ch.id)
+                job.celery_task_id = result.id
                 ut.status = "uploading"
                 task_ids.append(result.id)
                 logger.info(f"Queued upload: video={video_id} → channel={ch.id} ({ch.platform}), task={result.id}")
@@ -187,12 +212,14 @@ class UploadService:
 
     def upload_all_ready(self) -> int:
         """Trigger uploads for all completed videos with pending targets."""
-        rows = (
-            self.db.query(UploadTarget.video_id)
-            .filter(UploadTarget.status == "pending")
-            .distinct()
-            .all()
-        )
+        rows = self.db.execute(
+            text(
+                "SELECT DISTINCT ut.video_id "
+                "FROM upload_targets ut "
+                "JOIN generated_scripts gs ON gs.id::text = ut.video_id "
+                "WHERE ut.status = 'pending' AND gs.status = 'completed' AND gs.output_path IS NOT NULL"
+            )
+        ).fetchall()
         count = 0
         for (video_id,) in rows:
             task_ids = self.trigger_upload(video_id)

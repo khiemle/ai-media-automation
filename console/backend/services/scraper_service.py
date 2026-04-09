@@ -1,8 +1,9 @@
 import math
 from pathlib import Path
+from datetime import datetime, timezone
 
 import yaml
-from sqlalchemy import func, and_
+from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
 from console.backend.schemas.common import PaginatedResponse
@@ -44,8 +45,14 @@ class ScraperService:
                 return ScraperSourceResponse(**s)
         raise KeyError(f"Source '{source_id}' not found")
 
-    def trigger_scrape(self, source_id: str) -> str:
+    def trigger_scrape(self, source_id: str | None = None) -> str:
         """Dispatch a Celery scrape task and return its task ID."""
+        if not source_id:
+            active_source = next((s for s in _load_sources() if s.get("status") == "active" and s.get("module") and s.get("function")), None)
+            if not active_source:
+                raise ValueError("No active scraper source is configured")
+            source_id = active_source["id"]
+
         from console.backend.tasks.scraper_tasks import run_scrape_task
         task = run_scrape_task.delay(source_id)
         return task.id
@@ -74,7 +81,7 @@ class ScraperService:
         if region:
             filters.append(ViralVideo.region == region)
         if source:
-            filters.append(ViralVideo.platform == source)
+            filters.append(ViralVideo.source == source)
 
         query = self.db.query(ViralVideo)
         if filters:
@@ -96,8 +103,24 @@ class ScraperService:
         offset = (page - 1) * per_page
         rows = query.offset(offset).limit(per_page).all()
 
+        items = [
+            ScrapedVideoResponse.model_validate({
+                "id": str(r.id),
+                "platform": r.source,
+                "region": r.region,
+                "niche": r.niche,
+                "play_count": r.play_count,
+                "engagement_rate": r.engagement_rate,
+                "hook_text": r.hook_text,
+                "script_text": None,
+                "is_indexed": bool(r.indexed_at),
+                "scraped_at": r.scraped_at,
+            })
+            for r in rows
+        ]
+
         return PaginatedResponse(
-            items=[ScrapedVideoResponse.model_validate(r) for r in rows],
+            items=items,
             total=total,
             page=page,
             pages=math.ceil(total / per_page) if per_page else 1,
@@ -116,7 +139,7 @@ class ScraperService:
             index_videos(video_ids)
             self.db.query(ViralVideo).filter(
                 ViralVideo.id.in_(video_ids)
-            ).update({"is_indexed": True}, synchronize_session=False)
+            ).update({"indexed_at": datetime.now(timezone.utc)}, synchronize_session=False)
             self.db.commit()
             return len(video_ids)
         except Exception as e:

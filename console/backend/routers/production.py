@@ -108,8 +108,11 @@ def generate_scene_veo(
     _user=Depends(require_editor_or_admin),
 ):
     svc = ProductionService(db)
-    task_id = svc.generate_scene_veo(script_id, scene_index)
-    return {"task_id": task_id}
+    try:
+        task_id = svc.generate_scene_veo(script_id, scene_index)
+        return {"task_id": task_id}
+    except NotImplementedError as e:
+        raise HTTPException(status_code=501, detail=str(e))
 
 
 # ── Start production ──────────────────────────────────────────────────────────

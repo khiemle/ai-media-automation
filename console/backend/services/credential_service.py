@@ -35,6 +35,7 @@ PLATFORM_DEFAULTS = {
 
 
 def _fernet() -> Fernet:
+    settings.validate_fernet_key()
     return Fernet(settings.FERNET_KEY.encode())
 
 

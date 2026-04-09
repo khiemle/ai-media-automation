@@ -1,4 +1,4 @@
-# AI Media Management Console — Claude Code Context
+# AI Media Automation — Claude Code Context
 
 > This file is read automatically by Claude Code on every session.
 > It gives full project context so development can continue without re-explanation.
@@ -7,12 +7,15 @@
 
 ## What This Project Is
 
-A **web-based Management Console** layered on top of an existing AI media automation pipeline (`ai_media_company/`). The core pipeline already scrapes TikTok trends, generates scripts via LLM, produces videos, and uploads them automatically. This console adds a human control layer — editors can curate content, review scripts, edit scenes, manage upload channels, and monitor the pipeline in real time.
+A fully automated AI media pipeline with a **web-based Management Console** as the human control layer. Editors can curate content, review scripts, edit scenes, manage upload channels, and monitor the pipeline in real time.
 
-**Stack:** FastAPI (Python 3.11+) backend · React 18 + Vite + Tailwind CSS frontend · PostgreSQL (shared with core pipeline) · Celery + Redis task queue
+**Status (April 2026):**
+- **Management Console** (all 8 tabs) — complete ✅
+- **Core Pipeline** (scraper → RAG → production → upload → feedback) — complete ✅
 
-**Team:** 1 engineer + 1 business user  
-**Target:** 4-week build (Sprint 1 complete as of April 2026)
+**Stack:** FastAPI (Python 3.11+) backend · React 18 + Vite + Tailwind CSS frontend · PostgreSQL · Celery + Redis · Ollama/Qwen2.5 (local LLM) · Gemini 2.5 Flash (cloud LLM) · Kokoro ONNX (TTS) · ChromaDB (vector search) · MoviePy + ffmpeg (video)
+
+**Team:** 1 engineer + 1 business user
 
 ---
 
@@ -43,6 +46,40 @@ open http://localhost:8080/docs
 cd console/backend
 alembic upgrade head
 ```
+
+### Core Pipeline
+
+```bash
+# Install pipeline dependencies
+pip install -r requirements.pipeline.txt
+
+# First-time setup (ChromaDB collections)
+python3 database/setup_chromadb.py
+
+# Run migrations
+cd console/backend && alembic upgrade head && cd ../..
+
+# Start pipeline worker (render queue)
+./pipeline_start.sh
+
+# Run full daily pipeline
+python3 batch_runner.py --run-now
+
+# Dry-run (no LLM/render/upload)
+python3 batch_runner.py --run-now --dry-run
+
+# Verify LLM setup
+python3 -c "
+from rag.llm_router import LLMRouter
+r = LLMRouter(mode='local')
+print('Ollama up:', r.is_ollama_available())
+print('Model:', r.status()['ollama_model'])
+print('Gemini key:', r.status()['gemini_key_set'])
+"
+```
+
+See `guideline/01_install_ollama.md` for Ollama setup.  
+Set API keys in `pipeline.env` (copy from `pipeline.env.example`).
 
 ---
 
@@ -124,15 +161,65 @@ ai-media-automation/
 │               └── ScriptsPage.jsx    ← Status tabs · Bulk approve/reject · Script editor modal
 │
 ├── config/
-│   └── scraper_sources.yaml           ← Scraper source registry (read/written by ScraperService)
+│   ├── scraper_sources.yaml           ← Scraper source registry (read/written by ScraperService)
+│   └── pipeline_config.yaml           ← All pipeline runtime settings (niches, LLM, TTS, upload)
 │
-├── scraper/                           ← EXISTING core pipeline (do not modify)
-├── rag/                               ← EXISTING core pipeline (do not modify)
-├── pipeline/                          ← EXISTING core pipeline (do not modify)
-├── uploader/                          ← EXISTING core pipeline (do not modify)
-├── feedback/                          ← EXISTING core pipeline (do not modify)
-├── database/                          ← EXISTING — models.py has ViralVideo, GeneratedScript, etc.
-└── batch_runner.py                    ← EXISTING — runs unchanged alongside the console
+├── database/
+│   ├── models.py                      ← ViralVideo, GeneratedScript, VideoAsset, ViralPattern
+│   ├── connection.py                  ← engine + SessionLocal + get_session()
+│   └── setup_chromadb.py             ← creates 3 ChromaDB collections (run once)
+│
+├── scraper/
+│   ├── base_scraper.py               ← ScrapedVideo dataclass + BaseScraper abstract class
+│   ├── tiktok_research_api.py        ← TikTok Research API adapter
+│   ├── tiktok_playwright.py          ← Playwright headless scraper
+│   ├── apify_scraper.py              ← Apify cloud scraper
+│   ├── trend_analyzer.py             ← extracts patterns → viral_patterns table
+│   └── main.py                       ← run_scrape() orchestrator
+│
+├── vector_db/
+│   ├── indexer.py                    ← embed + upsert into ChromaDB
+│   └── retriever.py                  ← semantic search (scripts / hooks / patterns)
+│
+├── rag/
+│   ├── llm_router.py                 ← local/gemini/auto/hybrid dispatch
+│   ├── rate_limiter.py               ← RPD/RPM tracking with Redis fallback
+│   ├── prompt_builder.py             ← RAG-enriched prompt assembly
+│   ├── script_writer.py              ← generate_script() / regenerate_scene()
+│   └── script_validator.py           ← JSON schema validation + fix_and_normalize()
+│
+├── pipeline/
+│   ├── tts_engine.py                 ← Kokoro ONNX TTS → 44.1kHz WAV
+│   ├── asset_db.py                   ← VideoAsset CRUD + keyword-match search
+│   ├── asset_resolver.py             ← 3-tier: DB → Pexels → Veo
+│   ├── pexels_client.py              ← Pexels portrait video download + crop
+│   ├── veo_client.py                 ← Google Veo 8s segment generation
+│   ├── veo_prompt_builder.py         ← per-niche Veo style directives
+│   ├── overlay_builder.py            ← Pillow text overlay → PNG
+│   ├── caption_gen.py                ← Whisper base → SRT subtitles
+│   ├── composer.py                   ← MoviePy scene assembly → raw_video.mp4
+│   ├── renderer.py                   ← ffmpeg NVENC → video_final.mp4
+│   └── quality_validator.py          ← duration/codec/resolution/audio checks
+│
+├── uploader/
+│   ├── youtube_uploader.py           ← YouTube Data API v3 resumable upload
+│   ├── tiktok_uploader.py            ← TikTok Content Posting API v2
+│   └── scheduler.py                  ← peak-hour scheduling + upload_targets rows
+│
+├── feedback/
+│   ├── tracker.py                    ← fetch real metrics from YouTube/TikTok APIs
+│   ├── scorer.py                     ← compute quality score 0-100
+│   └── reindexer.py                  ← reindex top performers into ChromaDB
+│
+├── guideline/
+│   └── 01_install_ollama.md          ← Ollama + Qwen2.5 setup guide
+│
+├── pipeline.env.example              ← template — copy to pipeline.env
+├── pipeline.env                      ← GEMINI_API_KEY, GEMINI_MEDIA_API_KEY, PEXELS_API_KEY, etc.
+├── requirements.pipeline.txt         ← pip deps for core pipeline
+├── pipeline_start.sh                 ← starts Celery render worker + checks prerequisites
+├── batch_runner.py                   ← cron entry point (--run-now / --dry-run / --scrape-only)
+└── daily_pipeline.py                 ← orchestrates full daily run
 ```
 
 ---

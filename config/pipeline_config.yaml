@@ -1,0 +1,87 @@
+# ─────────────────────────────────────────────────────────
+#  AI Media Automation — Pipeline Configuration
+#  All runtime-tunable settings. Override via pipeline.env.
+# ─────────────────────────────────────────────────────────
+
+# ── Daily Pipeline ────────────────────────────────────────
+pipeline:
+  enabled: true
+  daily_video_target: 10     # videos to produce per day
+  niches:
+    - health
+    - fitness
+    - lifestyle
+    - finance
+  default_template: tiktok_viral
+  default_region: vn
+
+# ── Scraper ───────────────────────────────────────────────
+scraper:
+  enabled: true
+  run_time: "01:00"           # daily at 01:00 Vietnam time
+  sources:
+    - tiktok_research
+    - tiktok_playwright
+  min_play_count: 10000       # minimum views to consider a video
+  max_videos_per_source: 100
+
+# ── LLM ──────────────────────────────────────────────────
+llm:
+  mode: auto                  # local | gemini | auto | hybrid
+  ollama_model: qwen2.5:3b   # for local testing (switch to 7b for prod)
+  gemini_model: gemini-2.5-flash
+  max_retries: 3
+
+# ── Asset Resolver ────────────────────────────────────────
+assets:
+  resolver_mode: db_then_hybrid
+  db_min_score: 0.72
+  veo_model: veo-3.1-lite-generate-preview   # for testing
+  imagen_model: imagen-4.0-fast-generate-001
+  hybrid_rules:
+    hook: veo
+    cta: veo
+    body: pexels
+    transition: pexels
+
+# ── TTS ──────────────────────────────────────────────────
+tts:
+  engine: kokoro
+  model: kokoro.onnx
+  voice: af_heart
+  speed: 1.1
+  sample_rate: 44100
+
+# ── Video Production ─────────────────────────────────────
+production:
+  target_width: 1080
+  target_height: 1920
+  target_fps: 30
+  render_workers: 2           # GPU-bound, keep low
+  music_volume: 0.08
+
+# ── Upload Schedule (Vietnam time UTC+7) ─────────────────
+upload:
+  youtube:
+    peak_hours:
+      - [8, 10]
+      - [17, 20]
+  tiktok:
+    peak_hours:
+      - [7, 9]
+      - [19, 22]
+
+# ── Feedback Loop ────────────────────────────────────────
+feedback:
+  tracker_time: "06:00"
+  reindex_threshold: 70       # score ≥ 70 → index as high quality
+  low_quality_threshold: 40   # score < 40 → remove from ChromaDB
+  min_views_for_scoring: 1000
+
+# ── Cron Schedule ────────────────────────────────────────
+cron:
+  scrape:   "0 1 * * *"       # 01:00 daily
+  pipeline: "0 2 * * *"       # 02:00 daily
+  feedback: "0 6 * * *"       # 06:00 daily
+  reindex:  "0 7 * * *"       # 07:00 daily
+  token_refresh: "*/30 * * * *"  # every 30 minutes

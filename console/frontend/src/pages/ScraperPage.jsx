@@ -70,8 +70,20 @@ export default function ScraperPage() {
     setScraping(true)
     try {
       const activeSource = sources.find(s => s.status === 'active')
-      await scraperApi.triggerScrape(sourceId || activeSource?.id)
+      const targetSourceId = sourceId || activeSource?.id || null
+      if (!targetSourceId) {
+        throw new Error('No active scraper source is configured')
+      }
+
+      await scraperApi.triggerScrape(targetSourceId)
       showToast('Scrape queued — results will appear shortly', 'info')
+      refetchSources()
+      window.setTimeout(() => {
+        refetchVideos()
+      }, 2000)
+      window.setTimeout(() => {
+        refetchVideos()
+      }, 7000)
     } catch (e) {
       showToast(e.message, 'error')
     } finally {

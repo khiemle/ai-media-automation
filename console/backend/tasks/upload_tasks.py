@@ -1,5 +1,6 @@
 import logging
 from console.backend.celery_app import celery_app
+from console.backend.tasks.job_tracking import mark_job_completed, mark_job_failed, mark_job_progress
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,17 @@ def upload_to_channel_task(self, video_id: str, channel_id: int):
     self.update_state(state="PROGRESS", meta={"step": "uploading", "channel_id": channel_id})
     db = SessionLocal()
     try:
+        task_id = self.request.id
+        script_id = int(video_id) if str(video_id).isdigit() else None
+        mark_job_progress(
+            db,
+            task_id=task_id,
+            job_type="upload",
+            script_id=script_id,
+            progress=15,
+            details={"step": "loading", "channel_id": channel_id},
+        )
+
         target = db.query(UploadTarget).filter(
             UploadTarget.video_id == video_id,
             UploadTarget.channel_id == channel_id,
@@ -43,9 +55,26 @@ def upload_to_channel_task(self, video_id: str, channel_id: int):
         script = db.query(GeneratedScript).filter(GeneratedScript.id == video_id).first()
         video_meta = script.script_json.get("video", {}) if script else {}
         video_path = script.output_path if script and hasattr(script, "output_path") else None
+        if not script:
+            raise ValueError(f"Rendered script not found for video {video_id}")
+        if not video_path:
+            raise ValueError(f"Rendered output path missing for video {video_id}")
 
         target.status = "uploading"
         db.commit()
+        mark_job_progress(
+            db,
+            task_id=task_id,
+            job_type="upload",
+            script_id=script_id,
+            progress=55,
+            details={
+                "step": "uploading",
+                "channel_id": channel_id,
+                "platform": channel.platform,
+                "output_path": str(video_path),
+            },
+        )
 
         # Dispatch to the right uploader
         platform_id = None
@@ -55,12 +84,27 @@ def upload_to_channel_task(self, video_id: str, channel_id: int):
         elif channel.platform == "tiktok":
             from uploader.tiktok_uploader import upload_to_tiktok
             platform_id = upload_to_tiktok(video_path, video_meta, credentials_dict)
+        else:
+            raise ValueError(f"Unsupported upload platform: {channel.platform}")
 
         from datetime import datetime, timezone
         target.status = "published"
         target.uploaded_at = datetime.now(timezone.utc)
         target.platform_id = platform_id
         db.commit()
+        mark_job_completed(
+            db,
+            task_id=task_id,
+            job_type="upload",
+            script_id=script_id,
+            details={
+                "step": "published",
+                "channel_id": channel_id,
+                "platform": channel.platform,
+                "platform_id": platform_id,
+                "output_path": str(video_path),
+            },
+        )
 
         logger.info(f"Upload complete: video={video_id} → channel={channel_id} ({platform_id})")
         return {"video_id": video_id, "channel_id": channel_id, "platform_id": platform_id}
@@ -73,6 +117,14 @@ def upload_to_channel_task(self, video_id: str, channel_id: int):
         if target:
             target.status = "failed"
             db.commit()
+        mark_job_failed(
+            db,
+            task_id=self.request.id,
+            job_type="upload",
+            script_id=int(video_id) if str(video_id).isdigit() else None,
+            error=str(e),
+            details={"step": "uploading", "channel_id": channel_id},
+        )
         raise
     finally:
         db.close()

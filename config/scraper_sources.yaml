@@ -4,21 +4,21 @@ sources:
     type: tiktok
     module: scraper.tiktok_research_api
     function: scrape
-    status: active
+    status: planned
 
   - id: tiktok_playwright
     name: "TikTok Playwright"
     type: tiktok
     module: scraper.tiktok_playwright
     function: scrape
-    status: standby
+    status: active
 
   - id: tiktok_apify
     name: "TikTok Apify"
     type: tiktok
     module: scraper.apify_scraper
     function: scrape
-    status: standby
+    status: planned
 
   - id: youtube_trending
     name: "YouTube Trending"

@@ -1,0 +1,40 @@
+# AI Media Automation — Core Pipeline Dependencies
+# Install with: pip install -r requirements.pipeline.txt
+#
+# NOTE: Also install the console deps first:
+#   pip install -r console/requirements.txt
+
+# ── LLM + AI ──────────────────────────────────────────────
+google-genai>=1.0.0                 # Gemini API + Veo video generation (new SDK)
+httpx==0.27.0                       # Ollama local API calls (already in console)
+
+# ── Embeddings (ChromaDB + RAG) ───────────────────────────
+chromadb>=0.6.0                     # Vector DB — 0.6+ supports numpy 2.x
+sentence-transformers>=3.0.1        # vietnamese-sbert embeddings
+
+# ── Scraper ────────────────────────────────────────────────
+playwright==1.44.0                  # TikTok headless browser scraper
+selenium>=4.21.0                    # Chromium fallback when Playwright extraction fails
+apify-client==1.7.1                 # Apify cloud scraper fallback
+
+# ── TTS ────────────────────────────────────────────────────
+kokoro-onnx==0.4.0                  # Kokoro TTS ONNX inference (requires numpy>=2.0.2)
+onnxruntime>=1.18.0                 # ONNX runtime (CPU)
+soundfile>=0.12.1                   # WAV file read/write
+scipy>=1.13.0                       # Audio resampling (44.1kHz)
+numpy>=2.0.2                        # Required by kokoro-onnx 0.4.0
+
+# ── Captions ───────────────────────────────────────────────
+faster-whisper==1.0.3               # Whisper base → SRT subtitles (Python 3.12 compatible)
+
+# ── Video Production ──────────────────────────────────────
+moviepy==2.0.0                      # Scene composition + concatenation
+pillow>=10.3.0                      # Text overlay rendering (PIL)
+opencv-python>=4.9.0.80             # Video frame extraction + resize
+
+# ── Stock Footage ─────────────────────────────────────────
+requests>=2.31.0                    # HTTP downloads (Veo, Pexels streams)
+
+# ── Utilities ─────────────────────────────────────────────
+python-dotenv>=1.0.1                # Load pipeline.env (already in console)
+pyyaml>=6.0.1                       # pipeline_config.yaml (already in console)
