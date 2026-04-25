@@ -119,25 +119,8 @@ def _get_kokoro():
 
 
 def _normalize_text(text: str) -> str:
-    """Normalize Vietnamese text for natural TTS pronunciation."""
-    # Expand common abbreviations
-    replacements = {
-        "TP.HCM":     "Thành phố Hồ Chí Minh",
-        "TP.HN":      "Thành phố Hà Nội",
-        "&":          " và ",
-        "%":          " phần trăm",
-        "VND":        " đồng",
-        "USD":        " đô la Mỹ",
-        "k":          " nghìn",
-        "tr":         " triệu",
-        "tỷ":         " tỷ đồng",
-    }
-    for src, dst in replacements.items():
-        text = text.replace(src, dst)
-
-    # Normalize whitespace
-    text = re.sub(r"\s+", " ", text).strip()
-    return text
+    """Normalize text for Kokoro TTS (English)."""
+    return re.sub(r"\s+", " ", text).strip()
 
 
 def generate_tts(

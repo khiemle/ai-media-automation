@@ -30,13 +30,13 @@ def regenerate_tts_task(self, script_id: int, scene_index: int):
 
         scenes = script.script_json.get("scenes", [])
         scene = scenes[scene_index]
-        voice_cfg = script.script_json.get("video", {})
-
-        from pipeline.tts_engine import generate_tts
+        meta = script.script_json.get("meta", {})
+        from pipeline.tts_router import generate_tts
         audio_path = generate_tts(
             text=scene.get("narration", ""),
-            voice=voice_cfg.get("voice", "af_heart"),
-            speed=voice_cfg.get("voice_speed", 1.0),
+            voice_id=meta.get("voice", "af_heart"),
+            speed=meta.get("voice_speed", 1.0),
+            language=meta.get("language", "vietnamese"),
         )
         scene["audio_path"] = str(audio_path)
         scenes[scene_index] = scene

@@ -90,11 +90,12 @@ def _process_scene(scene: dict, meta: dict, out_dir: Path, idx: int) -> dict:
     # 1. TTS
     audio_path = out_dir / f"audio_{idx}.wav"
     try:
-        from pipeline.tts_engine import generate_tts
+        from pipeline.tts_router import generate_tts
         generate_tts(
             text=scene.get("narration", ""),
-            voice=meta.get("voice", "af_heart"),
+            voice_id=meta.get("voice", "af_heart"),
             speed=float(meta.get("voice_speed", 1.1)),
+            language=meta.get("language", "vietnamese"),
             output_path=str(audio_path),
         )
     except Exception as e:
@@ -198,7 +199,7 @@ def _assemble(
         raise ValueError("No scenes could be composed")
 
     # Concatenate all scenes
-    final = concatenate_videoclips(composed_clips, method="compose")
+    final = concatenate_videoclips(composed_clips, method="chain")
 
     # Mix background music (if available)
     music_track = _select_music(meta.get("mood", "uplifting"), meta.get("niche", "lifestyle"), final.duration)
