@@ -18,18 +18,19 @@ SAMPLE_RATE            = 44100  # pcm_44100 output
 
 def _normalize_text(text: str) -> str:
     """Expand Vietnamese abbreviations for natural TTS pronunciation."""
-    replacements = {
+    simple_replacements = {
         "TP.HCM":  "Thành phố Hồ Chí Minh",
         "TP.HN":   "Thành phố Hà Nội",
         "&":       " và ",
         "%":       " phần trăm",
         "VND":     " đồng",
         "USD":     " đô la Mỹ",
-        "k":       " nghìn",
-        "tr":      " triệu",
     }
-    for src, dst in replacements.items():
+    for src, dst in simple_replacements.items():
         text = text.replace(src, dst)
+    # Word-boundary replacements to avoid mangling "ok" → "o nghìn", "trong" → "t triệu", etc.
+    text = re.sub(r'\bk\b', ' nghìn', text)
+    text = re.sub(r'\btr\b', ' triệu', text)
     return re.sub(r"\s+", " ", text).strip()
 
 
@@ -43,9 +44,12 @@ def generate_tts_elevenlabs(
     Generate WAV audio from text using ElevenLabs.
     Raises RuntimeError on any failure.
     """
-    api_key = ELEVENLABS_API_KEY
+    api_key = os.environ.get("ELEVENLABS_API_KEY", "")  # read dynamically, not from import-time constant
     if not api_key:
         raise RuntimeError("ELEVENLABS_API_KEY is not set in .env")
+
+    if not voice_id:
+        raise RuntimeError("voice_id is required for ElevenLabs TTS")
 
     text = _normalize_text(text)
     if not text:
@@ -81,6 +85,10 @@ def generate_tts_elevenlabs(
 
     # PCM_44100 = signed 16-bit little-endian, mono
     pcm_bytes = response.content
+    if not pcm_bytes:
+        raise RuntimeError("ElevenLabs returned empty audio content")
+    if len(pcm_bytes) % 2 != 0:
+        raise RuntimeError(f"ElevenLabs returned malformed PCM: {len(pcm_bytes)} bytes (not 16-bit aligned)")
     samples = np.frombuffer(pcm_bytes, dtype=np.int16).astype(np.float32) / 32768.0
 
     output_path = Path(output_path)

@@ -50,9 +50,6 @@ def generate_tts(
     return _kokoro_generate(text, voice_id, speed, output_path)
 
 
-# Conditional define: if a test has mocked _kokoro_generate and then reloads this module,
-# the mock (a callable) is already in globals — skip redefining so the mock survives reload.
-if not callable(globals().get("_kokoro_generate")):
-    def _kokoro_generate(text: str, voice_id: str, speed: float, output_path: str) -> Path:
-        from pipeline.tts_engine import generate_tts as kokoro_tts
-        return kokoro_tts(text=text, voice=voice_id, speed=speed, output_path=output_path)
+def _kokoro_generate(text: str, voice_id: str, speed: float, output_path: str) -> Path:
+    from pipeline.tts_engine import generate_tts as kokoro_tts
+    return kokoro_tts(text=text, voice=voice_id, speed=speed, output_path=output_path)
