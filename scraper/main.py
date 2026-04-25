@@ -21,7 +21,7 @@ def _load_sources() -> list[dict]:
 def run_scrape(source_ids: list[str] | None = None) -> dict:
     """
     Run all enabled scrapers (or only the specified source_ids).
-    Then run trend analysis and ChromaDB indexing.
+    Then run trend analysis.
     Returns summary dict.
     """
     import importlib
@@ -61,15 +61,6 @@ def run_scrape(source_ids: list[str] | None = None) -> dict:
         except Exception as e:
             logger.error(f"[Scraper] Trend analysis failed: {e}")
             errors.append(f"trend_analyzer: {e}")
-
-        # Index new videos into ChromaDB
-        try:
-            from vector_db.indexer import index_videos
-            index_videos(all_inserted_ids)
-            logger.info(f"[Scraper] Indexed {len(all_inserted_ids)} videos into ChromaDB")
-        except Exception as e:
-            logger.error(f"[Scraper] ChromaDB indexing failed: {e}")
-            errors.append(f"chromadb_indexer: {e}")
 
     return {
         "sources_run":     len(to_run),

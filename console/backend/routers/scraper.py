@@ -7,8 +7,10 @@ from console.backend.schemas.scraper import (
     ScraperSourceResponse,
     ScraperSourceStatusUpdate,
     ScrapedVideoResponse,
+    ScrapedArticleResponse,
+    ScrapeUrlRequest,
     TriggerScrapeRequest,
-    IndexVideosRequest,
+    ScraperTaskStatus,
 )
 from console.backend.schemas.common import PaginatedResponse
 from console.backend.services.scraper_service import ScraperService
@@ -52,6 +54,15 @@ def trigger_scrape(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.get("/tasks/{task_id}", response_model=ScraperTaskStatus)
+def get_task_status(
+    task_id: str,
+    db: Session = Depends(get_db),
+    _user=Depends(require_editor_or_admin),
+):
+    return ScraperService(db).get_task_status(task_id)
+
+
 @router.get("/videos", response_model=PaginatedResponse[ScrapedVideoResponse])
 def list_videos(
     source: str | None = None,
@@ -75,14 +86,27 @@ def list_videos(
     )
 
 
-@router.post("/videos/index")
-def index_videos(
-    body: IndexVideosRequest,
+@router.get("/articles", response_model=PaginatedResponse[ScrapedArticleResponse])
+def list_articles(
+    source: str | None = None,
+    language: str | None = None,
+    page: int = 1,
+    per_page: int = 50,
+    db: Session = Depends(get_db),
+    _user=Depends(require_editor_or_admin),
+):
+    return ScraperService(db).list_articles(source=source, language=language, page=page, per_page=per_page)
+
+
+@router.post("/articles/from-url", response_model=ScrapedArticleResponse, status_code=201)
+def scrape_article_from_url(
+    body: ScrapeUrlRequest,
     db: Session = Depends(get_db),
     _user=Depends(require_editor_or_admin),
 ):
     try:
-        count = ScraperService(db).index_to_chromadb(body.video_ids)
-        return {"indexed": count}
+        return ScraperService(db).scrape_article_from_url(body.url)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=502, detail=str(e))

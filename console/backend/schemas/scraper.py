@@ -9,6 +9,9 @@ class ScraperSourceResponse(BaseModel):
     module: str | None
     function: str | None
     status: str  # active | standby | planned
+    language: str | None = None
+
+    model_config = {"extra": "ignore"}
 
 
 class ScraperSourceStatusUpdate(BaseModel):
@@ -34,8 +37,35 @@ class TriggerScrapeRequest(BaseModel):
     source_id: str | None = None
 
 
-class IndexVideosRequest(BaseModel):
-    video_ids: list[str]
+class ScrapedArticleResponse(BaseModel):
+    id: int
+    source: str
+    url: str
+    title: str
+    language: str
+    author: str | None = None
+    published_at: datetime | None = None
+    niche: str | None = None
+    tags: list[str] = []
+    is_indexed: bool = False
+    scraped_at: datetime | None = None
+    main_content: str | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class ScrapeUrlRequest(BaseModel):
+    url: str
+
+
+class ScraperTaskStatus(BaseModel):
+    task_id: str
+    state: str          # PENDING | PROGRESS | SUCCESS | FAILURE
+    step: str | None = None
+    source_id: str | None = None
+    count: int | None = None
+    error: str | None = None
+    logs: list[dict] = []
 
 
 class GenerateScriptRequest(BaseModel):

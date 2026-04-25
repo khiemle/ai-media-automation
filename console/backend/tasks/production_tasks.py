@@ -34,6 +34,7 @@ def regenerate_tts_task(self, script_id: int, scene_index: int):
         scenes = script.script_json.get("scenes", [])
         scene = scenes[scene_index]
         meta = script.script_json.get("meta", {})
+        video_cfg = script.script_json.get("video", {})
         out_dir = Path(os.environ.get("OUTPUT_PATH", "./assets/output")) / str(script_id)
         out_dir.mkdir(parents=True, exist_ok=True)
         audio_path = out_dir / f"audio_{scene_index}.wav"
@@ -41,8 +42,8 @@ def regenerate_tts_task(self, script_id: int, scene_index: int):
         from pipeline.tts_router import generate_tts
         generate_tts(
             text=scene.get("narration", ""),
-            voice_id=meta.get("voice", "af_heart"),
-            speed=float(meta.get("voice_speed", 1.0)),
+            voice_id=video_cfg.get("voice", "af_heart"),
+            speed=float(video_cfg.get("voice_speed", 1.0)),
             language=meta.get("language", "vietnamese"),
             output_path=str(audio_path),
         )

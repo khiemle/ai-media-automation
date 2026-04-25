@@ -53,7 +53,7 @@ def compose_video(script_id: int) -> Path:
 
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         futures = {
-            executor.submit(_process_scene, scene, meta, out_dir, i): i
+            executor.submit(_process_scene, scene, meta, video, out_dir, i): i
             for i, scene in enumerate(scenes)
         }
         for future in as_completed(futures):
@@ -82,7 +82,7 @@ def compose_video(script_id: int) -> Path:
     return raw_video_path
 
 
-def _process_scene(scene: dict, meta: dict, out_dir: Path, idx: int) -> dict:
+def _process_scene(scene: dict, meta: dict, video_cfg: dict, out_dir: Path, idx: int) -> dict:
     """Generate TTS audio, video clip, and text overlay for one scene."""
     scene_id = f"script_scene{idx}"
     duration = float(scene.get("duration", 5))
@@ -93,8 +93,8 @@ def _process_scene(scene: dict, meta: dict, out_dir: Path, idx: int) -> dict:
         from pipeline.tts_router import generate_tts
         generate_tts(
             text=scene.get("narration", ""),
-            voice_id=meta.get("voice", "af_heart"),
-            speed=float(meta.get("voice_speed", 1.1)),
+            voice_id=video_cfg.get("voice", "af_heart"),
+            speed=float(video_cfg.get("voice_speed", 1.1)),
             language=meta.get("language", "vietnamese"),
             output_path=str(audio_path),
         )
