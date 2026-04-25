@@ -17,8 +17,7 @@ from dotenv import load_dotenv
 
 # Load env files before reading any env vars (handles direct module import)
 _root = Path(__file__).parent.parent
-load_dotenv(_root / "pipeline.env", override=False)
-load_dotenv(_root / "console" / ".env", override=False)
+load_dotenv(_root / ".env", override=False)
 
 import httpx
 

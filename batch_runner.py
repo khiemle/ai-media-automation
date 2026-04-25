@@ -18,8 +18,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 # Load environment
 from dotenv import load_dotenv
-load_dotenv(Path(__file__).parent / "pipeline.env", override=False)
-load_dotenv(Path(__file__).parent / "console" / ".env", override=False)
+load_dotenv(Path(__file__).parent / ".env", override=False)
 
 logging.basicConfig(
     level=logging.INFO,

@@ -13,7 +13,7 @@ if PROJECT_ROOT not in sys.path:
 
 # ── Load .env so DATABASE_URL is available ────────────────────────────────────
 from dotenv import load_dotenv
-load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
+load_dotenv(Path(__file__).resolve().parent.parent.parent.parent / ".env")
 
 # ── Import settings (reads DATABASE_URL from env) ─────────────────────────────
 from console.backend.config import settings

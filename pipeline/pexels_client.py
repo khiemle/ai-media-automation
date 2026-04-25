@@ -11,8 +11,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 _root = Path(__file__).parent.parent
-load_dotenv(_root / "pipeline.env", override=False)
-load_dotenv(_root / "console" / ".env", override=False)
+load_dotenv(_root / ".env", override=False)
 
 import httpx
 

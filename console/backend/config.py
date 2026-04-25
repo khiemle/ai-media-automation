@@ -8,14 +8,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 CONSOLE_ROOT = Path(__file__).parent.parent
 PROJECT_ROOT = CONSOLE_ROOT.parent
 
-# Make pipeline credentials and runtime config available to console-invoked core modules.
-load_dotenv(PROJECT_ROOT / "pipeline.env", override=False)
-load_dotenv(CONSOLE_ROOT / ".env", override=True)
+load_dotenv(PROJECT_ROOT / ".env", override=False)
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=CONSOLE_ROOT / ".env",
+        env_file=PROJECT_ROOT / ".env",
         env_file_encoding="utf-8",
         extra="ignore",
     )
