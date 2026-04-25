@@ -1,5 +1,5 @@
 """
-Per-model rate limiter — token bucket for Gemini + Ollama.
+Per-model rate limiter — token bucket for Gemini.
 Thread-safe counters; uses Redis when available for multi-worker coordination.
 """
 import logging
@@ -131,27 +131,9 @@ class GeminiRateLimiter:
         raise RuntimeError(f"Gemini rate limit exceeded after {max_wait}s wait")
 
 
-class OllamaRateLimiter:
-    """Local Ollama — no real rate limit, but track usage."""
-
-    def check(self) -> tuple[bool, str]:
-        return True, "ok"
-
-    def usage(self) -> dict:
-        return {"rpm": 0, "rpm_limit": -1, "rpd": 0, "rpd_limit": -1}
-
-    def wait_if_needed(self, max_wait: float = 0):
-        pass
-
-
-# Singletons
+# Singleton
 _gemini_limiter  = GeminiRateLimiter()
-_ollama_limiter  = OllamaRateLimiter()
 
 
 def get_gemini_limiter() -> GeminiRateLimiter:
     return _gemini_limiter
-
-
-def get_ollama_limiter() -> OllamaRateLimiter:
-    return _ollama_limiter
