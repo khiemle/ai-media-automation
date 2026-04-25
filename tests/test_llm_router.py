@@ -2,6 +2,12 @@ import pytest
 from unittest.mock import patch, MagicMock
 
 
+@pytest.fixture(autouse=True)
+def _fake_gemini_key():
+    with patch("rag.llm_router.GEMINI_KEY", "fake-key"):
+        yield
+
+
 def test_gemini_router_returns_dict_on_success():
     mock_response = MagicMock()
     mock_response.text = '{"meta": {"topic": "test"}, "scenes": []}'
