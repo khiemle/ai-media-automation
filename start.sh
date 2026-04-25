@@ -3,11 +3,10 @@
 #  AI Media Automation — Unified Startup Script
 #  Run from project root: ./start.sh
 # ═══════════════════════════════════════════════════════════════════
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND_DIR="$SCRIPT_DIR/console/backend"
-FRONTEND_DIR="$SCRIPT_DIR/console/frontend"
 LOGS_DIR="$SCRIPT_DIR/logs"
 mkdir -p "$LOGS_DIR"
 
@@ -23,7 +22,10 @@ if [ ! -f "$SCRIPT_DIR/.env" ]; then
   echo "     cp .env.example .env"
   exit 1
 fi
-export $(grep -v '^#' "$SCRIPT_DIR/.env" | grep -v '^$' | xargs)
+set -a
+# shellcheck disable=SC1090
+source "$SCRIPT_DIR/.env"
+set +a
 echo "✅  Environment loaded"
 
 # ── 2. Validate required vars ─────────────────────────────────────
@@ -56,14 +58,15 @@ if ! command -v pg_isready &>/dev/null; then
   echo "❌  PostgreSQL not found. Install: brew install postgresql@16"
   exit 1
 fi
-if ! pg_isready -q 2>/dev/null; then
-  echo "❌  PostgreSQL not running. Start: brew services start postgresql@16"
-  exit 1
-fi
 DB_NAME=$(echo "$DATABASE_URL" | sed -E 's|.*/([^/]+)$|\1|')
 DB_USER=$(echo "$DATABASE_URL" | sed -E 's|postgresql://([^:]+):.*|\1|')
 DB_HOST=$(echo "$DATABASE_URL" | sed -E 's|.*@([^:/]+)[:/].*|\1|')
 DB_PORT=$(echo "$DATABASE_URL" | sed -E 's|.*:([0-9]+)/.*|\1|')
+DB_PORT="${DB_PORT:-5432}"
+if ! pg_isready -h "$DB_HOST" -p "${DB_PORT:-5432}" -q 2>/dev/null; then
+  echo "❌  PostgreSQL not running on $DB_HOST:${DB_PORT:-5432}. Start: brew services start postgresql@16"
+  exit 1
+fi
 if ! psql -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" -lqt 2>/dev/null | cut -d'|' -f1 | grep -qw "$DB_NAME"; then
   echo "❌  Database \"$DB_NAME\" does not exist."
   echo "   Run once: psql postgres -c \"CREATE USER $DB_USER WITH PASSWORD 'yourpass'; CREATE DATABASE $DB_NAME OWNER $DB_USER;\""
@@ -83,7 +86,10 @@ if ! redis-cli ping &>/dev/null 2>&1; then
     exit 1
   fi
   redis-server --daemonize yes --logfile "$LOGS_DIR/redis.log"
-  sleep 1
+  for i in 1 2 3 4 5; do
+    redis-cli ping &>/dev/null && break
+    sleep 1
+  done
 fi
 echo "✅  Redis ready"
 
@@ -95,7 +101,7 @@ fi
 echo "✅  ffmpeg ready"
 
 # ── 7. Kill stale processes ───────────────────────────────────────
-for pidfile in "$LOGS_DIR/celery.pid" "$LOGS_DIR/celery_beat.pid" "$LOGS_DIR/pipeline_celery.pid"; do
+for pidfile in "$LOGS_DIR/celery.pid" "$LOGS_DIR/celery_beat.pid" "$LOGS_DIR/pipeline_celery.pid" "$LOGS_DIR/uvicorn.pid"; do
   if [ -f "$pidfile" ]; then
     OLD_PID=$(cat "$pidfile")
     kill "$OLD_PID" 2>/dev/null && echo "⚠️   Stopped stale process (pid $OLD_PID)"
@@ -125,11 +131,14 @@ echo "✅  Celery beat started"
 
 # ── 10. Start FastAPI backend ─────────────────────────────────────
 echo "🔄  Starting FastAPI backend on :${CONSOLE_PORT:-8080}..."
+RELOAD_FLAG=""
+[[ "${DEV_MODE:-1}" == "1" ]] && RELOAD_FLAG="--reload"
 uvicorn console.backend.main:app \
   --host 0.0.0.0 \
   --port "${CONSOLE_PORT:-8080}" \
-  --reload \
+  ${RELOAD_FLAG} \
   >> "$LOGS_DIR/backend.log" 2>&1 &
+echo $! > "$LOGS_DIR/uvicorn.pid"
 echo "✅  Backend started"
 
 # ── Done ──────────────────────────────────────────────────────────
