@@ -88,6 +88,10 @@ def validate(script: Any) -> tuple[bool, list[str]]:
         if style and style not in VALID_OVERLAY_STYLES:
             errors.append(f"scenes[{i}].overlay_style '{style}' not in valid styles")
 
+        pexels_kw = scene.get("pexels_keywords")
+        if pexels_kw is not None and not isinstance(pexels_kw, list):
+            errors.append(f"scenes[{i}].pexels_keywords must be a list, got {type(pexels_kw).__name__}")
+
     # Total duration check
     if total_duration < MIN_TOTAL_DURATION:
         errors.append(f"Total duration {total_duration}s too short (min {MIN_TOTAL_DURATION}s)")
@@ -107,6 +111,7 @@ def fix_and_normalize(script: dict, topic: str, niche: str, template: str) -> di
     script["meta"].setdefault("niche",    niche)
     script["meta"].setdefault("template", template)
     script["meta"].setdefault("region",   "vn")
+    script["meta"].setdefault("language", "vietnamese")
 
     script.setdefault("video", {})
     script["video"].setdefault("title",       topic)
@@ -124,6 +129,7 @@ def fix_and_normalize(script: dict, topic: str, niche: str, template: str) -> di
         scene.setdefault("type",         "body")
         scene.setdefault("narration",    "")
         scene.setdefault("visual_hint",  "person talking camera lifestyle")
+        scene.setdefault("pexels_keywords", [])
         scene.setdefault("text_overlay", "")
         scene.setdefault("overlay_style", "minimal")
         scene.setdefault("duration",     5)

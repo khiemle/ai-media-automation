@@ -25,6 +25,42 @@ HYBRID_RULES = {
     "transition": "pexels",
 }
 
+NICHE_KEYWORDS = {
+    "lifestyle":  ["lifestyle", "people", "daily life"],
+    "cooking":    ["cooking", "food", "kitchen"],
+    "fitness":    ["fitness", "workout", "exercise"],
+    "finance":    ["business", "money", "office"],
+    "tech":       ["technology", "computer", "digital"],
+    "health":     ["health", "wellness", "doctor"],
+    "food":       ["food", "restaurant", "eating"],
+    "news":       ["city", "people walking", "urban"],
+}
+
+SCENE_TYPE_KEYWORDS = {
+    "hook":       ["attention", "people"],
+    "cta":        ["thumbs up", "smiling"],
+    "transition": ["background", "nature"],
+    "body":       ["lifestyle", "people"],
+    "proof":      ["success", "results"],
+    "outro":      ["waving", "smiling"],
+}
+
+
+def _get_pexels_keywords(scene: dict, meta: dict) -> list[str]:
+    """Return up to 3 English Pexels search keywords for a scene."""
+    pexels_kw = scene.get("pexels_keywords") or []
+    if pexels_kw:
+        return list(pexels_kw)[:3]
+
+    niche = meta.get("niche", "lifestyle")
+    scene_type = scene.get("type", "body")
+
+    fallback = NICHE_KEYWORDS.get(niche, ["lifestyle", "people"])
+    type_kw = SCENE_TYPE_KEYWORDS.get(scene_type, [])
+
+    combined = (type_kw + fallback)[:3]
+    return combined if combined else ["lifestyle", "people"]
+
 
 def resolve(
     scene: dict,
@@ -83,7 +119,8 @@ def resolve(
         source = "pexels"
 
     if source == "pexels":
-        result = _try_pexels(keywords, niche, duration, scene_id)
+        pexels_kw = _get_pexels_keywords(scene, meta)
+        result = _try_pexels(pexels_kw, niche, duration, scene_id)
         if result:
             return result
         logger.warning(f"[Resolver] {scene_id} → Pexels miss, using niche default")
