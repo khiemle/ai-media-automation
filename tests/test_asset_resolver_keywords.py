@@ -39,3 +39,11 @@ def test_returns_at_most_three_keywords():
     }
     keywords = _get_pexels_keywords(scene, {"niche": "lifestyle"})
     assert len(keywords) <= 3
+
+
+def test_falls_back_when_pexels_keywords_is_not_a_list():
+    """Non-list pexels_keywords must fall back, not iterate characters."""
+    scene = {"type": "body", "pexels_keywords": "woman coffee morning"}
+    keywords = _get_pexels_keywords(scene, {"niche": "lifestyle"})
+    assert keywords != ["w", "o", "m"]
+    assert all(len(k) > 1 for k in keywords)

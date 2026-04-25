@@ -48,9 +48,9 @@ SCENE_TYPE_KEYWORDS = {
 
 def _get_pexels_keywords(scene: dict, meta: dict) -> list[str]:
     """Return up to 3 English Pexels search keywords for a scene."""
-    pexels_kw = scene.get("pexels_keywords") or []
-    if pexels_kw:
-        return list(pexels_kw)[:3]
+    pexels_kw = scene.get("pexels_keywords")
+    if isinstance(pexels_kw, list) and pexels_kw:
+        return [str(kw) for kw in pexels_kw][:3]
 
     niche = meta.get("niche", "lifestyle")
     scene_type = scene.get("type", "body")
@@ -58,8 +58,9 @@ def _get_pexels_keywords(scene: dict, meta: dict) -> list[str]:
     fallback = NICHE_KEYWORDS.get(niche, ["lifestyle", "people"])
     type_kw = SCENE_TYPE_KEYWORDS.get(scene_type, [])
 
-    combined = (type_kw + fallback)[:3]
-    return combined if combined else ["lifestyle", "people"]
+    seen: set[str] = set()
+    deduped = [k for k in (type_kw + fallback) if not (k in seen or seen.add(k))]
+    return deduped[:3]
 
 
 def resolve(
