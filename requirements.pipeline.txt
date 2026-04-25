@@ -6,9 +6,7 @@
 
 # ── LLM + AI ──────────────────────────────────────────────
 google-genai>=1.0.0                 # Gemini API + Veo video generation (new SDK)
-httpx==0.27.0                       # Ollama local API calls (already in console)
-
-# ── Embeddings (ChromaDB + RAG) ───────────────────────────
+httpx==0.27.0                       # HTTP client (Pexels, ElevenLabs REST; already in console)
 
 # ── Scraper ────────────────────────────────────────────────
 playwright==1.44.0                  # TikTok headless browser scraper

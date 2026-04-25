@@ -85,7 +85,7 @@ def run_daily(topics: list[str] | None = None, dry_run: bool = False) -> dict:
                         template=template,
                         script_json=script_json,
                         status="approved",  # auto-approved in batch mode
-                        llm_used=os.environ.get("OLLAMA_MODEL", "qwen2.5:3b"),
+                        llm_used=os.environ.get("GEMINI_MODEL", "gemini-2.5-flash"),
                     )
                     db.add(script)
                     db.commit()
