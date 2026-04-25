@@ -9,10 +9,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-ELEVENLABS_API_KEY     = os.environ.get("ELEVENLABS_API_KEY", "")
-ELEVENLABS_VOICE_ID_VI = os.environ.get("ELEVENLABS_VOICE_ID_VI", "")
-ELEVENLABS_VOICE_ID_EN = os.environ.get("ELEVENLABS_VOICE_ID_EN", "")
-ELEVENLABS_MODEL       = "eleven_multilingual_v2"
+ELEVENLABS_MODEL = "eleven_multilingual_v2"
 SAMPLE_RATE            = 44100  # pcm_44100 output
 
 
@@ -28,9 +25,9 @@ def _normalize_text(text: str) -> str:
     }
     for src, dst in simple_replacements.items():
         text = text.replace(src, dst)
-    # Word-boundary replacements to avoid mangling "ok" → "o nghìn", "trong" → "t triệu", etc.
-    text = re.sub(r'\bk\b', ' nghìn', text)
-    text = re.sub(r'\btr\b', ' triệu', text)
+    # Match k/tr not immediately surrounded by letters (allows numeric context like "10k", "500tr")
+    text = re.sub(r'(?<![a-zA-ZÀ-ỹ])k(?![a-zA-ZÀ-ỹ])', ' nghìn', text)
+    text = re.sub(r'(?<![a-zA-ZÀ-ỹ])tr(?![a-zA-ZÀ-ỹ])', ' triệu', text)
     return re.sub(r"\s+", " ", text).strip()
 
 
