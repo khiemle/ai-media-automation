@@ -183,6 +183,10 @@ def _assemble(
                 logger.debug(f"[Composer] Scene {idx} overlay layer failed: {e}")
 
         scene_clip = CompositeVideoClip(layers, size=(TARGET_W, TARGET_H)).with_duration(duration)
+        # Strip any alpha mask inherited from the overlay — without this, the mask
+        # (nearly 0 = transparent) would cause concatenate_videoclips to render black frames.
+        scene_clip = scene_clip.with_opacity(1.0)
+        scene_clip.mask = None
 
         # Set narration audio
         if assets.get("audio_path") and Path(assets["audio_path"]).exists():
