@@ -20,7 +20,8 @@ def test_gemini_router_returns_dict_on_success():
 
 
 def test_gemini_router_raises_on_api_error():
-    with patch("rag.llm_router.genai") as mock_genai:
+    with patch("rag.llm_router.genai") as mock_genai, \
+         patch("rag.llm_router.time.sleep"):
         mock_client = MagicMock()
         mock_genai.Client.return_value = mock_client
         mock_client.models.generate_content.side_effect = Exception("API error")

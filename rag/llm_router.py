@@ -20,10 +20,8 @@ GEMINI_KEY   = os.environ.get("GEMINI_API_KEY", "")
 
 try:
     from google import genai
-    from google.genai import types as genai_types
 except ImportError:
     genai = None
-    genai_types = None
 
 
 class GeminiRouter:
@@ -38,6 +36,8 @@ class GeminiRouter:
         Call Gemini and return parsed dict (expect_json=True) or raw string.
         Raises RuntimeError if Gemini is unavailable or returns an error.
         """
+        if not GEMINI_KEY:
+            raise RuntimeError("GEMINI_API_KEY is not set in .env")
         if genai is None:
             raise RuntimeError("google-genai not installed. Run: pip install google-genai")
 
