@@ -1,4 +1,6 @@
 #!/bin/bash
+echo "⚠️  pipeline_start.sh is deprecated. Use ./start.sh from the project root instead."
+exit 1
 # ═══════════════════════════════════════════════════════════════════════
 #  AI Media Automation — Core Pipeline Startup Script
 #  Run from project root: ./pipeline_start.sh
