@@ -42,7 +42,7 @@ def regenerate_tts_task(self, script_id: int, scene_index: int):
         generate_tts(
             text=scene.get("narration", ""),
             voice_id=meta.get("voice", "af_heart"),
-            speed=meta.get("voice_speed", 1.0),
+            speed=float(meta.get("voice_speed", 1.0)),
             language=meta.get("language", "vietnamese"),
             output_path=str(audio_path),
         )

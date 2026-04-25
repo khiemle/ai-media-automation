@@ -199,7 +199,7 @@ def _assemble(
         raise ValueError("No scenes could be composed")
 
     # Concatenate all scenes
-    final = concatenate_videoclips(composed_clips, method="chain")
+    final = concatenate_videoclips(composed_clips, method="compose")
 
     # Mix background music (if available)
     music_track = _select_music(meta.get("mood", "uplifting"), meta.get("niche", "lifestyle"), final.duration)
