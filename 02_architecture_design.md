@@ -48,13 +48,13 @@ The Management Console is a thin control layer that wraps the existing AI Media 
  │             │  │                   │  │ TikTok Research  │
  │ Shared DB   │  │ scraper/          │  │ Pexels           │
  │ + new tables│  │ rag/              │  │ Google Veo       │
- │             │  │ pipeline/         │  │ Gemini           │
- └─────────────┘  │ uploader/         │  │ YouTube Data v3  │
-                  │ feedback/         │  │ TikTok Content   │
- ┌─────────────┐  │                   │  │ Ollama :11434    │
- │ ChromaDB    │  └─────────┬─────────┘  └──────────────────┘
- │ (file-based)│            │
- └─────────────┘   ┌────────▼────────┐
+ │             │  │ pipeline/         │  │ Gemini 2.5 Flash │
+ └─────────────┘  │ uploader/         │  │ ElevenLabs TTS   │
+                  │ feedback/         │  │ YouTube Data v3  │
+                  │                   │  │ TikTok Content   │
+                  └─────────┬─────────┘  └──────────────────┘
+                            │
+                   ┌────────▼────────┐
                    │ Celery + Redis  │
  ┌─────────────┐   │ (:6379)         │
  │ File System │   │                 │
@@ -83,6 +83,8 @@ The Management Console is a thin control layer that wraps the existing AI Media 
 | Database | PostgreSQL 16 | Already running — extend with 6 new tables |
 | File Server | FastAPI StaticFiles | Serve asset thumbnails and audio previews |
 | Encryption | Fernet (cryptography) | Encrypt OAuth secrets at rest |
+| LLM | Gemini 2.5 Flash only | Ollama/local model removed — Gemini handles all script generation |
+| TTS | ElevenLabs (VI) + Kokoro (EN) | TTS Router selects engine by script language; auto mode default |
 
 ---
 
@@ -127,7 +129,6 @@ The Management Console is a thin control layer that wraps the existing AI Media 
 │  SystemService ──────── reads ──▶ psutil (CPU/RAM/Disk)               │
 │       │                           nvidia-smi (GPU)                     │
 │       │                           pg_isready (PostgreSQL)              │
-│       │                           curl :11434 (Ollama)                 │
 │       │                           (via subprocess)                     │
 │       │                                                                │
 │  LLMService ─────────── calls ──▶ rag/llm_router.py config           │
@@ -198,10 +199,9 @@ Editor opens Scraper tab
                    template: "tiktok_viral", source_video_ids: [id1, id2, id3, id4, id5] }
            │
            └─▶ ScriptService:
-                 ├─ Fetch selected videos from viral_videos
-                 ├─ ChromaDB.query(top_k=5) using selected as context
-                 ├─ Build RAG prompt (prompt_builder.py)
-                 ├─ LLM Router → generate script JSON
+                 ├─ Fetch selected videos from viral_videos (for article content)
+                 ├─ Build prompt (topic + niche + template + language + article)
+                 ├─ GeminiRouter → generate script JSON (incl. pexels_keywords per scene)
                  ├─ script_validator.py → validate + auto-fix
                  └─ INSERT INTO generated_scripts (status='draft', script_json=...)
 ```
@@ -247,7 +247,9 @@ Editor opens Production tab → selects approved script
     │
     ├─▶ Editor edits scene #3 narration → clicks "Regenerate TTS"
     │     └─▶ POST /api/production/scripts/{id}/scenes/3/tts
-    │           └─▶ Celery task → pipeline/tts_engine.py → audio_3.wav
+    │           └─▶ Celery task → pipeline/tts_router.py
+    │                 language=vietnamese → ElevenLabs API → audio_3.wav
+    │                 language=english    → Kokoro ONNX   → audio_3.wav
     │
     └─▶ Editor clicks "Start Production"
           └─▶ POST /api/pipeline/jobs

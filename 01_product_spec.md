@@ -50,7 +50,6 @@ Build a **web-based Management Console** that wraps around the existing automati
 | Scraped Data Browser | Tabular view of all scraped videos with columns: hook text, author, play count, ER, niche, region, tags, indexed status. Supports filtering by source, niche, region, and sorting by views/ER/likes | P0 |
 | Multi-select & Topic Creation | Editor selects 1–N scraped videos, clicks "Generate Script", enters a topic/niche/template, and the system sends the selected videos as RAG context to the LLM Router for script generation | P0 |
 | Manual Scrape Trigger | Button to trigger an immediate scrape run outside the cron schedule | P1 |
-| ChromaDB Index Control | Manually index or de-index selected videos from the vector database | P1 |
 | Source Plugin API | Adapter interface for adding new scraper sources without modifying core code. Each adapter implements `scrape(config) → list[ScrapedVideo]` | P2 |
 
 **Data Model:** Reads from existing `viral_videos` and `viral_patterns` tables. No schema changes.
@@ -86,7 +85,7 @@ Build a **web-based Management Console** that wraps around the existing automati
 |---------|-------------|----------|
 | Visual Timeline | Proportional horizontal bar showing all scenes by duration. Click a scene to expand its editor | P0 |
 | Scene Asset Replacement | Per-scene: browse the Video Asset DB (Tier 1), search Pexels (Tier 2A), or trigger a Veo generation (Tier 2B). Select a replacement clip from a visual grid | P0 |
-| Audio Regeneration | Re-run Kokoro TTS for a scene after editing its narration text. Option to upload a custom audio file | P0 |
+| Audio Regeneration | Re-run TTS for a scene after editing narration. Engine selected automatically by script language: ElevenLabs for Vietnamese, Kokoro for English. Option to upload a custom audio file | P0 |
 | Asset DB Browser | Full-screen modal to search the `video_assets` table by keywords, niche, source, duration. Shows thumbnail grid with metadata | P0 |
 | Overlay Editing | Edit text overlay content and style (5 built-in styles). Live preview of text on a colored placeholder | P1 |
 | Asset Resolver Mode | Switch between `db_only`, `db_then_pexels`, `db_then_veo`, `db_then_hybrid` from the UI | P1 |
@@ -94,7 +93,7 @@ Build a **web-based Management Console** that wraps around the existing automati
 
 **Data Model:** Reads/writes `generated_scripts.script_json` (scenes array). Reads `video_assets` table.
 
-**Integration:** Calls `pipeline/asset_resolver.py`, `pipeline/tts_engine.py`, `pipeline/overlay_builder.py` as Celery tasks. After editor approves, `script.json` passes to `pipeline/composer.py`.
+**Integration:** Calls `pipeline/asset_resolver.py`, `pipeline/tts_router.py`, `pipeline/overlay_builder.py` as Celery tasks. After editor approves, `script.json` passes to `pipeline/composer.py`.
 
 ---
 
@@ -139,14 +138,21 @@ Build a **web-based Management Console** that wraps around the existing automati
 
 ---
 
-### 2.6 LLM Router Control
+### 2.6 LLM & TTS Control
+
+**LLM:** Gemini 2.5 Flash only. Ollama/local model removed.
 
 | Feature | Description | Priority |
 |---------|-------------|----------|
-| Mode Selector | Switch between local/gemini/auto/hybrid | P0 |
-| Quota Monitor | Gemini RPD/RPM usage, Ollama health, average latency | P0 |
-| Hybrid Routing Config | Edit which LLM handles which template | P1 |
-| Rate Limiter Dashboard | Per-model usage bars, auto-fallback status | P1 |
+| Quota Monitor | Gemini RPD/RPM usage, average latency per generation | P0 |
+| Rate Limiter Dashboard | Usage bar, requests remaining today | P1 |
+
+**TTS:** Engine selected by script language via `TTS_ENGINE` env var (`auto|kokoro|elevenlabs`).
+
+| Feature | Description | Priority |
+|---------|-------------|----------|
+| TTS Engine Status | Show active engine per language (ElevenLabs for VI, Kokoro for EN) | P0 |
+| Voice Selection | Per-language voice ID config (set in `.env`) | P1 |
 
 ---
 
@@ -155,7 +161,7 @@ Build a **web-based Management Console** that wraps around the existing automati
 | Feature | Description | Priority |
 |---------|-------------|----------|
 | 14-day Dashboard | Charts: daily video output, total views, average ER, revenue | P0 |
-| Feedback Scoring View | Scoring formula, reindexed count (>70), low-performers (<40) | P0 |
+| Feedback Scoring View | Scoring formula, high performers (>70), low-performers (<40) | P0 |
 | Per-niche Breakdown | ER and views grouped by niche | P1 |
 | Top Performing Videos | Ranked list with links | P1 |
 
@@ -166,7 +172,7 @@ Build a **web-based Management Console** that wraps around the existing automati
 | Feature | Description | Priority |
 |---------|-------------|----------|
 | Resource Gauges | CPU, GPU, RAM, Disk with warning thresholds | P0 |
-| Service Status | Green/yellow/red for PostgreSQL, ChromaDB, Ollama, NVENC, Kokoro, Whisper, ffmpeg, Pexels | P0 |
+| Service Status | Green/yellow/red for PostgreSQL, Redis, ElevenLabs, Kokoro, NVENC, Whisper, ffmpeg, Pexels, Gemini | P0 |
 | Cron Schedule | All scheduled jobs with status and last-run time | P0 |
 | Error Log | Last 24h of errors from all pipeline modules | P0 |
 
