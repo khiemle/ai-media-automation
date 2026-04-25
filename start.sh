@@ -63,8 +63,8 @@ DB_USER=$(echo "$DATABASE_URL" | sed -E 's|postgresql://([^:]+):.*|\1|')
 DB_HOST=$(echo "$DATABASE_URL" | sed -E 's|.*@([^:/]+)[:/].*|\1|')
 DB_PORT=$(echo "$DATABASE_URL" | sed -E 's|.*:([0-9]+)/.*|\1|')
 DB_PORT="${DB_PORT:-5432}"
-if ! pg_isready -h "$DB_HOST" -p "${DB_PORT:-5432}" -q 2>/dev/null; then
-  echo "❌  PostgreSQL not running on $DB_HOST:${DB_PORT:-5432}. Start: brew services start postgresql@16"
+if ! pg_isready -h "$DB_HOST" -p "$DB_PORT" -q 2>/dev/null; then
+  echo "❌  PostgreSQL not running on $DB_HOST:$DB_PORT. Start: brew services start postgresql@16"
   exit 1
 fi
 if ! psql -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" -lqt 2>/dev/null | cut -d'|' -f1 | grep -qw "$DB_NAME"; then
@@ -90,6 +90,10 @@ if ! redis-cli ping &>/dev/null 2>&1; then
     redis-cli ping &>/dev/null && break
     sleep 1
   done
+  if ! redis-cli ping &>/dev/null; then
+    echo "❌  Redis did not start within 5 s. Check $LOGS_DIR/redis.log"
+    exit 1
+  fi
 fi
 echo "✅  Redis ready"
 
