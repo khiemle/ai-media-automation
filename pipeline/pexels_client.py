@@ -142,6 +142,7 @@ def _trim_and_resize(src: Path, dst: Path, duration: float) -> Path | None:
     )
     cmd = [
         "ffmpeg", "-y",
+        "-stream_loop", "-1",   # loop input so output is always exactly `duration` seconds
         "-i", str(src),
         "-t", str(duration),
         "-vf", vf,

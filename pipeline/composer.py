@@ -154,12 +154,19 @@ def _assemble(
         # Base video clip
         if assets.get("clip_path") and Path(assets["clip_path"]).exists():
             try:
-                clip = VideoFileClip(assets["clip_path"]).with_subclip(0, duration)
+                raw_clip = VideoFileClip(assets["clip_path"])
+                clip_end = min(duration, raw_clip.duration)
+                if raw_clip.duration < duration - 0.1:
+                    logger.warning(
+                        f"[Composer] Scene {idx} clip is {raw_clip.duration:.1f}s, "
+                        f"scene needs {duration:.1f}s — clamping to clip length"
+                    )
+                clip = raw_clip.with_subclip(0, clip_end)
                 # Ensure correct size
                 if clip.w != TARGET_W or clip.h != TARGET_H:
                     clip = clip.resized((TARGET_W, TARGET_H))
             except Exception as e:
-                logger.warning(f"[Composer] Scene {idx} clip load failed: {e}")
+                logger.warning(f"[Composer] Scene {idx} clip load failed ({assets['clip_path']}): {e}")
                 clip = ColorClip((TARGET_W, TARGET_H), color=(0, 0, 0), duration=duration)
         else:
             clip = ColorClip((TARGET_W, TARGET_H), color=(10, 10, 15), duration=duration)
