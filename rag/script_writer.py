@@ -1,5 +1,5 @@
 """
-Script writer — orchestrates the full RAG → LLM → validate → store pipeline.
+Script writer — orchestrates the LLM → validate pipeline for script generation.
 
 Public API:
   generate_script(topic, niche, template, context_videos=None) → dict
@@ -17,86 +17,65 @@ def generate_script(
     topic: str,
     niche: str = "lifestyle",
     template: str = "tiktok_viral",
-    context_videos=None,          # list[ViralVideo] ORM objects, optional
+    language: str = "vietnamese",
+    article_content: str | None = None,
+    context_videos=None,
     video_ids: list[int] | None = None,
 ) -> dict:
     """
-    Full RAG + LLM script generation pipeline.
-    1. Retrieve similar scripts, top hooks, and viral patterns from ChromaDB
-    2. Build a RAG-enriched prompt
-    3. Route to LLM (Gemini or Ollama based on LLM_MODE)
-    4. Validate JSON output; retry up to MAX_RETRIES times on failure
-    5. Normalize + return the final script dict
+    Generate a script via Gemini. Raises RuntimeError if Gemini fails.
     """
     from rag.llm_router import get_router
     from rag.prompt_builder import build_prompt
     from rag.script_validator import validate, fix_and_normalize
-    from vector_db.retriever import retrieve_similar_scripts, retrieve_top_hooks, retrieve_patterns
 
-    # 1. Retrieve RAG context
-    similar_scripts = retrieve_similar_scripts(topic, niche, k=3)
-    top_hooks       = retrieve_top_hooks(niche, k=8)
-    patterns        = retrieve_patterns(niche)
-
-    # 2. Optionally enrich with passed-in context videos (from editor selection)
     extra_hooks: list[str] = []
     if context_videos:
         extra_hooks = [v.hook_text for v in context_videos if getattr(v, "hook_text", None)]
-        top_hooks = (extra_hooks + top_hooks)[:10]
 
-    # 3. Build prompt
     prompt = build_prompt(
         topic=topic,
         niche=niche,
         template=template,
-        viral_scripts=similar_scripts,
-        top_hooks=top_hooks,
-        patterns=patterns,
+        language=language,
+        article_content=article_content,
+        extra_hooks=extra_hooks,
     )
 
-    # 4. Generate with retries
     router = get_router()
-    script: dict | None = None
-    last_errors: list[str] = []
+    last_error: str = ""
 
     for attempt in range(1, MAX_RETRIES + 1):
         try:
             result = router.generate(prompt, template=template, expect_json=True)
 
             if not isinstance(result, dict):
-                logger.warning(f"[ScriptWriter] Attempt {attempt}: LLM returned non-dict ({type(result).__name__})")
-                last_errors = [f"LLM returned {type(result).__name__}, expected dict"]
+                last_error = f"LLM returned {type(result).__name__}, expected dict"
+                logger.warning(f"[ScriptWriter] Attempt {attempt}: {last_error}")
                 continue
 
-            # Inject meta in case LLM omitted it
             result.setdefault("meta", {})
             result["meta"].setdefault("topic", topic)
             result["meta"].setdefault("niche", niche)
             result["meta"].setdefault("template", template)
+            result["meta"].setdefault("language", language)
 
             valid, errors = validate(result)
             if valid:
-                script = fix_and_normalize(result, topic, niche, template)
-                logger.info(f"[ScriptWriter] Generated valid script on attempt {attempt}")
-                break
-            else:
-                last_errors = errors
-                logger.warning(
-                    f"[ScriptWriter] Attempt {attempt} validation failed: {errors[:3]}"
-                )
-                # Add error feedback to prompt for next retry
-                prompt += f"\n\nPREVIOUS ATTEMPT ERRORS (fix these):\n" + "\n".join(f"- {e}" for e in errors[:5])
+                logger.info(f"[ScriptWriter] Valid script on attempt {attempt}")
+                return fix_and_normalize(result, topic, niche, template)
 
+            last_error = "; ".join(errors[:3])
+            logger.warning(f"[ScriptWriter] Attempt {attempt} validation failed: {errors[:3]}")
+            prompt += f"\n\nPREVIOUS ATTEMPT ERRORS (fix these):\n" + "\n".join(f"- {e}" for e in errors[:5])
+
+        except RuntimeError:
+            raise  # Gemini hard failure — propagate immediately
         except Exception as e:
-            last_errors = [str(e)]
+            last_error = str(e)
             logger.error(f"[ScriptWriter] Attempt {attempt} exception: {e}")
 
-    if script is None:
-        logger.error(f"[ScriptWriter] All {MAX_RETRIES} attempts failed. Last errors: {last_errors}")
-        # Return a minimal fallback script so the pipeline doesn't crash
-        script = _fallback_script(topic, niche, template)
-
-    return script
+    raise RuntimeError(f"Script generation failed after {MAX_RETRIES} attempts. Last error: {last_error}")
 
 
 def regenerate_scene(script_dict: dict, scene_index: int) -> dict:
@@ -136,36 +115,3 @@ def regenerate_scene(script_dict: dict, scene_index: int) -> dict:
     return script_dict
 
 
-def _fallback_script(topic: str, niche: str, template: str) -> dict:
-    """Minimal valid script when all LLM attempts fail."""
-    return {
-        "meta":   {"topic": topic, "niche": niche, "template": template, "region": "vn"},
-        "video":  {
-            "title": topic, "description": "", "hashtags": [],
-            "voice": "af_heart", "voice_speed": 1.1, "mood": "uplifting", "total_duration": 30,
-        },
-        "cta":    {"type": "follow", "text": "Theo dõi để xem thêm!", "affiliate_links": []},
-        "scenes": [
-            {
-                "scene_number": 1, "type": "hook",
-                "narration": f"Hôm nay chúng ta sẽ nói về chủ đề {topic}.",
-                "visual_hint": f"{niche} lifestyle person talking",
-                "text_overlay": topic[:30], "overlay_style": "big_white_center",
-                "duration": 5, "transition": "cut",
-            },
-            {
-                "scene_number": 2, "type": "body",
-                "narration": "Đây là những thông tin quan trọng bạn cần biết.",
-                "visual_hint": f"{niche} informative content",
-                "text_overlay": "", "overlay_style": "minimal",
-                "duration": 15, "transition": "fade",
-            },
-            {
-                "scene_number": 3, "type": "cta",
-                "narration": "Theo dõi kênh để không bỏ lỡ những nội dung hữu ích tiếp theo nhé!",
-                "visual_hint": "person waving goodbye smiling camera",
-                "text_overlay": "Theo dõi ngay!", "overlay_style": "big_white_center",
-                "duration": 7, "transition": "fade",
-            },
-        ],
-    }
