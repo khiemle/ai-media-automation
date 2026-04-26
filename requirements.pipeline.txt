@@ -9,7 +9,7 @@ google-genai>=1.0.0                 # Gemini API + Veo video generation (new SDK
 httpx==0.27.0                       # HTTP client (Pexels, ElevenLabs REST; already in console)
 
 # ── Scraper ────────────────────────────────────────────────
-playwright==1.44.0                  # TikTok headless browser scraper
+playwright>=1.48.0                  # TikTok headless browser scraper
 selenium>=4.21.0                    # Chromium fallback when Playwright extraction fails
 apify-client==1.7.1                 # Apify cloud scraper fallback
 
@@ -21,7 +21,7 @@ scipy>=1.13.0                       # Audio resampling (44.1kHz)
 numpy>=2.0.2                        # Required by kokoro-onnx 0.4.0
 
 # ── Captions ───────────────────────────────────────────────
-faster-whisper==1.0.3               # Whisper base → SRT subtitles (Python 3.12 compatible)
+faster-whisper>=1.2.0               # Whisper base → SRT subtitles
 
 # ── Video Production ──────────────────────────────────────
 moviepy>=2.2.1                      # Scene composition + concatenation (requires av; install with --only-binary=:all:)

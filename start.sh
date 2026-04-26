@@ -28,14 +28,12 @@ fi
 
 # ── 2. Install / sync dependencies ───────────────────────────────
 echo "🔄  Installing dependencies..."
-# These packages must come from pre-built wheels — they fail to compile
-# from source on Python 3.14 due to removed/changed C-level APIs.
-"$PIP" install \
-  "av>=11.0.0" \
-  "psycopg2-binary>=2.9.9" \
-  "greenlet>=3.0.0" \
-  --only-binary=:all: -q
-"$PIP" install -r "$SCRIPT_DIR/console/requirements.txt" -q
+# av and psycopg2-binary must come from pre-built wheels — they fail to
+# compile from source on Python 3.14 due to removed/changed C-level APIs.
+# greenlet resolves correctly via playwright>=1.48.0 (greenlet>=3.1.1).
+BINARY_PKGS="av,psycopg2-binary"
+"$PIP" install -r "$SCRIPT_DIR/console/requirements.txt" \
+  --only-binary="$BINARY_PKGS" -q
 echo "✅  Dependencies ready"
 
 # ── 3. Load .env ──────────────────────────────────────────────────
