@@ -218,11 +218,18 @@ function GenerateModal({ niches, onClose, onGenerated, onPollTrack }) {
           <textarea
             value={expanded || idea}
             onChange={e => { expanded ? setExpanded(e.target.value) : setIdea(e.target.value) }}
-            rows={3}
+            rows={4}
             placeholder="e.g. upbeat energetic workout music with punchy beats"
-            className="bg-[#16161a] border border-[#2a2a32] rounded-lg px-3 py-1.5 text-sm text-[#e8e8f0] placeholder:text-[#5a5a70] focus:outline-none focus:border-[#7c6af7] resize-y"
+            className={`bg-[#16161a] rounded-lg px-3 py-1.5 text-sm text-[#e8e8f0] placeholder:text-[#5a5a70] focus:outline-none resize-y transition-colors ${
+              expanded
+                ? 'border border-[#34d399] focus:border-[#34d399]'
+                : 'border border-[#2a2a32] focus:border-[#7c6af7]'
+            }`}
           />
-          {expanded && <p className="text-xs text-[#34d399]">✓ Expanded by Gemini — edit freely before generating</p>}
+          {expanded
+            ? <p className="text-xs text-[#34d399]">✓ Expanded by Gemini — edit freely before generating</p>
+            : <p className="text-xs text-[#5a5a70]">Click "✨ Expand" to enrich this with Gemini before generating</p>
+          }
         </div>
 
         <MultiSelect label="Niches" options={niches.map(n => n.name)} value={selNiches} onChange={setSelNiches} />

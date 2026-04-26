@@ -196,9 +196,10 @@ Return a JSON object with exactly two keys:
 Respond with JSON only."""
 
         router = GeminiRouter()
-        raw = router.generate(system_prompt, expect_json=False)
         try:
-            data = json.loads(raw)
+            data = router.generate(system_prompt, expect_json=True)
+            if not isinstance(data, dict):
+                raise ValueError("Unexpected response type")
             return {
                 "expanded_prompt": data.get("expanded_prompt", idea),
                 "negative_tags":   data.get("negative_tags", ""),
