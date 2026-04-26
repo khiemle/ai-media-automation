@@ -75,7 +75,7 @@ def test_lyria_provider_generate_returns_bytes():
     mock_response = MagicMock()
     mock_response.candidates = [mock_candidate]
 
-    with patch.dict("os.environ", {"GEMINI_API_KEY": "fake-key"}):
+    with patch.dict("os.environ", {"GEMINI_MEDIA_API_KEY": "fake-key"}):
         with patch("pipeline.music_providers.lyria_provider.genai") as mock_genai:
             mock_client = MagicMock()
             mock_genai.Client.return_value = mock_client

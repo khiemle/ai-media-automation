@@ -15,9 +15,9 @@ LYRIA_MODELS = {
 
 class LyriaProvider:
     def __init__(self):
-        self._key = os.environ.get("GEMINI_API_KEY", "")
+        self._key = os.environ.get("GEMINI_MEDIA_API_KEY", "")
         if not self._key:
-            raise RuntimeError("GEMINI_API_KEY is not set")
+            raise RuntimeError("GEMINI_MEDIA_API_KEY is not set")
         if genai is None:
             raise RuntimeError("google-genai not installed. Run: pip install google-genai")
 

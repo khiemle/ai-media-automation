@@ -5,11 +5,11 @@ The Music Background Feature supports two music generation providers: **Suno** a
 ## Quick Start
 
 ```bash
-# 1. Set SUNO_API_KEY in console/.env
+# 1. Set SUNO_API_KEY in root .env
 SUNO_API_KEY=your-suno-api-key-here
 
-# 2. Set GEMINI_API_KEY in .env (root)
-GEMINI_API_KEY=your-google-api-key-here
+# 2. Set GEMINI_MEDIA_API_KEY in root .env
+GEMINI_MEDIA_API_KEY=your-google-api-key-here
 
 # 3. Restart the console
 cd console && ./start.sh
@@ -29,7 +29,7 @@ cd console && ./start.sh
 
 ### Where to Set It
 
-- **File:** `console/.env`
+- **File:** `.env` (root directory)
 - **Variable:** `SUNO_API_KEY`
 - **Example:**
   ```
@@ -64,13 +64,13 @@ cd console && ./start.sh
 ### Where to Set It
 
 - **File:** `.env` (root directory)
-- **Variable:** `GEMINI_API_KEY`
+- **Variable:** `GEMINI_MEDIA_API_KEY`
 - **Example:**
   ```
-  GEMINI_API_KEY=AIzaSy...
+  GEMINI_MEDIA_API_KEY=AIzaSy...
   ```
 
-**Note:** Lyria uses the same key as other Gemini services (script generation, Veo video generation, etc.). It's shared across all features.
+**Note:** Lyria uses `GEMINI_MEDIA_API_KEY` (the same key used for Veo video generation). This can be the same value as `GEMINI_API_KEY`.
 
 ### Model Selection
 
@@ -105,16 +105,17 @@ The model is selected when generating music in the console. Default is **Lyria C
 
 ### Environment Files
 
-The Music feature uses two env files:
+All music API keys live in the **root `.env` file**:
 
-1. **`.env` (root)**
-   - `GEMINI_API_KEY` — Used by Lyria, script generation, Veo
-   - Other LLM settings (Ollama URL, TTS config, etc.)
+1. **`.env` (root) — ALL API keys go here**
+   - `SUNO_API_KEY` — Suno music generation
+   - `GEMINI_MEDIA_API_KEY` — Lyria music generation + Veo video generation
+   - `GEMINI_API_KEY` — Script generation, prompt expansion
+   - Other LLM/pipeline settings
 
 2. **`console/.env`**
-   - `SUNO_API_KEY` — Used by Suno music generation only
-   - Database URL, Redis, JWT, Fernet key
-   - References CORE_PIPELINE_PATH to root
+   - Database URL, Redis, JWT, Fernet key only
+   - Does **not** contain API keys for music or LLM providers
 
 ### Loading Order
 
@@ -130,9 +131,8 @@ At startup, the console backend loads:
 ### Quick Test: Verify Keys Are Loaded
 
 ```bash
-# Check console backend has access
-cd console/backend
-python3 -c "from config import settings; print(f'Suno key: {bool(settings.SUNO_API_KEY)}'); print(f'Gemini key: {bool(settings.GEMINI_API_KEY)}')"
+# Check keys are set in root .env
+grep -E "SUNO_API_KEY|GEMINI_MEDIA_API_KEY" .env
 ```
 
 ### Test Music Generation
@@ -148,8 +148,8 @@ python3 -c "from config import settings; print(f'Suno key: {bool(settings.SUNO_A
 
 | Error | Cause | Fix |
 |-------|-------|-----|
-| `SUNO_API_KEY is not set` | Missing env var | Set SUNO_API_KEY in console/.env |
-| `GEMINI_API_KEY is not set` | Missing env var | Set GEMINI_API_KEY in .env |
+| `SUNO_API_KEY is not set` | Missing env var | Set SUNO_API_KEY in root `.env` |
+| `GEMINI_MEDIA_API_KEY is not set` | Missing env var | Set GEMINI_MEDIA_API_KEY in root `.env` |
 | `401 Unauthorized` | Invalid key format | Check key is copied completely, no extra spaces |
 | `403 Forbidden` | Key has no access | Verify key has Suno API or Gemini API permissions |
 | `Lyria returned no audio data` | API error | Try again, check quota, check model availability |
