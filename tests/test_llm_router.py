@@ -4,7 +4,7 @@ from unittest.mock import patch, MagicMock
 
 @pytest.fixture(autouse=True)
 def _fake_gemini_key():
-    with patch("rag.llm_router.GEMINI_KEY", "fake-key"):
+    with patch.dict("os.environ", {"GEMINI_API_KEY": "fake-key"}):
         yield
 
 
