@@ -28,8 +28,13 @@ fi
 
 # ── 2. Install / sync dependencies ───────────────────────────────
 echo "🔄  Installing dependencies..."
-# av must be installed from pre-built wheel on Python 3.14+
-"$PIP" install "av>=11.0.0" --only-binary=:all: -q
+# These packages must come from pre-built wheels — they fail to compile
+# from source on Python 3.14 due to removed/changed C-level APIs.
+"$PIP" install \
+  "av>=11.0.0" \
+  "psycopg2-binary>=2.9.9" \
+  "greenlet>=3.0.0" \
+  --only-binary=:all: -q
 "$PIP" install -r "$SCRIPT_DIR/console/requirements.txt" -q
 echo "✅  Dependencies ready"
 
