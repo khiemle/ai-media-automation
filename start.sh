@@ -8,13 +8,32 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND_DIR="$SCRIPT_DIR/console/backend"
 LOGS_DIR="$SCRIPT_DIR/logs"
+VENV_DIR="$SCRIPT_DIR/.venv"
+PYTHON="$VENV_DIR/bin/python3"
+PIP="$VENV_DIR/bin/pip"
+CELERY="$VENV_DIR/bin/celery"
+UVICORN="$VENV_DIR/bin/uvicorn"
 mkdir -p "$LOGS_DIR"
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  AI Media Automation — Starting"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-# ── 1. Load .env ──────────────────────────────────────────────────
+# ── 1. Ensure .venv exists ────────────────────────────────────────
+if [ ! -f "$PYTHON" ]; then
+  echo "🔄  Creating virtual environment..."
+  python3 -m venv "$VENV_DIR"
+  echo "✅  Virtual environment created"
+fi
+
+# ── 2. Install / sync dependencies ───────────────────────────────
+echo "🔄  Installing dependencies..."
+# av must be installed from pre-built wheel on Python 3.14+
+"$PIP" install "av>=11.0.0" --only-binary=:all: -q
+"$PIP" install -r "$SCRIPT_DIR/console/requirements.txt" -q
+echo "✅  Dependencies ready"
+
+# ── 3. Load .env ──────────────────────────────────────────────────
 if [ ! -f "$SCRIPT_DIR/.env" ]; then
   echo ""
   echo "❌  .env not found at project root."
@@ -28,7 +47,7 @@ source "$SCRIPT_DIR/.env"
 set +a
 echo "✅  Environment loaded"
 
-# ── 2. Validate required vars ─────────────────────────────────────
+# ── 4. Validate required vars ─────────────────────────────────────
 MISSING=""
 for var in DATABASE_URL GEMINI_API_KEY FERNET_KEY PEXELS_API_KEY; do
   if [ -z "${!var}" ]; then
@@ -41,7 +60,7 @@ if [ -n "$MISSING" ]; then
 fi
 
 # Validate Fernet key
-if ! python3 - <<'PY' >/dev/null 2>&1
+if ! "$PYTHON" - <<'PY' >/dev/null 2>&1
 from cryptography.fernet import Fernet
 import os
 Fernet(os.environ["FERNET_KEY"].encode())
@@ -53,7 +72,7 @@ then
 fi
 echo "✅  Config validated"
 
-# ── 3. Check PostgreSQL ───────────────────────────────────────────
+# ── 5. Check PostgreSQL ───────────────────────────────────────────
 if ! command -v pg_isready &>/dev/null; then
   echo "❌  PostgreSQL not found. Install: brew install postgresql@16"
   exit 1
@@ -74,12 +93,12 @@ if ! psql -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" -lqt 2>/dev/null | cut -d'|'
 fi
 echo "✅  PostgreSQL ready (db: $DB_NAME)"
 
-# ── 4. Run Alembic migrations ─────────────────────────────────────
+# ── 6. Run Alembic migrations ─────────────────────────────────────
 echo "🔄  Running migrations..."
-cd "$BACKEND_DIR" && alembic upgrade head 2>&1 | tail -3 && cd "$SCRIPT_DIR"
+cd "$BACKEND_DIR" && "$VENV_DIR/bin/alembic" upgrade head 2>&1 | tail -3 && cd "$SCRIPT_DIR"
 echo "✅  Migrations up to date"
 
-# ── 5. Start Redis ────────────────────────────────────────────────
+# ── 7. Start Redis ────────────────────────────────────────────────
 if ! redis-cli ping &>/dev/null 2>&1; then
   if ! command -v redis-server &>/dev/null; then
     echo "❌  Redis not found. Install: brew install redis"
@@ -97,14 +116,14 @@ if ! redis-cli ping &>/dev/null 2>&1; then
 fi
 echo "✅  Redis ready"
 
-# ── 6. Check ffmpeg ───────────────────────────────────────────────
+# ── 8. Check ffmpeg ───────────────────────────────────────────────
 if ! command -v ffmpeg &>/dev/null; then
   echo "❌  ffmpeg not found. Install: brew install ffmpeg"
   exit 1
 fi
 echo "✅  ffmpeg ready"
 
-# ── 7. Kill stale processes ───────────────────────────────────────
+# ── 9. Kill stale processes ───────────────────────────────────────
 for pidfile in "$LOGS_DIR/celery.pid" "$LOGS_DIR/celery_beat.pid" "$LOGS_DIR/pipeline_celery.pid" "$LOGS_DIR/uvicorn.pid"; do
   if [ -f "$pidfile" ]; then
     OLD_PID=$(cat "$pidfile")
@@ -114,9 +133,9 @@ for pidfile in "$LOGS_DIR/celery.pid" "$LOGS_DIR/celery_beat.pid" "$LOGS_DIR/pip
 done
 lsof -ti :"${CONSOLE_PORT:-8080}" | xargs kill 2>/dev/null || true
 
-# ── 8. Start Celery worker (all queues) ───────────────────────────
+# ── 10. Start Celery worker (all queues) ──────────────────────────
 echo "🔄  Starting Celery worker..."
-celery -A console.backend.celery_app worker \
+"$CELERY" -A console.backend.celery_app worker \
   -Q scrape_q,script_q,render_q,upload_q \
   --concurrency=4 \
   --loglevel=info \
@@ -125,19 +144,19 @@ celery -A console.backend.celery_app worker \
   --pidfile="$LOGS_DIR/celery.pid"
 echo "✅  Celery worker started (all queues)"
 
-# ── 9. Start Celery beat ─────────────────────────────────────────
-celery -A console.backend.celery_app beat \
+# ── 11. Start Celery beat ─────────────────────────────────────────
+"$CELERY" -A console.backend.celery_app beat \
   --loglevel=info \
   --detach \
   --logfile="$LOGS_DIR/celery_beat.log" \
   --pidfile="$LOGS_DIR/celery_beat.pid"
 echo "✅  Celery beat started"
 
-# ── 10. Start FastAPI backend ─────────────────────────────────────
+# ── 12. Start FastAPI backend ─────────────────────────────────────
 echo "🔄  Starting FastAPI backend on :${CONSOLE_PORT:-8080}..."
 RELOAD_FLAG=""
 [[ "${DEV_MODE:-1}" == "1" ]] && RELOAD_FLAG="--reload --reload-dir console"
-uvicorn console.backend.main:app \
+"$UVICORN" console.backend.main:app \
   --host 0.0.0.0 \
   --port "${CONSOLE_PORT:-8080}" \
   ${RELOAD_FLAG} \
@@ -157,3 +176,4 @@ echo "    → http://localhost:5173"
 echo ""
 echo "  Logs → logs/"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
