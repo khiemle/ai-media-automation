@@ -6,7 +6,7 @@
 
 ## Overview
 
-Seven improvements to the AI Media Automation Management Console:
+Eight improvements to the AI Media Automation Management Console:
 
 1. Remove obsolete Videos feature and ChromaDB references from Scraper
 2. Remove TikTok/YouTube scraper sources and their backend code
@@ -15,6 +15,7 @@ Seven improvements to the AI Media Automation Management Console:
 5. Enrich Production page scene cards and script header with more detail
 6. Add live log streaming per job in Pipeline tab
 7. Simplify LLM tab to Gemini-only with dynamic model selection
+8. Update `01_product_spec.md` and `02_architecture_design.md` to reflect all changes above
 
 ---
 
@@ -306,11 +307,13 @@ Remove `ModeCard` and `ProviderCard` components. New three-card layout:
 | `console/backend/services/llm_service.py` | Replace MODES with PROVIDER_REGISTRY |
 | `console/backend/services/pipeline_service.py` | Add `emit_log`, Redis log storage |
 | `console/backend/ws/pipeline_ws.py` | Include job_logs in WS broadcast |
-| `console/backend/schemas/script.py` | Add `raw_content`, `expand_first` fields |
+| `console/backend/schemas/script.py` | Add `raw_content` field; remove `expand_first` |
 | `console/backend/services/script_service.py` | Handle `raw_content` source in generation |
 | `console/backend/routers/scripts.py` | Add `/expand` endpoint |
 | `config/scraper_sources.yaml` | Remove TikTok + YouTube entries |
 | `rag/llm_router.py` | No changes needed (already Gemini-only) |
+| `01_product_spec.md` | Update sections 2.1, 2.6 to reflect Gemini-only, Niches, Composer, scraper cleanup |
+| `02_architecture_design.md` | Update API endpoint list, folder structure, data flow diagrams |
 
 ### Deleted files
 | File | Reason |
@@ -320,3 +323,28 @@ Remove `ModeCard` and `ProviderCard` components. New three-card layout:
 | `scraper/tiktok_selenium.py` | TikTok source removed |
 | `scraper/tiktok_browser_common.py` | TikTok source removed |
 | `scraper/apify_scraper.py` | TikTok/Apify source removed |
+
+---
+
+## Section 7 — Documentation Updates
+
+### `01_product_spec.md`
+
+| Section | Change |
+|---|---|
+| **2.1 Scraper Management** | Remove the "Scraped Data Browser", "Multi-select & Topic Creation" features (videos only). Replace with: Articles Browser (filter by source/language), article-to-script generation. Remove TikTok/Playwright/Apify/YouTube from Source Manager feature description. |
+| **2.1 — new** | Add Niches Management module entry: CRUD for niches, NicheCombobox in all generation flows, seeded defaults. |
+| **2.1 — new** | Add Composer module entry: free-form content/idea input, optional expand-first toggle, generates script via Gemini. |
+| **2.6 LLM & TTS Control** | Update LLM section: Gemini-only, dynamic model selection from API, quota monitor, remove routing mode table. Keep TTS section unchanged. |
+| **API endpoint list** (if present) | Add `/api/niches` (GET/POST/DELETE), `POST /api/scripts/expand`, `PUT /api/llm/model`. Remove `GET /api/scraper/videos`, `POST /api/scraper/videos/index`, `PUT /api/llm/mode`. |
+
+### `02_architecture_design.md`
+
+| Section | Change |
+|---|---|
+| **Section 3.1 — Console ↔ Core Pipeline** | Remove `ScraperService → tiktok_research_api.py` reference. Add `NicheService → niches table`. Add `ScriptService → /expand endpoint (inline Gemini call)`. Update `LLMService → PROVIDER_REGISTRY` note. |
+| **Section 4.1 — Data Flow: Scrape → Curate → Generate** | Replace video-selection flow with article-selection flow. Update `POST /api/scripts/generate` payload example to include `raw_content` option and article source. |
+| **Section 5.1 — New Tables** | Add `niches` table DDL. |
+| **Section 7 — API Endpoint Summary** | Add `NICHES (3)` group. Update SCRAPER group (remove videos endpoints). Update LLM group (replace `/mode` with `/model`, add `/expand` under SCRIPTS). Update total count. |
+| **Section 6 / Folder Structure** | Add `NichesPage.jsx`, `ComposerPage.jsx`, `NicheCombobox.jsx`, `niche_service.py`, `niches.py` router. Remove deleted scraper files. |
+| **Tech Stack table** | Remove "TikTok Research / Playwright / Apify" from External APIs. Update LLM row to "Gemini 2.5 Flash — model selectable via console". |
