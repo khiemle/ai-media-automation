@@ -1,9 +1,25 @@
-// ── Token storage (memory only — not localStorage) ────────────────────────────
+// ── Token storage (localStorage + memory) ─────────────────────────────────────
+const TOKEN_KEY = 'ai_media_token'
 let _token = null
 
-export function setToken(token) { _token = token }
-export function clearToken()    { _token = null }
-export function getToken()      { return _token }
+export function setToken(token) {
+  _token = token
+  localStorage.setItem(TOKEN_KEY, token)
+}
+
+export function clearToken() {
+  _token = null
+  localStorage.removeItem(TOKEN_KEY)
+}
+
+export function getToken() { return _token }
+
+/** Restore token from localStorage into memory. Returns the token or null. */
+export function loadPersistedToken() {
+  const saved = localStorage.getItem(TOKEN_KEY)
+  if (saved) _token = saved
+  return saved
+}
 
 // ── Base fetch wrapper ─────────────────────────────────────────────────────────
 export async function fetchApi(url, options = {}) {
@@ -44,12 +60,13 @@ export const scraperApi = {
     fetchApi(`/api/scraper/sources/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
   triggerScrape: (source_id) =>
     fetchApi('/api/scraper/run', { method: 'POST', body: JSON.stringify({ source_id }) }),
-  getVideos: (params = {}) => {
+  getTaskStatus: (task_id) => fetchApi(`/api/scraper/tasks/${task_id}`),
+  getArticles: (params = {}) => {
     const q = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== '')))
-    return fetchApi(`/api/scraper/videos?${q}`)
+    return fetchApi(`/api/scraper/articles?${q}`)
   },
-  indexVideos: (video_ids) =>
-    fetchApi('/api/scraper/videos/index', { method: 'POST', body: JSON.stringify({ video_ids }) }),
+  scrapeFromUrl: (url) =>
+    fetchApi('/api/scraper/articles/from-url', { method: 'POST', body: JSON.stringify({ url }) }),
 }
 
 // ── Scripts ────────────────────────────────────────────────────────────────────
