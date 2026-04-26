@@ -57,7 +57,14 @@ class NicheService:
 
     def get_or_create(self, name: str, user_id: int) -> dict:
         name = name.strip()
+        if not name:
+            raise ValueError("Niche name cannot be empty")
         existing = self.db.query(Niche).filter(Niche.name == name).first()
         if existing:
-            return {"id": existing.id, "name": existing.name}
+            return {
+                "id": existing.id,
+                "name": existing.name,
+                "script_count": 0,
+                "created_at": existing.created_at.isoformat() if existing.created_at else None,
+            }
         return self.create_niche(name, user_id)

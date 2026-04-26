@@ -237,6 +237,7 @@ export function Spinner({ size = 20 }) {
   )
 }
 
+export { default as NicheCombobox } from './NicheCombobox.jsx'
 // ─── EmptyState ───────────────────────────────────────────────────────────────
 export function EmptyState({ icon = '📭', title, description }) {
   return (

@@ -97,7 +97,6 @@ function ComingSoon({ name }) {
 export default function App() {
   const [user, setUser]         = useState(null)
   const [activeTab, setTab]     = useState('niches')
-  const [restoring, setRestoring] = useState(true)  // true while checking saved token
 
   // ── Restore session on mount ───────────────────────────────────────────────
   useEffect(() => {
@@ -120,11 +119,6 @@ export default function App() {
     setUser(null)
   }
 
-  if (restoring) return (
-    <div className="min-h-screen bg-[#0d0d0f] flex items-center justify-center">
-      <div className="w-5 h-5 border-2 border-[#7c6af7] border-t-transparent rounded-full animate-spin" />
-    </div>
-  )
 
   if (!user) return <LoginPage onLogin={handleLogin} />
 
