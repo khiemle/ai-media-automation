@@ -3,7 +3,6 @@ YouTube Data API v3 uploader.
 Uses OAuth credentials stored (Fernet-encrypted) in the console DB.
 """
 import logging
-import os
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -21,7 +20,8 @@ def upload(
 
     Args:
         video_path:  Path to video_final.mp4
-        metadata:    dict with keys: title, description, hashtags, niche, template
+        metadata:    dict with keys: title, description, hashtags, niche, template,
+                     language (default "en"), privacy_status (default "unlisted")
         credentials: dict with keys: client_id, client_secret, access_token, refresh_token
 
     Returns: YouTube video ID (e.g. 'dQw4w9WgXcQ')
@@ -41,7 +41,6 @@ def upload(
     if not video_path.exists():
         raise FileNotFoundError(f"Video file not found: {video_path}")
 
-    # Build credentials
     creds = Credentials(
         token=credentials.get("access_token"),
         refresh_token=credentials.get("refresh_token"),
@@ -50,29 +49,29 @@ def upload(
         token_uri="https://oauth2.googleapis.com/token",
     )
 
-    # Refresh token if expired
     if creds.expired and creds.refresh_token:
         creds.refresh(Request())
         logger.info("[YouTube] Token refreshed")
 
     youtube = build("youtube", "v3", credentials=creds)
 
-    # Build video resource
-    title       = metadata.get("title", video_path.stem)[:100]
-    description = _build_description(metadata)
-    tags        = _build_tags(metadata)
-    category_id = _niche_to_category(metadata.get("niche", "lifestyle"))
+    title          = metadata.get("title", video_path.stem)[:100]
+    description    = _build_description(metadata)
+    tags           = _build_tags(metadata)
+    category_id    = _niche_to_category(metadata.get("niche", "lifestyle"))
+    language       = metadata.get("language", "en")
+    privacy_status = metadata.get("privacy_status", "unlisted")
 
     body = {
         "snippet": {
-            "title":       title,
-            "description": description,
-            "tags":        tags,
-            "categoryId":  category_id,
-            "defaultLanguage": "vi",
+            "title":           title,
+            "description":     description,
+            "tags":            tags,
+            "categoryId":      category_id,
+            "defaultLanguage": language,
         },
         "status": {
-            "privacyStatus":           "public",
+            "privacyStatus":           privacy_status,
             "selfDeclaredMadeForKids": False,
         },
     }
@@ -98,42 +97,50 @@ def upload(
             logger.info(f"[YouTube] Upload progress: {progress}%")
 
     video_id = response.get("id", "")
-    logger.info(f"[YouTube] Uploaded video: https://youtube.com/watch?v={video_id}")
+    logger.info(f"[YouTube] Uploaded: https://youtube.com/watch?v={video_id}")
     return video_id
 
 
 def _build_description(metadata: dict) -> str:
-    desc = metadata.get("description", "")
-    hashtags = metadata.get("hashtags", [])
+    desc      = metadata.get("description", "")
+    hashtags  = metadata.get("hashtags", [])
     affiliate = metadata.get("affiliate_links", [])
 
     parts = [desc]
     if affiliate:
         parts.append("\n🔗 Links:\n" + "\n".join(affiliate))
-    if hashtags:
-        parts.append("\n" + " ".join(f"#{h.lstrip('#')}" for h in hashtags[:15]))
+
+    # Build hashtag line — always include #Shorts
+    ht_tags = [f"#{h.lstrip('#')}" for h in hashtags[:14]]
+    if "#Shorts" not in ht_tags:
+        ht_tags.append("#Shorts")
+    parts.append("\n" + " ".join(ht_tags))
 
     return "\n\n".join(p for p in parts if p).strip()[:5000]
 
 
 def _build_tags(metadata: dict) -> list[str]:
-    tags = []
+    # Shorts must be first so YouTube reliably classifies the video
+    tags = ["Shorts"]
     for h in metadata.get("hashtags", []):
-        tags.append(h.lstrip("#"))
+        tag = h.lstrip("#")
+        if tag != "Shorts":
+            tags.append(tag)
     niche = metadata.get("niche", "")
     if niche and niche not in tags:
         tags.append(niche)
-    return tags[:500]   # YouTube tag list max length
+    return tags[:500]
 
 
 def _niche_to_category(niche: str) -> str:
     mapping = {
-        "health":      "26",   # Howto & Style
-        "fitness":     "17",   # Sports
-        "lifestyle":   "26",   # Howto & Style
-        "finance":     "27",   # Education
-        "food":        "26",   # Howto & Style
-        "productivity": "27",  # Education
+        "health":       "26",   # Howto & Style
+        "fitness":      "17",   # Sports
+        "running":      "17",   # Sports
+        "lifestyle":    "26",   # Howto & Style
+        "finance":      "27",   # Education
+        "food":         "26",   # Howto & Style
+        "productivity": "27",   # Education
     }
     return mapping.get(niche, "22")   # 22 = People & Blogs
 
