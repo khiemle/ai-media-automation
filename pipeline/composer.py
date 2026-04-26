@@ -138,7 +138,7 @@ def _assemble(
 ):
     """Assemble all scene clips into raw_video.mp4 using MoviePy."""
     try:
-        from moviepy.editor import (
+        from moviepy import (
             VideoFileClip, AudioFileClip, ImageClip,
             ColorClip, concatenate_videoclips, CompositeVideoClip,
         )
@@ -162,31 +162,31 @@ def _assemble(
                         f"[Composer] Scene {idx} clip is {raw_clip.duration:.1f}s, "
                         f"scene needs {duration:.1f}s — clamping to clip length"
                     )
-                clip = raw_clip.subclip(0, clip_end)
+                clip = raw_clip.with_subclip(0, clip_end)
                 # Ensure correct size
                 if clip.w != TARGET_W or clip.h != TARGET_H:
-                    clip = clip.resize((TARGET_W, TARGET_H))
+                    clip = clip.resized((TARGET_W, TARGET_H))
             except Exception as e:
                 logger.warning(f"[Composer] Scene {idx} clip load failed ({assets['clip_path']}): {e}")
                 clip = ColorClip((TARGET_W, TARGET_H), color=(0, 0, 0), duration=duration)
         else:
             clip = ColorClip((TARGET_W, TARGET_H), color=(10, 10, 15), duration=duration)
 
-        clip = clip.set_duration(duration)
+        clip = clip.with_duration(duration)
 
         # Layer overlay PNG
         layers = [clip]
         if assets.get("overlay_path") and Path(assets["overlay_path"]).exists():
             try:
-                overlay = ImageClip(assets["overlay_path"]).set_duration(duration)
+                overlay = ImageClip(assets["overlay_path"]).with_duration(duration)
                 layers.append(overlay)
             except Exception as e:
                 logger.debug(f"[Composer] Scene {idx} overlay layer failed: {e}")
 
-        scene_clip = CompositeVideoClip(layers, size=(TARGET_W, TARGET_H)).set_duration(duration)
+        scene_clip = CompositeVideoClip(layers, size=(TARGET_W, TARGET_H)).with_duration(duration)
         # Strip any alpha mask inherited from the overlay — without this, the mask
         # (nearly 0 = transparent) would cause concatenate_videoclips to render black frames.
-        scene_clip = scene_clip.set_opacity(1.0)
+        scene_clip = scene_clip.with_opacity(1.0)
         scene_clip.mask = None
 
         # Set narration audio
@@ -195,8 +195,8 @@ def _assemble(
                 audio = AudioFileClip(assets["audio_path"])
                 # Trim or pad audio to match scene duration
                 if audio.duration > duration:
-                    audio = audio.subclip(0, duration)
-                scene_clip = scene_clip.set_audio(audio)
+                    audio = audio.with_subclip(0, duration)
+                scene_clip = scene_clip.with_audio(audio)
             except Exception as e:
                 logger.warning(f"[Composer] Scene {idx} audio failed: {e}")
 
@@ -229,22 +229,22 @@ def _assemble(
     music_track_path = _assigned_track or _select_music(meta.get("mood", "uplifting"), meta.get("niche", "lifestyle"), final.duration)
     if music_track_path:
         try:
-            from moviepy.editor import AudioFileClip, CompositeAudioClip
-            music = AudioFileClip(music_track_path).volumex(_track_volume)
+            from moviepy import AudioFileClip, CompositeAudioClip
+            music = AudioFileClip(music_track_path).with_volume_scaled(_track_volume)
             if music.duration < final.duration:
                 # Loop music
                 import math
                 loops = math.ceil(final.duration / music.duration)
-                from moviepy.editor import concatenate_audioclips
-                music = concatenate_audioclips([music] * loops).subclip(0, final.duration)
+                from moviepy import concatenate_audioclips
+                music = concatenate_audioclips([music] * loops).with_subclip(0, final.duration)
             else:
-                music = music.subclip(0, final.duration)
+                music = music.with_subclip(0, final.duration)
 
             if final.audio:
                 mixed = CompositeAudioClip([final.audio, music])
-                final = final.set_audio(mixed)
+                final = final.with_audio(mixed)
             else:
-                final = final.set_audio(music)
+                final = final.with_audio(music)
 
             # Increment usage count for DB-tracked tracks
             if music_track_id and _assigned_track:

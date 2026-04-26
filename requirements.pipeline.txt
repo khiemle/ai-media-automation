@@ -24,7 +24,7 @@ numpy>=2.0.2                        # Required by kokoro-onnx 0.4.0
 faster-whisper==1.0.3               # Whisper base → SRT subtitles (Python 3.12 compatible)
 
 # ── Video Production ──────────────────────────────────────
-moviepy==1.0.3                      # Scene composition + concatenation (2.x requires av which fails on Python 3.14)
+moviepy>=2.2.1                      # Scene composition + concatenation (requires av; install with --only-binary=:all:)
 pillow>=10.3.0                      # Text overlay rendering (PIL)
 opencv-python>=4.9.0.80             # Video frame extraction + resize
 
