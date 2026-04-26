@@ -1,35 +1,22 @@
 sources:
-  - id: tiktok_research
-    name: "TikTok Research API"
-    type: tiktok
-    module: scraper.tiktok_research_api
-    function: scrape
-    status: planned
-
-  - id: tiktok_playwright
-    name: "TikTok Playwright"
-    type: tiktok
-    module: scraper.tiktok_playwright
-    function: scrape
-    status: active
-
-  - id: tiktok_apify
-    name: "TikTok Apify"
-    type: tiktok
-    module: scraper.apify_scraper
-    function: scrape
-    status: planned
-
-  - id: youtube_trending
-    name: "YouTube Trending"
-    type: youtube
-    module: null
-    function: null
-    status: planned
-
-  - id: news_vnexpress
-    name: "VnExpress News"
-    type: news
-    module: null
-    function: null
-    status: planned
+- function: scrape_homepage
+  id: news_vnexpress
+  language: vietnamese
+  module: scraper.vnexpress_scraper
+  name: VnExpress News
+  status: standby
+  type: news
+- function: scrape_homepage
+  id: news_tinhte
+  language: vietnamese
+  module: scraper.tinhte_scraper
+  name: Tinhte News
+  status: standby
+  type: news
+- function: scrape_homepage
+  id: news_cnn
+  language: english
+  module: scraper.cnn_scraper
+  name: CNN News
+  status: active
+  type: news
