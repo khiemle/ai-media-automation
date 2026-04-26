@@ -252,6 +252,85 @@ function GenerateModal({ niches, onClose, onGenerated, onPollTrack }) {
   )
 }
 
+// ── Import Music Modal ────────────────────────────────────────────────────────
+function ImportModal({ niches, onClose, onImported }) {
+  const [file,         setFile]         = useState(null)
+  const [detectedDur,  setDetectedDur]  = useState(null)
+  const [title,        setTitle]        = useState('')
+  const [selNiches,    setSelNiches]    = useState([])
+  const [selMoods,     setSelMoods]     = useState([])
+  const [selGenres,    setSelGenres]    = useState([])
+  const [isVocal,      setIsVocal]      = useState(false)
+  const [volume,       setVolume]       = useState(0.15)
+  const [qualityScore, setQualityScore] = useState(80)
+  const [uploading,    setUploading]    = useState(false)
+  const [toast,        setToast]        = useState(null)
+  const showToast = (msg, type='error') => { setToast({msg,type}); setTimeout(()=>setToast(null),3000) }
+
+  const handleFileChange = (e) => {
+    const f = e.target.files?.[0]
+    if (!f) return
+    setFile(f)
+    const baseName = f.name.replace(/\.[^.]+$/, '')
+    setTitle(baseName)
+    // Detect duration client-side
+    const url = URL.createObjectURL(f)
+    const audio = new Audio(url)
+    audio.onloadedmetadata = () => { setDetectedDur(Math.round(audio.duration)); URL.revokeObjectURL(url) }
+  }
+
+  const handleImport = async () => {
+    if (!file) { showToast('Choose a file first'); return }
+    if (!title.trim()) { showToast('Title is required'); return }
+    setUploading(true)
+    try {
+      await musicApi.upload(file, {
+        title, niches: selNiches, moods: selMoods, genres: selGenres,
+        is_vocal: isVocal, volume, quality_score: qualityScore,
+      })
+      onImported()
+      onClose()
+    } catch (e) { showToast(e.message) }
+    finally { setUploading(false) }
+  }
+
+  return (
+    <Modal open onClose={onClose} title="Import Music File" width="max-w-xl"
+      footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button variant="primary" loading={uploading} onClick={handleImport}>Import</Button></>}
+    >
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-[#9090a8] font-medium">Audio file (.mp3 / .wav / .m4a / .ogg)</label>
+          <input type="file" accept=".mp3,.wav,.m4a,.ogg" onChange={handleFileChange}
+            className="text-sm text-[#9090a8] file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border file:border-[#2a2a32] file:bg-[#222228] file:text-[#e8e8f0] file:text-xs hover:file:bg-[#2a2a32]" />
+          {detectedDur !== null && <p className="text-xs text-[#34d399]">Detected duration: {detectedDur}s</p>}
+        </div>
+
+        <Input label="Title" value={title} onChange={e => setTitle(e.target.value)} placeholder="Track title" />
+        <MultiSelect label="Niches" options={niches.map(n => n.name)} value={selNiches} onChange={setSelNiches} />
+        <MultiSelect label="Moods"  options={MOODS}  value={selMoods}  onChange={setSelMoods} />
+        <MultiSelect label="Genres" options={GENRES} value={selGenres} onChange={setSelGenres} />
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-[#9090a8] font-medium">Volume ({(volume * 100).toFixed(0)}%)</label>
+            <input type="range" min="0" max="1" step="0.01" value={volume}
+              onChange={e => setVolume(parseFloat(e.target.value))} className="accent-[#7c6af7]" />
+          </div>
+          <Input label="Quality Score (0–100)" type="number" value={qualityScore}
+            onChange={e => setQualityScore(parseInt(e.target.value) || 0)} />
+        </div>
+
+        <label className="flex items-center gap-2 cursor-pointer text-sm text-[#9090a8]">
+          <input type="checkbox" checked={isVocal} onChange={e => setIsVocal(e.target.checked)} className="accent-[#7c6af7]" />
+          With vocals
+        </label>
+      </div>
+      {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+    </Modal>
+  )
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function MusicPage() {
   const [filterNiche,  setFilterNiche]  = useState('')
@@ -263,6 +342,7 @@ export default function MusicPage() {
   const [playingTrack, setPlayingTrack] = useState(null)
   const [deletingId,   setDeletingId]   = useState(null)
   const [showGenerate, setShowGenerate] = useState(false)
+  const [showImport,   setShowImport]   = useState(false)
   const [toast,        setToast]        = useState(null)
   const [pendingPolls, setPendingPolls] = useState({}) // trackId → celeryTaskId
 
@@ -325,7 +405,7 @@ export default function MusicPage() {
           <p className="text-sm text-[#9090a8] mt-0.5">Manage background music tracks for videos</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="default" onClick={() => {/* ImportModal - Task 12 */}}>↑ Import</Button>
+          <Button variant="default" onClick={() => setShowImport(true)}>↑ Import</Button>
           <Button variant="primary" onClick={() => setShowGenerate(true)}>+ Generate</Button>
         </div>
       </div>
@@ -436,6 +516,14 @@ export default function MusicPage() {
           onClose={() => setShowGenerate(false)}
           onGenerated={refetch}
           onPollTrack={(trackId, taskId) => setPendingPolls(p => ({ ...p, [trackId]: taskId }))}
+        />
+      )}
+
+      {showImport && (
+        <ImportModal
+          niches={niches}
+          onClose={() => setShowImport(false)}
+          onImported={refetch}
         />
       )}
 
