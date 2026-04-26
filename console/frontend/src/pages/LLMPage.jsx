@@ -28,6 +28,7 @@ export default function LLMPage() {
   }
 
   useEffect(() => { load() }, [])
+  useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current) }, [])
 
   const handleModelChange = async (model) => {
     setSaving(true)
@@ -38,7 +39,7 @@ export default function LLMPage() {
       })
       setStatus(s => ({ ...s, model }))
       showToast(`Model set to ${model}`)
-    } catch (e) { showToast(e.message, 'error') }
+    } catch (e) { showToast(e.message || 'Failed to set model', 'error') }
     finally { setSaving(false) }
   }
 

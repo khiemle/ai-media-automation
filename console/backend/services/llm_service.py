@@ -75,7 +75,9 @@ class LLMService:
             for m in client.models.list():
                 name = getattr(m, 'name', '') or ''
                 # Filter to text-generation models; skip embedding/vision-only
-                supported = getattr(m, 'supported_actions', None) or getattr(m, 'supportedActions', None)
+                supported = getattr(m, 'supported_actions', None)
+                if supported is None:
+                    supported = getattr(m, 'supportedActions', None)
                 if supported is not None:
                     if 'generateContent' not in supported:
                         continue

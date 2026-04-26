@@ -15,8 +15,8 @@ load_dotenv(_root / ".env", override=False)
 
 logger = logging.getLogger(__name__)
 
-# GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")  # No longer used at runtime
-GEMINI_KEY   = os.environ.get("GEMINI_API_KEY", "")
+# Both GEMINI_MODEL and GEMINI_KEY are read at call time (not import time)
+# so that set_model() and late env injection take effect immediately.
 
 try:
     from google import genai
@@ -36,17 +36,18 @@ class GeminiRouter:
         Call Gemini and return parsed dict (expect_json=True) or raw string.
         Raises RuntimeError if Gemini is unavailable or returns an error.
         """
-        if not GEMINI_KEY:
+        api_key = os.environ.get("GEMINI_API_KEY", "")
+        if not api_key:
             raise RuntimeError("GEMINI_API_KEY is not set in .env")
         if genai is None:
             raise RuntimeError("google-genai not installed. Run: pip install google-genai")
 
-        client = genai.Client(api_key=GEMINI_KEY)
-        model = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
-        logger.info(f"[GeminiRouter] model={model} template={template}")
+        client = genai.Client(api_key=api_key)
 
         for attempt in range(3):
             try:
+                model = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+                logger.info(f"[GeminiRouter] model={model} template={template}")
                 self._limiter.wait_if_needed()
                 config = genai.types.GenerateContentConfig(temperature=0.8)
                 if expect_json:
@@ -54,7 +55,6 @@ class GeminiRouter:
                         temperature=0.8,
                         response_mime_type="application/json",
                     )
-                model = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
                 response = client.models.generate_content(
                     model=model,
                     contents=prompt,
@@ -76,7 +76,7 @@ class GeminiRouter:
         model = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
         return {
             "model":           model,
-            "gemini_key_set":  bool(GEMINI_KEY),
+            "gemini_key_set":  bool(os.environ.get("GEMINI_API_KEY", "")),
             "gemini_usage":    self._limiter.usage(),
         }
 
