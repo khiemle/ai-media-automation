@@ -83,7 +83,7 @@ The Management Console is a thin control layer that wraps the existing AI Media 
 | Database | PostgreSQL 16 | Already running — extend with 6 new tables |
 | File Server | FastAPI StaticFiles | Serve asset thumbnails and audio previews |
 | Encryption | Fernet (cryptography) | Encrypt OAuth secrets at rest |
-| LLM | Gemini 2.5 Flash only | Ollama/local model removed — Gemini handles all script generation |
+| LLM | Gemini 2.5 Flash (model selectable via console) | Gemini-only; provider registry extensible for future models |
 | TTS | ElevenLabs (VI) + Kokoro (EN) | TTS Router selects engine by script language; auto mode default |
 
 ---
@@ -414,6 +414,7 @@ ai_media_company/
 │   │   ├── config.py                 # Console config (pydantic-settings)
 │   │   ├── celery_app.py             # Celery instance + task registration
 │   │   ├── routers/                  # 11 route groups
+│   │   │   ├── niches.py
 │   │   │   ├── auth.py               # /api/auth/*
 │   │   │   ├── scraper.py            # /api/scraper/*
 │   │   │   ├── scripts.py            # /api/scripts/*
@@ -426,7 +427,9 @@ ai_media_company/
 │   │   │   ├── credentials.py        # /api/credentials/*
 │   │   │   └── channels.py           # /api/channels/*
 │   │   ├── services/                 # 11 service classes
+│   │   │   ├── niche_service.py
 │   │   ├── models/                   # SQLAlchemy (console-only tables)
+│   │   │   ├── niche.py
 │   │   ├── schemas/                  # Pydantic request/response
 │   │   └── ws/
 │   │       └── pipeline_ws.py        # WebSocket for live job updates
@@ -436,7 +439,10 @@ ai_media_company/
 │   │   │   ├── App.jsx               # Layout + tab routing
 │   │   │   ├── api/                  # API client per module
 │   │   │   ├── components/           # Shared UI (Card, Badge, Modal, etc.)
+│   │   │   ├── components/NicheCombobox.jsx
 │   │   │   ├── pages/                # 8 page components
+│   │   │   ├── pages/NichesPage.jsx
+│   │   │   ├── pages/ComposerPage.jsx
 │   │   │   ├── hooks/                # useWebSocket, useApi, useAuth
 │   │   │   └── utils/
 │   │   ├── vite.config.js
@@ -447,6 +453,7 @@ ai_media_company/
 │
 ├── config/                           # (existing — unchanged)
 ├── scraper/                          # (existing — unchanged)
+    # REMOVED: tiktok_research_api.py, tiktok_playwright.py, tiktok_selenium.py, tiktok_browser_common.py, apify_scraper.py
 ├── database/                         # (existing — models extended)
 ├── rag/                              # (existing — unchanged)
 ├── pipeline/                         # (existing — unchanged)

@@ -46,15 +46,42 @@ Build a **web-based Management Console** that wraps around the existing automati
 
 | Feature | Description | Priority |
 |---------|-------------|----------|
-| Source Manager | View, enable/disable scraper sources (TikTok Research API, Playwright, Apify). Architecture supports future sources (YouTube Trending, news websites like VnExpress, Tuổi Trẻ) via a pluggable adapter interface | P0 |
-| Scraped Data Browser | Tabular view of all scraped videos with columns: hook text, author, play count, ER, niche, region, tags, indexed status. Supports filtering by source, niche, region, and sorting by views/ER/likes | P0 |
-| Multi-select & Topic Creation | Editor selects 1–N scraped videos, clicks "Generate Script", enters a topic/niche/template, and the system sends the selected videos as RAG context to the LLM Router for script generation | P0 |
-| Manual Scrape Trigger | Button to trigger an immediate scrape run outside the cron schedule | P1 |
-| Source Plugin API | Adapter interface for adding new scraper sources without modifying core code. Each adapter implements `scrape(config) → list[ScrapedVideo]` | P2 |
+| Source Manager | View, enable/disable news scraper sources (VnExpress, Tinhte, CNN). Architecture supports future sources via a pluggable adapter interface (`scraper/base_scraper.py`) | P0 |
+| Articles Browser | Tabular view of all scraped news articles: title, source, language, date. Supports filtering by source and language. Expand row to read full content | P0 |
+| Article → Script | Click "→ Script" on any article to open the Generate Script modal, pre-filled with article title and language | P0 |
+| Manual Scrape Trigger | Button to trigger an immediate scrape run for any news source outside the cron schedule | P1 |
 
-**Data Model:** Reads from existing `viral_videos` and `viral_patterns` tables. No schema changes.
+
+> **Data Model:** Reads from `news_articles` table. `viral_videos` table remains in schema for pipeline use but is not exposed in the console.
 
 **Integration:** Scraper Manager → `viral_videos` table → `rag/script_writer.py` → `generated_scripts` table.
+
+---
+
+### 2.1a Niche Management
+
+**Purpose:** Central registry of content niches used across all script generation flows.
+
+| Feature | Description | Priority |
+|---------|-------------|----------|
+| Niche List | Table of all niches with script usage count | P0 |
+| Add Niche | Admin-only: add new niche via modal or inline combobox | P0 |
+| Delete Niche | Admin-only: delete niche if not in use by any scripts | P0 |
+| NicheCombobox | Shared dropdown+free-text component used in Generate Script modal and Composer. Typing a new name shows "+ Add" option that creates the niche inline | P0 |
+
+**Data Model:** New `niches` table: `id, name (unique), created_at`. Seeded with: `beauty, education, finance, fitness, food, lifestyle, tech`.
+
+### 2.1b Composer
+
+**Purpose:** Allow editors to generate scripts from free-form content or ideas without needing a scraped article.
+
+| Feature | Description | Priority |
+|---------|-------------|----------|
+| Content Input | Large textarea accepting full articles, topic sentences, or general ideas | P0 |
+| Expand Idea First | Optional toggle: Gemini expands the input into a detailed outline the editor can review and edit before generating the script | P0 |
+| Generate Script | Calls the same generation pipeline as the Scraper flow, using the input (or expanded outline) as `raw_content` | P0 |
+
+**Integration:** `POST /api/scripts/expand` (inline Gemini call, returns outline). `POST /api/scripts/generate` with `raw_content` field.
 
 ---
 
@@ -140,12 +167,13 @@ Build a **web-based Management Console** that wraps around the existing automati
 
 ### 2.6 LLM & TTS Control
 
-**LLM:** Gemini 2.5 Flash only. Ollama/local model removed.
+**LLM:** Google Gemini only. Model selectable from the console UI (fetched dynamically from Gemini's model list API).
 
 | Feature | Description | Priority |
 |---------|-------------|----------|
-| Quota Monitor | Gemini RPD/RPM usage, average latency per generation | P0 |
-| Rate Limiter Dashboard | Usage bar, requests remaining today | P1 |
+| Active Model | Shows provider (Google Gemini), API key status, model selector dropdown | P0 |
+| Quota Monitor | Gemini RPD/RPM usage from rate limiter | P0 |
+| Future Providers | Extensible via `PROVIDER_REGISTRY` in `llm_service.py` — add Ollama, OpenAI etc. by adding an entry and a model-fetch method | P1 |
 
 **TTS:** Engine selected by script language via `TTS_ENGINE` env var (`auto|kokoro|elevenlabs`).
 
