@@ -93,3 +93,37 @@ export const nichesApi = {
   create: (name) => fetchApi('/api/niches', { method: 'POST', body: JSON.stringify({ name }) }),
   remove: (id) => fetchApi(`/api/niches/${id}`, { method: 'DELETE' }),
 }
+
+// ── Music ──────────────────────────────────────────────────────────────────────
+export const musicApi = {
+  list: (params = {}) => {
+    const q = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== '')))
+    return fetchApi(`/api/music?${q}`)
+  },
+  generate: (body) =>
+    fetchApi('/api/music/generate', { method: 'POST', body: JSON.stringify(body) }),
+  upload: (file, metadata) => {
+    const form = new FormData()
+    form.append('file', file)
+    form.append('metadata', JSON.stringify(metadata))
+    // fetchApi adds Content-Type: application/json which breaks multipart — use raw fetch
+    const headers = {}
+    const token = getToken()
+    if (token) headers['Authorization'] = `Bearer ${token}`
+    return fetch('/api/music/upload', { method: 'POST', body: form, headers })
+      .then(async res => {
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ detail: res.statusText }))
+          throw new Error(err.detail || `HTTP ${res.status}`)
+        }
+        return res.json()
+      })
+  },
+  get: (id) => fetchApi(`/api/music/${id}`),
+  update: (id, body) =>
+    fetchApi(`/api/music/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  delete: (id) =>
+    fetchApi(`/api/music/${id}`, { method: 'DELETE' }),
+  pollTask: (taskId) => fetchApi(`/api/music/tasks/${taskId}`),
+  streamUrl: (id) => `/api/music/${id}/stream`,
+}

@@ -218,6 +218,18 @@ class ScriptService:
         self.db.add(row)
         self.db.commit()
         self.db.refresh(row)
+
+        # Auto-assign music track for the niche (best ready track, or none)
+        try:
+            from console.backend.services.music_service import MusicService
+            track_id = MusicService(self.db).best_track_for_niche(niche or "")
+            if track_id:
+                row.music_track_id = track_id
+                self.db.commit()
+                self.db.refresh(row)
+        except Exception:
+            pass  # never block script creation
+
         _audit(self.db, user_id, "generate_script", "script", row.id, {
             "topic": topic,
             "source_article_id": source_article_id,

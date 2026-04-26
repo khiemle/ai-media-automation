@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { scriptsApi } from '../api/client.js'
+import { scriptsApi, musicApi } from '../api/client.js'
 import { useApi } from '../hooks/useApi.js'
 import { Card, Badge, Button, Modal, Tabs, Select, Input, Textarea, StatBox, Toast, Spinner, EmptyState } from '../components/index.jsx'
 
@@ -116,6 +116,13 @@ function ScriptEditorModal({ scriptId, onClose, onSaved }) {
   const meta       = scriptJson.meta || {}
   const video      = scriptJson.video || {}
 
+  // Load music tracks filtered by script niche
+  const scriptNiche = data?.script_json?.meta?.niche || data?.niche || ''
+  const { data: musicTracks = [] } = useApi(
+    () => musicApi.list({ status: 'ready', niche: scriptNiche }),
+    [scriptNiche]
+  )
+
   const setScriptField = (section, key, value) => {
     const current = draft ?? data?.script_json ?? {}
     setDraft({ ...current, [section]: { ...(current[section] || {}), [key]: value } })
@@ -205,6 +212,21 @@ function ScriptEditorModal({ scriptId, onClose, onSaved }) {
             <Textarea label="Description" value={video.description || ''} onChange={e => setScriptField('video', 'description', e.target.value)} rows={2} />
             <Input label="Hashtags (comma-sep)" value={(video.hashtags || []).join(', ')} onChange={e => setScriptField('video', 'hashtags', e.target.value.split(',').map(h => h.trim()).filter(Boolean))} />
             <Select label="Voice"   value={video.voice   || ''} onChange={e => setScriptField('video', 'voice', e.target.value)}   placeholder="Default" options={VOICES.map(v => ({ value: v, label: v }))} />
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-[#9090a8] font-medium">Background Music</label>
+              <select
+                value={video.music_track_id || ''}
+                onChange={e => setScriptField('video', 'music_track_id', e.target.value ? parseInt(e.target.value) : null)}
+                className="bg-[#16161a] border border-[#2a2a32] rounded-lg px-3 py-1.5 text-sm text-[#e8e8f0] focus:outline-none focus:border-[#7c6af7] transition-colors appearance-none cursor-pointer"
+              >
+                <option value="">None</option>
+                {musicTracks.map(t => (
+                  <option key={t.id} value={t.id}>
+                    {t.title} · {t.duration_s ? `${t.duration_s.toFixed(0)}s` : '?'} · {(t.genres || []).join(', ')}
+                  </option>
+                ))}
+              </select>
+            </div>
             <Select label="Mood"    value={video.music_mood || ''} onChange={e => setScriptField('video', 'music_mood', e.target.value)} placeholder="Default" options={MOODS.map(m => ({ value: m, label: m }))} />
             <Input label="Voice Speed" type="number" value={video.voice_speed ?? 1} onChange={e => setScriptField('video', 'voice_speed', parseFloat(e.target.value))} />
           </div>

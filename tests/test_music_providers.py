@@ -56,3 +56,37 @@ def test_suno_provider_poll_returns_none_when_pending():
         url = provider.poll("abc-123")
 
     assert url is None
+
+
+def test_lyria_provider_generate_returns_bytes():
+    import base64
+    fake_audio = base64.b64encode(b"FAKE_MP3_DATA").decode()
+
+    mock_part = MagicMock()
+    mock_part.inline_data = MagicMock()
+    mock_part.inline_data.data = fake_audio
+
+    mock_content = MagicMock()
+    mock_content.parts = [mock_part]
+
+    mock_candidate = MagicMock()
+    mock_candidate.content = mock_content
+
+    mock_response = MagicMock()
+    mock_response.candidates = [mock_candidate]
+
+    with patch.dict("os.environ", {"GEMINI_API_KEY": "fake-key"}):
+        with patch("pipeline.music_providers.lyria_provider.genai") as mock_genai:
+            mock_client = MagicMock()
+            mock_genai.Client.return_value = mock_client
+            mock_client.models.generate_content.return_value = mock_response
+
+            from pipeline.music_providers.lyria_provider import LyriaProvider
+            provider = LyriaProvider()
+            audio_bytes = provider.generate(
+                prompt="calm ambient background",
+                model="lyria-3-clip-preview",
+                is_vocal=False,
+            )
+
+    assert audio_bytes == b"FAKE_MP3_DATA"
