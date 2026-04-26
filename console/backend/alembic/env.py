@@ -24,6 +24,7 @@ import console.backend.models.console_user   # noqa
 import console.backend.models.credentials    # noqa
 import console.backend.models.channel        # noqa
 import console.backend.models.audit_log      # noqa
+import console.backend.models.niche          # noqa
 
 # ── Alembic Config ────────────────────────────────────────────────────────────
 config = context.config
