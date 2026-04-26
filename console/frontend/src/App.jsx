@@ -101,11 +101,10 @@ export default function App() {
   // ── Restore session on mount ───────────────────────────────────────────────
   useEffect(() => {
     const token = loadPersistedToken()
-    if (!token) { setRestoring(false); return }
+    if (!token) return
     authApi.me()
-      .then(userData => { setUser(userData) })
-      .catch(() => { clearToken() })
-      .finally(() => { setRestoring(false) })
+      .then(userData => setUser(userData))
+      .catch(() => clearToken())
   }, [])
 
   // ── Auth handlers ──────────────────────────────────────────────────────────

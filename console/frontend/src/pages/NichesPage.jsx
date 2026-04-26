@@ -4,7 +4,7 @@ import { useApi } from '../hooks/useApi.js'
 import { Card, Button, StatBox, Modal, Input, Toast, Spinner, EmptyState } from '../components/index.jsx'
 
 export default function NichesPage() {
-  const { data, loading, refetch } = useApi(() => nichesApi.list(), [])
+  const { data, loading, error, refetch } = useApi(() => nichesApi.list(), [])
   const niches = data || []
 
   const [addOpen,   setAddOpen]   = useState(false)
@@ -62,6 +62,11 @@ export default function NichesPage() {
       <Card title="All Niches">
         {loading ? (
           <div className="flex justify-center py-12"><Spinner size={28} /></div>
+        ) : error ? (
+          <div className="py-10 text-center">
+            <p className="text-sm text-[#f87171] mb-3">{error}</p>
+            <Button variant="ghost" size="sm" onClick={refetch}>Retry</Button>
+          </div>
         ) : niches.length === 0 ? (
           <EmptyState icon="🏷️" title="No niches yet" description="Add your first niche above." />
         ) : (
@@ -109,7 +114,7 @@ export default function NichesPage() {
         }>
         <Input label="Niche Name" value={newName} onChange={e => setNewName(e.target.value)}
           placeholder="e.g. gaming" autoFocus
-          onKeyDown={e => e.key === 'Enter' && handleAdd()} />
+          onKeyDown={e => e.key === 'Enter' && !saving && handleAdd()} />
       </Modal>
 
       {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}

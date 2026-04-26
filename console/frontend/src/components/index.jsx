@@ -59,7 +59,7 @@ const BUTTON_SIZES = {
   lg: 'px-5 py-2 text-sm',
 }
 
-export function Button({ variant = 'default', size = 'md', disabled, loading, onClick, children, className = '', type = 'button' }) {
+export function Button({ variant = 'default', size = 'md', disabled, loading, onClick, children, className = '', type = 'button', ...rest }) {
   const style = BUTTON_STYLES[variant] || BUTTON_STYLES.default
   const sz = BUTTON_SIZES[size] || BUTTON_SIZES.md
   return (
@@ -68,6 +68,7 @@ export function Button({ variant = 'default', size = 'md', disabled, loading, on
       onClick={onClick}
       disabled={disabled || loading}
       className={`inline-flex items-center gap-1.5 rounded-lg font-medium transition-colors ${style} ${sz} disabled:opacity-40 disabled:cursor-not-allowed ${className}`}
+      {...rest}
     >
       {loading && (
         <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none">
