@@ -67,7 +67,7 @@ def compose_video(script_id: int) -> Path:
 
     # ── Phase 2: MoviePy assembly ─────────────────────────────────────────────
     raw_video_path = out_dir / "raw_video.mp4"
-    _assemble(scenes, scene_assets, meta, video, raw_video_path)
+    _assemble(scenes, scene_assets, meta, video, raw_video_path, music_track_id=music_track_id)
 
     # Update output_path in DB
     db = get_session()
@@ -130,11 +130,12 @@ def _process_scene(scene: dict, meta: dict, video_cfg: dict, out_dir: Path, idx:
 
 
 def _assemble(
-    scenes:       list[dict],
-    scene_assets: dict[int, dict],
-    meta:         dict,
-    video_cfg:    dict,
-    output_path:  Path,
+    scenes:         list[dict],
+    scene_assets:   dict[int, dict],
+    meta:           dict,
+    video_cfg:      dict,
+    output_path:    Path,
+    music_track_id: int | None = None,
 ):
     """Assemble all scene clips into raw_video.mp4 using MoviePy."""
     try:
