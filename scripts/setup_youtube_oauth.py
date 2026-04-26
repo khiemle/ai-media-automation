@@ -25,12 +25,13 @@ import os
 import sys
 import threading
 import time
+import urllib.error
 import urllib.parse
 import webbrowser
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-import httpx
+import urllib.request
 
 # ── Env setup ──────────────────────────────────────────────────────────────────
 ROOT = Path(__file__).resolve().parent.parent
@@ -168,21 +169,20 @@ def main():
         print(f"✓ Received auth code")
 
         # 4. Exchange code for tokens
-        resp = httpx.post(
-            TOKEN_ENDPOINT,
-            data={
-                "code":          code,
-                "client_id":     args.client_id,
-                "client_secret": args.client_secret,
-                "redirect_uri":  REDIRECT_URI,
-                "grant_type":    "authorization_code",
-            },
-            timeout=15,
-        )
-        if resp.status_code != 200:
-            sys.exit(f"ERROR: Token exchange failed ({resp.status_code}): {resp.text}")
-
-        tokens = resp.json()
+        post_data = urllib.parse.urlencode({
+            "code":          code,
+            "client_id":     args.client_id,
+            "client_secret": args.client_secret,
+            "redirect_uri":  REDIRECT_URI,
+            "grant_type":    "authorization_code",
+        }).encode()
+        req = urllib.request.Request(TOKEN_ENDPOINT, data=post_data, method="POST")
+        req.add_header("Content-Type", "application/x-www-form-urlencoded")
+        try:
+            with urllib.request.urlopen(req, timeout=15) as r:
+                tokens = json.loads(r.read())
+        except urllib.error.HTTPError as exc:
+            sys.exit(f"ERROR: Token exchange failed ({exc.code}): {exc.read().decode()}")
         if "access_token" not in tokens:
             sys.exit(f"ERROR: No access_token in response: {tokens}")
 
