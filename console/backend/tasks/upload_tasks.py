@@ -53,8 +53,12 @@ def upload_to_channel_task(self, video_id: str, channel_id: int):
         # Fetch video metadata from the script
         from database.models import GeneratedScript
         script = db.query(GeneratedScript).filter(GeneratedScript.id == video_id).first()
-        video_meta = script.script_json.get("video", {}) if script else {}
+        video_meta = dict(script.script_json.get("video", {})) if script else {}
         video_path = script.output_path if script and hasattr(script, "output_path") else None
+
+        # Inject channel-specific upload settings
+        video_meta["language"]       = channel.default_language or "en"
+        video_meta["privacy_status"] = "unlisted"
         if not script:
             raise ValueError(f"Rendered script not found for video {video_id}")
         if not video_path:
