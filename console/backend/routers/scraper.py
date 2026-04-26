@@ -6,7 +6,6 @@ from console.backend.database import get_db
 from console.backend.schemas.scraper import (
     ScraperSourceResponse,
     ScraperSourceStatusUpdate,
-    ScrapedVideoResponse,
     ScrapedArticleResponse,
     ScrapeUrlRequest,
     TriggerScrapeRequest,
@@ -61,29 +60,6 @@ def get_task_status(
     _user=Depends(require_editor_or_admin),
 ):
     return ScraperService(db).get_task_status(task_id)
-
-
-@router.get("/videos", response_model=PaginatedResponse[ScrapedVideoResponse])
-def list_videos(
-    source: str | None = None,
-    niche: str | None = None,
-    region: str | None = None,
-    sort_by: str = "play_count",
-    sort_dir: str = "desc",
-    page: int = 1,
-    per_page: int = 50,
-    db: Session = Depends(get_db),
-    _user=Depends(require_editor_or_admin),
-):
-    return ScraperService(db).list_videos(
-        source=source,
-        niche=niche,
-        region=region,
-        sort_by=sort_by,
-        sort_dir=sort_dir,
-        page=page,
-        per_page=per_page,
-    )
 
 
 @router.get("/articles", response_model=PaginatedResponse[ScrapedArticleResponse])

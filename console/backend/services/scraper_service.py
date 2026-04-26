@@ -12,7 +12,6 @@ from sqlalchemy.orm import Session
 from console.backend.schemas.common import PaginatedResponse
 from console.backend.schemas.scraper import (
     ScraperSourceResponse,
-    ScrapedVideoResponse,
     ScrapedArticleResponse,
 )
 
@@ -100,77 +99,7 @@ class ScraperService:
         task = run_scrape_task.delay(source_id)
         return task.id
 
-    # ── Videos ────────────────────────────────────────────────────────────────
-
-    def list_videos(
-        self,
-        source: str | None = None,
-        niche: str | None = None,
-        region: str | None = None,
-        sort_by: str = "play_count",
-        sort_dir: str = "desc",
-        page: int = 1,
-        per_page: int = 50,
-    ) -> PaginatedResponse[ScrapedVideoResponse]:
-        try:
-            from database.models import ViralVideo
-        except ImportError:
-            # Core pipeline not present — return empty results
-            return PaginatedResponse(items=[], total=0, page=page, pages=0, per_page=per_page)
-
-        filters = []
-        if niche:
-            filters.append(ViralVideo.niche == niche)
-        if region:
-            filters.append(ViralVideo.region == region)
-        if source:
-            filters.append(ViralVideo.source == source)
-
-        query = self.db.query(ViralVideo)
-        if filters:
-            query = query.filter(and_(*filters))
-
-        total = query.count()
-
-        sort_col = {
-            "play_count":      ViralVideo.play_count,
-            "engagement_rate": ViralVideo.engagement_rate,
-            "likes":           ViralVideo.play_count,
-        }.get(sort_by, ViralVideo.play_count)
-
-        if sort_dir == "desc":
-            query = query.order_by(sort_col.desc())
-        else:
-            query = query.order_by(sort_col.asc())
-
-        offset = (page - 1) * per_page
-        rows = query.offset(offset).limit(per_page).all()
-
-        items = [
-            ScrapedVideoResponse.model_validate({
-                "id": str(r.id),
-                "platform": r.source,
-                "region": r.region,
-                "niche": r.niche,
-                "play_count": r.play_count,
-                "engagement_rate": r.engagement_rate,
-                "hook_text": r.hook_text,
-                "script_text": None,
-                "is_indexed": bool(r.indexed_at),
-                "scraped_at": r.scraped_at,
-            })
-            for r in rows
-        ]
-
-        return PaginatedResponse(
-            items=items,
-            total=total,
-            page=page,
-            pages=math.ceil(total / per_page) if per_page else 1,
-            per_page=per_page,
-        )
-
-    # ── Articles ──────────────────────────────────────────────────────────────
+# ── Articles ──────────────────────────────────────────────────────────────
 
     def list_articles(
         self,
