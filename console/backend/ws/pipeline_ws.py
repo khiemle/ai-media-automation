@@ -4,7 +4,8 @@ import logging
 from datetime import datetime, timezone
 from typing import List
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
+from console.backend.auth import decode_token
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -100,7 +101,12 @@ def _get_stats() -> dict:
 
 
 @router.websocket("/ws/pipeline")
-async def pipeline_ws(websocket: WebSocket):
+async def pipeline_ws(websocket: WebSocket, token: str = Query(...)):
+    try:
+        decode_token(token)
+    except Exception:
+        await websocket.close(code=1008)
+        return
     await manager.connect(websocket)
     try:
         while True:

@@ -4,6 +4,7 @@ from pathlib import Path
 
 from console.backend.celery_app import celery_app
 from console.backend.tasks.job_tracking import mark_job_completed, mark_job_failed, mark_job_progress
+from console.backend.services.pipeline_service import emit_log
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,7 @@ def regenerate_tts_task(self, script_id: int, scene_index: int):
     db = SessionLocal()
     try:
         task_id = self.request.id
-        mark_job_progress(
+        job = mark_job_progress(
             db,
             task_id=task_id,
             job_type="tts",
@@ -25,6 +26,7 @@ def regenerate_tts_task(self, script_id: int, scene_index: int):
             progress=20,
             details={"step": "tts", "scene_index": scene_index},
         )
+        emit_log(job.id, "INFO", f"Regenerating TTS for scene {scene_index}...")
 
         from database.models import GeneratedScript
         script = db.query(GeneratedScript).filter(GeneratedScript.id == script_id).first()
@@ -51,6 +53,7 @@ def regenerate_tts_task(self, script_id: int, scene_index: int):
         scenes[scene_index] = scene
         script.script_json = {**script.script_json, "scenes": scenes}
         db.commit()
+        emit_log(job.id, "INFO", f"TTS done → {audio_path}")
         mark_job_completed(
             db,
             task_id=task_id,
@@ -64,6 +67,8 @@ def regenerate_tts_task(self, script_id: int, scene_index: int):
         )
         return {"scene": scene_index, "audio_path": str(audio_path)}
     except Exception as exc:
+        if 'job' in dir():
+            emit_log(job.id, "ERROR", f"TTS failed: {exc}")
         mark_job_failed(
             db,
             task_id=self.request.id,
@@ -86,7 +91,7 @@ def render_video_task(self, script_id: int):
     db = SessionLocal()
     try:
         task_id = self.request.id
-        mark_job_progress(
+        job = mark_job_progress(
             db,
             task_id=task_id,
             job_type="render",
@@ -94,6 +99,7 @@ def render_video_task(self, script_id: int):
             progress=10,
             details={"step": "composing"},
         )
+        emit_log(job.id, "INFO", "Starting render pipeline: compose → captions → render")
 
         from database.models import GeneratedScript
         script = db.query(GeneratedScript).filter(GeneratedScript.id == script_id).first()
@@ -107,6 +113,7 @@ def render_video_task(self, script_id: int):
         from pipeline.composer import compose_video
         self.update_state(state="PROGRESS", meta={"step": "composing"})
         raw_path = compose_video(script_id)
+        emit_log(job.id, "INFO", f"Compose done → {raw_path}")
         mark_job_progress(
             db,
             task_id=task_id,
@@ -120,6 +127,7 @@ def render_video_task(self, script_id: int):
         from pipeline.caption_gen import generate_captions
         self.update_state(state="PROGRESS", meta={"step": "captions"})
         srt_path = generate_captions(raw_path)
+        emit_log(job.id, "INFO", f"Captions done → {srt_path}")
         mark_job_progress(
             db,
             task_id=task_id,
@@ -132,11 +140,13 @@ def render_video_task(self, script_id: int):
         # Step 3: Render
         from pipeline.renderer import render_final
         self.update_state(state="PROGRESS", meta={"step": "rendering"})
+        emit_log(job.id, "INFO", "Rendering final video...")
         final_path = render_final(raw_video_path=raw_path, srt_path=srt_path)
 
         script.output_path = str(final_path)
         script.status = "completed"
         db.commit()
+        emit_log(job.id, "INFO", f"Render complete → {final_path}")
         mark_job_completed(
             db,
             task_id=task_id,
@@ -153,6 +163,8 @@ def render_video_task(self, script_id: int):
         return {"script_id": script_id, "output": str(final_path), "srt_path": str(srt_path)}
     except Exception as e:
         db.rollback()
+        if 'job' in dir():
+            emit_log(job.id, "ERROR", f"Render failed: {e}")
         script = db.query(GeneratedScript).filter(GeneratedScript.id == script_id).first()
         if script:
             script.status = "approved"  # Roll back to approved so editor can retry

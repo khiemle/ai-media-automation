@@ -13,15 +13,30 @@ class NicheService:
         self.db = db
 
     def list_niches(self) -> list[dict]:
-        """Return all niches with script_count."""
+        """Return all niches with script_count — single query."""
         try:
             from database.models import GeneratedScript
-            rows = self.db.query(Niche).order_by(Niche.name).all()
-            result = []
-            for n in rows:
-                count = self.db.query(GeneratedScript).filter(GeneratedScript.niche == n.name).count()
-                result.append({"id": n.id, "name": n.name, "script_count": count, "created_at": n.created_at.isoformat() if n.created_at else None})
-            return result
+            from sqlalchemy import func
+            counts_q = (
+                self.db.query(GeneratedScript.niche, func.count().label("cnt"))
+                .group_by(GeneratedScript.niche)
+                .subquery()
+            )
+            rows = (
+                self.db.query(Niche, func.coalesce(counts_q.c.cnt, 0).label("script_count"))
+                .outerjoin(counts_q, Niche.name == counts_q.c.niche)
+                .order_by(Niche.name)
+                .all()
+            )
+            return [
+                {
+                    "id": n.id,
+                    "name": n.name,
+                    "script_count": int(cnt),
+                    "created_at": n.created_at.isoformat() if n.created_at else None,
+                }
+                for n, cnt in rows
+            ]
         except Exception:
             rows = self.db.query(Niche).order_by(Niche.name).all()
             return [{"id": n.id, "name": n.name, "script_count": 0, "created_at": n.created_at.isoformat() if n.created_at else None} for n in rows]

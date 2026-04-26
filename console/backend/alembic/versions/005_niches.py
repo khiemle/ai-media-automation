@@ -26,9 +26,9 @@ def upgrade() -> None:
     op.create_index("idx_niches_name", "niches", ["name"])
 
     # Seed default niches
-    op.execute(
-        sa.text("INSERT INTO niches (name) VALUES " +
-                ", ".join(f"('{n}')" for n in SEED_NICHES))
+    op.bulk_insert(
+        sa.table("niches", sa.column("name", sa.String)),
+        [{"name": n} for n in SEED_NICHES],
     )
 
 

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
+import { getToken } from '../api/client.js'
 
 /**
  * useWebSocket — auto-reconnecting WebSocket hook.
@@ -18,7 +19,8 @@ export function useWebSocket(path, onMessage, { enabled = true, retryMs = 3000 }
     if (!enabled) return
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const url      = `${protocol}//${window.location.host}${path}`
+    const token    = getToken()
+    const url      = `${protocol}//${window.location.host}${path}${token ? `?token=${encodeURIComponent(token)}` : ''}`
 
     const ws = new WebSocket(url)
     wsRef.current = ws

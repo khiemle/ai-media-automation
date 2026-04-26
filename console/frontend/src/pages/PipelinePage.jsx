@@ -108,7 +108,7 @@ function JobRow({ job, onRetry, onCancel, onError }) {
 
 
 export default function PipelinePage() {
-  const [stats,      setStats]      = useState({ queued: 0, running: 0, completed: 0, failed: 0, total: 0 })
+  const [stats,      setStats]      = useState({ queued: 0, running: 0, completed: 0, failed: 0, cancelled: 0, total: 0 })
   const [jobs,       setJobs]       = useState([])
   const [wsConnected,setWsConnected]= useState(false)
   const [statusFilter, setFilter]   = useState('all')
@@ -186,11 +186,12 @@ export default function PipelinePage() {
   return (
     <div className="space-y-5">
       {/* Stats row */}
-      <div className="grid grid-cols-5 gap-3">
+      <div className="grid grid-cols-6 gap-3">
         <StatBox label="Running"   value={stats.running}   color="#7c6af7" />
         <StatBox label="Queued"    value={stats.queued}    color="#fbbf24" />
         <StatBox label="Completed" value={stats.completed} color="#34d399" />
         <StatBox label="Failed"    value={stats.failed}    color="#f87171" />
+        <StatBox label="Cancelled" value={stats?.cancelled ?? 0} color="#9090a8" />
         <StatBox label="Total"     value={stats.total}     />
       </div>
 

@@ -29,7 +29,8 @@ def create_niche(
     try:
         return NicheService(db).create_niche(body.name, user.id)
     except ValueError as e:
-        raise HTTPException(status_code=409, detail=str(e))
+        code = 409 if "already exists" in str(e) else 400
+        raise HTTPException(status_code=code, detail=str(e))
 
 
 @router.delete("/{niche_id}", status_code=204)
