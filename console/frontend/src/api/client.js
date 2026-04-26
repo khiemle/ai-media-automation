@@ -89,3 +89,10 @@ export const scriptsApi = {
   regenerateScene: (id, sceneIndex) =>
     fetchApi(`/api/scripts/${id}/scenes/${sceneIndex}/regenerate`, { method: 'POST' }),
 }
+
+// ── Niches ─────────────────────────────────────────────────────────────────────
+export const nichesApi = {
+  list: () => fetchApi('/api/niches'),
+  create: (name) => fetchApi('/api/niches', { method: 'POST', body: JSON.stringify({ name }) }),
+  remove: (id) => fetchApi(`/api/niches/${id}`, { method: 'DELETE' }),
+}

@@ -69,6 +69,12 @@ def register_routers():
     app.include_router(scraper.router, prefix="/api")
     app.include_router(scripts.router, prefix="/api")
 
+    try:
+        from console.backend.routers import niches
+        app.include_router(niches.router, prefix="/api")
+    except ImportError:
+        pass
+
     # Remaining routers added in later sprints:
     try:
         from console.backend.routers import production
