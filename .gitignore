@@ -45,3 +45,4 @@ models/kokoro/kokoro.onnx
 models/kokoro/voices
 logs
 .worktrees/
+nohup.out

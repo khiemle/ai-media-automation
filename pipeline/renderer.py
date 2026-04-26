@@ -68,6 +68,7 @@ def render_final(
 
     cmd = [
         "ffmpeg", "-y",
+        "-err_detect", "ignore_err",
         "-i", str(raw_path_obj),
     ]
 
@@ -107,11 +108,21 @@ def render_final(
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
         if result.returncode != 0:
-            error_msg = result.stderr[-500:]
+            error_msg = result.stderr[-2000:]
             # If NVENC failed mid-run, retry with CPU
             if nvenc_available and ("nvenc" in error_msg.lower() or "cuda" in error_msg.lower()):
                 logger.warning("[Renderer] NVENC failed, retrying with libx264")
                 return render_final(raw_video_path, srt_path, music_path)
+            # If audio decode failed, retry with corrupt-tolerant flags
+            if "decode error rate" in error_msg.lower() or "aresample" in error_msg.lower():
+                if "-fflags" not in cmd:
+                    logger.warning("[Renderer] Audio decode errors detected, retrying with fflags +discardcorrupt")
+                    cmd_retry = ["ffmpeg", "-y", "-fflags", "+discardcorrupt", "-err_detect", "ignore_err",
+                                 "-i", str(raw_path_obj)] + cmd[cmd.index("-map"):]
+                    result2 = subprocess.run(cmd_retry, capture_output=True, text=True, timeout=600)
+                    if result2.returncode == 0:
+                        logger.info(f"[Renderer] video_final.mp4 → {final_path} (retry OK)")
+                        return final_path
             raise RuntimeError(f"ffmpeg failed:\n{error_msg}")
 
         logger.info(f"[Renderer] video_final.mp4 → {final_path} ({final_path.stat().st_size // 1024 // 1024}MB)")
