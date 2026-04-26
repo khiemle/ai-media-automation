@@ -353,10 +353,14 @@ export default function MusicPage() {
     () => musicApi.list({ niche: filterNiche, mood: filterMood, genre: filterGenre, status: filterStatus, search: filterSearch }),
     [filterNiche, filterMood, filterGenre, filterStatus, filterSearch]
   )
+  
+  // Guard against null from useApi hook
+  const nicheList = niches || []
+  const trackList = tracks || []
 
   // Poll pending tracks every 10s
   useEffect(() => {
-    const pending = (tracks || []).filter(t => t.generation_status === 'pending' && pendingPolls[t.id])
+    const pending = trackList.filter(t => t.generation_status === 'pending' && pendingPolls[t.id])
     if (!pending.length) return
     const timer = setInterval(async () => {
       for (const t of pending) {
@@ -391,7 +395,6 @@ export default function MusicPage() {
   }
 
   // Stats
-  const trackList    = tracks || []
   const totalTracks  = trackList.length
   const sunoCount    = trackList.filter(t => t.provider === 'suno').length
   const lyriaCount   = trackList.filter(t => t.provider?.startsWith('lyria')).length
@@ -427,7 +430,7 @@ export default function MusicPage() {
         <select value={filterNiche} onChange={e => setFilterNiche(e.target.value)}
           className="bg-[#16161a] border border-[#2a2a32] rounded-lg px-3 py-1.5 text-sm text-[#e8e8f0] focus:outline-none focus:border-[#7c6af7]">
           <option value="">All niches</option>
-          {niches.map(n => <option key={n.id} value={n.name}>{n.name}</option>)}
+          {nicheList.map(n => <option key={n.id} value={n.name}>{n.name}</option>)}
         </select>
         <select value={filterMood} onChange={e => setFilterMood(e.target.value)}
           className="bg-[#16161a] border border-[#2a2a32] rounded-lg px-3 py-1.5 text-sm text-[#e8e8f0] focus:outline-none focus:border-[#7c6af7]">
@@ -507,13 +510,13 @@ export default function MusicPage() {
       </Card>
 
       {editingTrack && (
-        <EditModal track={editingTrack} niches={niches}
+        <EditModal track={editingTrack} niches={nicheList}
           onClose={() => setEditingTrack(null)} onSaved={refetch} />
       )}
 
       {showGenerate && (
         <GenerateModal
-          niches={niches}
+          niches={nicheList}
           onClose={() => setShowGenerate(false)}
           onGenerated={refetch}
           onPollTrack={(trackId, taskId) => setPendingPolls(p => ({ ...p, [trackId]: taskId }))}
@@ -522,7 +525,7 @@ export default function MusicPage() {
 
       {showImport && (
         <ImportModal
-          niches={niches}
+          niches={nicheList}
           onClose={() => setShowImport(false)}
           onImported={refetch}
         />
