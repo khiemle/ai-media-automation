@@ -82,6 +82,8 @@ def generate_suno_music_task(self, track_id: int):
 @celery_app.task(bind=True, name="console.backend.tasks.music_tasks.generate_lyria_music_task", queue="render_q")
 def generate_lyria_music_task(self, track_id: int):
     """Generate music via Lyria (synchronous API call), save to disk, update DB."""
+    import subprocess
+    import tempfile
     from console.backend.database import SessionLocal
     from console.backend.services.music_service import MusicService
     from pipeline.music_providers.lyria_provider import LyriaProvider, LYRIA_MODELS
@@ -96,7 +98,7 @@ def generate_lyria_music_task(self, track_id: int):
         model_name = LYRIA_MODELS.get(model_key, "lyria-3-clip-preview")
 
         provider = LyriaProvider()
-        audio_bytes = provider.generate(
+        audio_bytes, mime_type = provider.generate(
             prompt=track["generation_prompt"] or "",
             model=model_name,
             is_vocal=track["is_vocal"],
@@ -104,7 +106,40 @@ def generate_lyria_music_task(self, track_id: int):
 
         MUSIC_DIR.mkdir(parents=True, exist_ok=True)
         dest = MUSIC_DIR / f"{track_id}.mp3"
-        dest.write_bytes(audio_bytes)
+
+        # Lyria returns PCM/WAV audio — convert to MP3 via ffmpeg for browser compatibility
+        is_pcm = "pcm" in mime_type.lower() or "L16" in mime_type
+        is_wav = "wav" in mime_type.lower()
+
+        if is_pcm and not is_wav:
+            # Raw L16 PCM — need sample rate from mime type e.g. "audio/L16;rate=44100"
+            rate = 44100
+            for part in mime_type.split(";"):
+                if "rate=" in part:
+                    try:
+                        rate = int(part.split("=")[1].strip())
+                    except ValueError:
+                        pass
+            with tempfile.NamedTemporaryFile(suffix=".pcm", delete=False) as tmp:
+                tmp.write(audio_bytes)
+                tmp_path = tmp.name
+            subprocess.run(
+                ["ffmpeg", "-y", "-f", "s16le", "-ar", str(rate), "-ac", "1",
+                 "-i", tmp_path, str(dest)],
+                check=True, capture_output=True,
+            )
+        elif is_wav or not dest.suffix:
+            # WAV or unknown — let ffmpeg figure it out
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+                tmp.write(audio_bytes)
+                tmp_path = tmp.name
+            subprocess.run(
+                ["ffmpeg", "-y", "-i", tmp_path, str(dest)],
+                check=True, capture_output=True,
+            )
+        else:
+            # Already MP3 or other browser-compatible format
+            dest.write_bytes(audio_bytes)
 
         from pipeline.music_providers import probe_audio_duration
         duration = probe_audio_duration(str(dest))
@@ -120,3 +155,4 @@ def generate_lyria_music_task(self, track_id: int):
         raise
     finally:
         db.close()
+

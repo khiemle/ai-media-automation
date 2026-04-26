@@ -21,11 +21,12 @@ class LyriaProvider:
         if genai is None:
             raise RuntimeError("google-genai not installed. Run: pip install google-genai")
 
-    def generate(self, prompt: str, model: str, is_vocal: bool = False) -> bytes:
+    def generate(self, prompt: str, model: str, is_vocal: bool = False) -> tuple[bytes, str]:
         """
-        Generate music and return raw MP3 bytes.
+        Generate music and return (raw_audio_bytes, mime_type).
 
         model: 'lyria-3-clip-preview' (30s) or 'lyria-3-pro-preview' (full song)
+        mime_type: e.g. 'audio/wav', 'audio/pcm', 'audio/L16;rate=44100'
         """
         vocal_suffix = " with vocals, sung lyrics" if is_vocal else " instrumental only, no vocals, no singing"
         full_prompt = prompt.strip() + vocal_suffix
@@ -33,7 +34,6 @@ class LyriaProvider:
         client = genai.Client(api_key=self._key)
         config = genai.types.GenerateContentConfig(
             response_modalities=["AUDIO"],
-            response_mime_type="audio/mp3",
         )
         response = client.models.generate_content(
             model=model,
@@ -44,6 +44,7 @@ class LyriaProvider:
         for candidate in response.candidates:
             for part in candidate.content.parts:
                 if hasattr(part, "inline_data") and part.inline_data:
-                    return base64.b64decode(part.inline_data.data)
+                    mime_type = getattr(part.inline_data, "mime_type", "audio/wav") or "audio/wav"
+                    return base64.b64decode(part.inline_data.data), mime_type
 
         raise RuntimeError("Lyria returned no audio data")

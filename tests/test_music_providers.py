@@ -65,6 +65,7 @@ def test_lyria_provider_generate_returns_bytes():
     mock_part = MagicMock()
     mock_part.inline_data = MagicMock()
     mock_part.inline_data.data = fake_audio
+    mock_part.inline_data.mime_type = "audio/wav"
 
     mock_content = MagicMock()
     mock_content.parts = [mock_part]
@@ -83,10 +84,11 @@ def test_lyria_provider_generate_returns_bytes():
 
             from pipeline.music_providers.lyria_provider import LyriaProvider
             provider = LyriaProvider()
-            audio_bytes = provider.generate(
+            audio_bytes, mime_type = provider.generate(
                 prompt="calm ambient background",
                 model="lyria-3-clip-preview",
                 is_vocal=False,
             )
 
     assert audio_bytes == b"FAKE_MP3_DATA"
+    assert mime_type == "audio/wav"
