@@ -116,11 +116,10 @@ function ScriptEditorModal({ scriptId, onClose, onSaved }) {
   const meta       = scriptJson.meta || {}
   const video      = scriptJson.video || {}
 
-  // Load music tracks filtered by script niche
-  const scriptNiche = data?.script_json?.meta?.niche || data?.niche || ''
+  // Load all ready music tracks (no niche filter — allow manual selection from full library)
   const { data: musicTracks = [] } = useApi(
-    () => musicApi.list({ status: 'ready', niche: scriptNiche }),
-    [scriptNiche]
+    () => musicApi.list({ status: 'ready' }),
+    []
   )
 
   const setScriptField = (section, key, value) => {

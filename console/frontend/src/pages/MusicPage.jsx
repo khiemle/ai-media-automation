@@ -33,7 +33,7 @@ function MultiSelect({ label, options, value = [], onChange }) {
 }
 
 // ── Edit Track Modal ──────────────────────────────────────────────────────────
-function EditModal({ track, niches, onClose, onSaved }) {
+function EditModal({ track, niches, onClose, onSaved, onPollTrack }) {
   const [form, setForm] = useState({
     title:         track.title,
     niches:        track.niches || [],
@@ -44,8 +44,9 @@ function EditModal({ track, niches, onClose, onSaved }) {
     volume:        track.volume ?? 0.15,
     quality_score: track.quality_score ?? 80,
   })
-  const [saving, setSaving] = useState(false)
-  const [toast,  setToast]  = useState(null)
+  const [saving,      setSaving]      = useState(false)
+  const [regenerating,setRegenerating]= useState(false)
+  const [toast,       setToast]       = useState(null)
   const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000) }
 
   const handleSave = async () => {
@@ -58,9 +59,36 @@ function EditModal({ track, niches, onClose, onSaved }) {
     finally { setSaving(false) }
   }
 
+  const handleRegenerate = async () => {
+    if (!track.generation_prompt) { showToast('No prompt available for regeneration', 'error'); return }
+    setRegenerating(true)
+    try {
+      const res = await musicApi.generate({
+        idea:      track.generation_prompt,
+        niches:    form.niches,
+        moods:     form.moods,
+        genres:    form.genres,
+        provider:  track.provider || 'lyria-clip',
+        is_vocal:  form.is_vocal,
+        expand_only: false,
+      })
+      onPollTrack(res.track_id, res.task_id)
+      onSaved()
+      onClose()
+      showToast('Regeneration started — a new track will appear when ready', 'success')
+    } catch (e) { showToast(e.message, 'error') }
+    finally { setRegenerating(false) }
+  }
+
   return (
     <Modal open onClose={onClose} title={`Edit — ${track.title}`} width="max-w-xl"
-      footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button variant="primary" loading={saving} onClick={handleSave}>Save</Button></>}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="default" loading={regenerating} onClick={handleRegenerate} title="Generate a new track using this prompt">↺ Re-generate</Button>
+          <Button variant="primary" loading={saving} onClick={handleSave}>Save</Button>
+        </>
+      }
     >
       <div className="flex flex-col gap-4">
         <Input label="Title" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
@@ -89,6 +117,14 @@ function EditModal({ track, niches, onClose, onSaved }) {
             Favorite ★
           </label>
         </div>
+        {track.generation_prompt && (
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-[#9090a8] font-medium">Generation Prompt <span className="text-[#5a5a70]">(used for ↺ Re-generate)</span></label>
+            <div className="bg-[#0d0d0f] border border-[#2a2a32] rounded-lg px-3 py-2 text-xs text-[#9090a8] leading-relaxed line-clamp-3">
+              {track.generation_prompt}
+            </div>
+          </div>
+        )}
       </div>
       {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
     </Modal>
@@ -518,7 +554,8 @@ export default function MusicPage() {
 
       {editingTrack && (
         <EditModal track={editingTrack} niches={nicheList}
-          onClose={() => setEditingTrack(null)} onSaved={refetch} />
+          onClose={() => setEditingTrack(null)} onSaved={refetch}
+          onPollTrack={(trackId, taskId) => setPendingPolls(p => ({ ...p, [trackId]: taskId }))} />
       )}
 
       {showGenerate && (
