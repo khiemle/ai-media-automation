@@ -9,7 +9,7 @@ pydantic-settings==2.2.1
 python-dotenv==1.0.1
 
 # Database
-sqlalchemy==2.0.30
+sqlalchemy>=2.0.31             # 2.0.31+ required for Python 3.14 (__firstlineno__ compat)
 alembic==1.13.1
 psycopg2-binary>=2.9.9
 
