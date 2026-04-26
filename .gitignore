@@ -41,7 +41,6 @@ console/frontend/.vite/
 # Claude Code
 .claude/
 assets
-pipeline.env
 models/kokoro/kokoro.onnx
 models/kokoro/voices
 logs
