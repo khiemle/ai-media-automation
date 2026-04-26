@@ -9,6 +9,8 @@ from console.backend.schemas.script import (
     ScriptDetail,
     ScriptUpdate,
     ScriptGenerateRequest,
+    ExpandRequest,
+    ExpandResponse,
 )
 from console.backend.services.script_service import ScriptService
 
@@ -40,7 +42,31 @@ def generate_script(
             template=body.template,
             source_video_ids=body.source_video_ids,
             user_id=user.id,
+            language=body.language,
+            source_article_id=body.source_article_id,
+            raw_content=body.raw_content,
         )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/expand", response_model=ExpandResponse)
+def expand_content(
+    body: ExpandRequest,
+    _user=Depends(require_editor_or_admin),
+):
+    """Inline Gemini call — expands a short idea into a detailed outline. Not queued."""
+    try:
+        from rag.llm_router import get_router
+        router_instance = get_router()
+        prompt = (
+            "You are a video script planner. Expand the following idea into a detailed "
+            "video script outline. Include: a strong hook, 3-5 key points with supporting "
+            "details, and a clear call to action. Write in prose, not JSON.\n\n"
+            f"Idea: {body.content}"
+        )
+        result = router_instance.generate(prompt, expect_json=False)
+        return ExpandResponse(expanded_outline=str(result))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

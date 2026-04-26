@@ -157,6 +157,9 @@ class ScriptService:
         template: str,
         source_video_ids: list[str] | None,
         user_id: int,
+        language: str = "vietnamese",
+        source_article_id: int | None = None,
+        raw_content: str | None = None,
     ) -> ScriptDetail:
         Script = self._get_model()
 
@@ -173,29 +176,49 @@ class ScriptService:
             except Exception:
                 pass
 
+        # Fetch article content for rewrite mode
+        article_content: str | None = None
+        if source_article_id:
+            try:
+                from database.models import NewsArticle
+                article = self.db.query(NewsArticle).filter(NewsArticle.id == source_article_id).first()
+                if article and article.main_content:
+                    article_content = article.main_content
+                    # Use article language if caller didn't explicitly set one
+                    if language == "vietnamese" and article.language:
+                        language = article.language
+            except Exception:
+                pass
+
+        # Composer raw content overrides article lookup
+        if raw_content and not article_content:
+            article_content = raw_content
+
         # Call the core script writer
-        try:
-            from rag.script_writer import generate_script as _generate
-            script_json = _generate(
-                topic=topic,
-                niche=niche,
-                template=template,
-                context_videos=context_videos if context_videos else None,
-            )
-        except TypeError:
-            # Fallback: call without context_videos if the function signature differs
-            from rag.script_writer import generate_script as _generate
-            script_json = _generate(topic=topic, niche=niche, template=template)
+        from rag.script_writer import generate_script as _generate
+        script_json = _generate(
+            topic=topic,
+            niche=niche,
+            template=template,
+            language=language,
+            article_content=article_content,
+            context_videos=context_videos if context_videos else None,
+        )
 
         row = Script(
             topic=topic,
             niche=niche,
             template=template,
+            language=language,
             script_json=script_json,
             status="draft",
         )
         self.db.add(row)
-        _audit(self.db, user_id, "generate_script", "script", "new", {"topic": topic})
+        _audit(self.db, user_id, "generate_script", "script", "new", {
+            "topic": topic,
+            "source_article_id": source_article_id,
+            "from_composer": bool(raw_content),
+        })
         self.db.commit()
         self.db.refresh(row)
         return ScriptDetail.model_validate(row)
@@ -209,7 +232,10 @@ class ScriptService:
             raise KeyError(f"Script {script_id} not found")
 
         from rag.script_writer import generate_script as _generate
-        script_json = _generate(topic=row.topic, niche=row.niche, template=row.template)
+        script_json = _generate(
+            topic=row.topic, niche=row.niche, template=row.template,
+            language=getattr(row, "language", "vietnamese"),
+        )
         row.script_json = script_json
         row.status = "draft"
         self.db.commit()
