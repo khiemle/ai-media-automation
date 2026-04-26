@@ -22,24 +22,16 @@ python-multipart==0.0.9
 celery==5.3.6
 redis==5.0.4
 
-# Gemini API (used for prompt expansion and Lyria music generation)
-google-genai>=1.0.0
-
 # Encryption (OAuth secrets at rest)
 cryptography==42.0.5
 
-# HTTP client (for OAuth flows, health checks)
-httpx==0.27.0
-
 # News scraping
-requests>=2.31.0
 beautifulsoup4>=4.12.3
 lxml>=5.0.0
 
 # Utilities
-pyyaml==6.0.1
 python-dateutil==2.9.0
 psutil==5.9.8
-soundfile>=0.12.1
-kokoro-onnx>=0.4.0
-faster-whisper>=1.0.3
+
+# Pipeline dependencies (TTS, video, captions, LLM, scrapers, etc.)
+-r ../requirements.pipeline.txt

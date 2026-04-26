@@ -14,7 +14,7 @@ selenium>=4.21.0                    # Chromium fallback when Playwright extracti
 apify-client==1.7.1                 # Apify cloud scraper fallback
 
 # ── TTS ────────────────────────────────────────────────────
-kokoro-onnx==0.4.0                  # Kokoro TTS ONNX inference (requires numpy>=2.0.2)
+kokoro-onnx>=0.4.0                  # Kokoro TTS ONNX inference (requires numpy>=2.0.2)
 onnxruntime>=1.18.0                 # ONNX runtime (CPU)
 soundfile>=0.12.1                   # WAV file read/write
 scipy>=1.13.0                       # Audio resampling (44.1kHz)
