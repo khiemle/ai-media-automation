@@ -98,7 +98,7 @@ echo "✅  PostgreSQL ready (db: $DB_NAME)"
 
 # ── 6. Run Alembic migrations ─────────────────────────────────────
 echo "🔄  Running migrations..."
-cd "$BACKEND_DIR" && "$VENV_DIR/bin/alembic" upgrade head 2>&1 | tail -3 && cd "$SCRIPT_DIR"
+(cd "$BACKEND_DIR" && "$VENV_DIR/bin/alembic" upgrade head 2>&1 | tail -3)
 echo "✅  Migrations up to date"
 
 # ── 7. Start Redis ────────────────────────────────────────────────
@@ -138,6 +138,10 @@ lsof -ti :"${CONSOLE_PORT:-8080}" | xargs kill 2>/dev/null || true
 
 # ── 10. Start Celery worker (all queues) ──────────────────────────
 echo "🔄  Starting Celery worker..."
+# Celery must run from the project root so Python can find the 'console' package.
+# Set PYTHONPATH explicitly and cd back to SCRIPT_DIR to be safe.
+cd "$SCRIPT_DIR"
+export PYTHONPATH="$SCRIPT_DIR"
 "$CELERY" -A console.backend.celery_app worker \
   -Q scrape_q,script_q,render_q,upload_q \
   --concurrency=4 \
