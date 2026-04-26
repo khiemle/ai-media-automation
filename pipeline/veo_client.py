@@ -13,8 +13,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 _root = Path(__file__).parent.parent
-load_dotenv(_root / "pipeline.env", override=False)
-load_dotenv(_root / "console" / ".env", override=False)
+load_dotenv(_root / ".env", override=False)
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +34,7 @@ class VeoClient:
         if self._configured:
             return
         if not GEMINI_MEDIA_KEY:
-            raise RuntimeError("GEMINI_MEDIA_API_KEY not set in pipeline.env")
+            raise RuntimeError("GEMINI_MEDIA_API_KEY not set in .env")
         try:
             from google import genai
             from google.genai import types as genai_types
