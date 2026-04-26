@@ -61,6 +61,11 @@ function SceneCard({ scene, index, scriptId, onUpdate, onToast }) {
       >
         <span className="text-xs font-mono text-[#5a5a70] w-6">{String(index + 1).padStart(2, '0')}</span>
         <span className="text-xs font-mono text-[#fbbf24] w-12">{scene.type || 'scene'}</span>
+        {/* Readiness dots */}
+        <span title={scene.asset_id ? 'Asset assigned' : 'No asset'}
+          className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${scene.asset_id ? 'bg-[#34d399]' : 'bg-[#5a5a70]'}`} />
+        <span title={scene.tts_audio_url ? 'Audio ready' : 'No audio'}
+          className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${scene.tts_audio_url ? 'bg-[#34d399]' : 'bg-[#5a5a70]'}`} />
         <span className="text-sm text-[#e8e8f0] flex-1 truncate">{scene.narration?.slice(0, 80) || '—'}</span>
         <span className="text-xs font-mono text-[#9090a8]">{scene.duration || 0}s</span>
         <svg
@@ -77,12 +82,21 @@ function SceneCard({ scene, index, scriptId, onUpdate, onToast }) {
           {/* Left — visual asset */}
           <div className="space-y-3">
             <div className="text-xs font-semibold text-[#9090a8] uppercase tracking-wider">Visual Asset</div>
-            <div className="aspect-[9/16] max-h-48 bg-[#0d0d0f] rounded-lg border border-[#2a2a32] flex items-center justify-center">
-              {scene.asset_id ? (
+            <div className="aspect-[9/16] max-h-48 bg-[#0d0d0f] rounded-lg border border-[#2a2a32] flex items-center justify-center overflow-hidden">
+              {scene.asset_thumbnail_url ? (
+                <img src={scene.asset_thumbnail_url} alt="asset thumbnail"
+                  className="w-full h-full object-cover" />
+              ) : scene.asset_id ? (
                 <div className="text-xs text-[#7c6af7] font-mono">Asset #{scene.asset_id}</div>
               ) : (
                 <div className="text-xs text-[#5a5a70]">No asset</div>
               )}
+            </div>
+            <div className="flex items-center gap-2 text-xs font-mono text-[#9090a8]">
+              {scene.asset_source && (
+                <span className="px-1.5 py-0.5 rounded bg-[#1c1c22] border border-[#2a2a32]">{scene.asset_source}</span>
+              )}
+              {scene.asset_duration && <span>{scene.asset_duration}s clip</span>}
             </div>
             <Input
               label="Visual hint"
@@ -103,6 +117,12 @@ function SceneCard({ scene, index, scriptId, onUpdate, onToast }) {
           {/* Right — audio / narration */}
           <div className="space-y-3">
             <div className="text-xs font-semibold text-[#9090a8] uppercase tracking-wider">Audio</div>
+            {scene.tts_audio_url ? (
+              <audio controls src={scene.tts_audio_url}
+                className="w-full h-8 accent-[#7c6af7]" />
+            ) : (
+              <div className="text-xs text-[#5a5a70] py-2 border border-dashed border-[#2a2a32] rounded text-center">No audio yet</div>
+            )}
             <Textarea
               label="Narration"
               value={narration}
@@ -203,7 +223,15 @@ export default function ProductionPage() {
             <p className="text-xs text-[#9090a8]">No approved scripts yet.</p>
           ) : (
             <div className="space-y-1 -mx-2">
-              {scripts.map(s => (
+              {scripts.map(s => {
+                const isActive = activeId === s.id
+                const readyCount = isActive && script
+                  ? (script.script_json?.scenes || []).filter(sc => sc.asset_id && sc.tts_audio_url).length
+                  : null
+                const totalCount = isActive && script
+                  ? (script.script_json?.scenes || []).length
+                  : null
+                return (
                 <button
                   key={s.id}
                   onClick={() => loadScript(s.id)}
@@ -218,8 +246,12 @@ export default function ProductionPage() {
                     <Badge status={s.status} />
                     <span className="text-[#5a5a70] font-mono">{s.niche}</span>
                   </div>
+                  {isActive && readyCount !== null && (
+                    <span className="text-[#5a5a70] font-mono text-[10px]">{readyCount}/{totalCount} ready</span>
+                  )}
                 </button>
-              ))}
+                )
+              })}
             </div>
           )}
         </Card>
@@ -257,6 +289,12 @@ export default function ProductionPage() {
                 <span><span className="text-[#5a5a70]">Duration</span> {vidMeta.total_duration || totalDur}s</span>
                 <span><span className="text-[#5a5a70]">Scenes</span> {scenes.length}</span>
               </div>
+              {vidMeta.hook && (
+                <div className="mt-2 text-xs text-[#9090a8]">
+                  <span className="text-[#5a5a70]">Hook </span>
+                  <span className="text-[#e8e8f0] italic">"{vidMeta.hook}"</span>
+                </div>
+              )}
             </Card>
 
             {/* Timeline bar */}
