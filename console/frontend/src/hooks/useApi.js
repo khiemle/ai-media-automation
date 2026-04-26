@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from 'react'
  * Usage: const { data, loading, error, refetch } = useApi(fn, [deps])
  */
 export function useApi(fetchFn, deps = []) {
-  const [data, setData]       = useState(null)
+  const [data, setData]       = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState(null)
 
