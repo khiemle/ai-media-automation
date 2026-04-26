@@ -160,6 +160,98 @@ function AudioPlayer({ track, onClose }) {
   )
 }
 
+// ── Generate Music Modal ──────────────────────────────────────────────────────
+function GenerateModal({ niches, onClose, onGenerated, onPollTrack }) {
+  const [idea,      setIdea]      = useState('')
+  const [selNiches, setSelNiches] = useState([])
+  const [selMoods,  setSelMoods]  = useState([])
+  const [selGenres, setSelGenres] = useState([])
+  const [provider,  setProvider]  = useState('suno')
+  const [isVocal,   setIsVocal]   = useState(false)
+  const [expanded,  setExpanded]  = useState('')
+  const [expanding, setExpanding] = useState(false)
+  const [generating,setGenerating]= useState(false)
+  const [toast,     setToast]     = useState(null)
+  const showToast = (msg, type='error') => { setToast({msg,type}); setTimeout(()=>setToast(null),3000) }
+
+  const handleExpand = async () => {
+    if (!idea.trim()) { showToast('Enter an idea first'); return }
+    setExpanding(true)
+    try {
+      const res = await musicApi.generate({
+        idea, niches: selNiches, moods: selMoods, genres: selGenres,
+        provider, is_vocal: isVocal, expand_only: true,
+      })
+      setExpanded(res.expanded_prompt || idea)
+    } catch (e) { showToast(e.message) }
+    finally { setExpanding(false) }
+  }
+
+  const handleGenerate = async () => {
+    if (!idea.trim() && !expanded.trim()) { showToast('Enter an idea or expand first'); return }
+    setGenerating(true)
+    try {
+      const res = await musicApi.generate({
+        idea: expanded || idea, niches: selNiches, moods: selMoods, genres: selGenres,
+        provider, is_vocal: isVocal, expand_only: false,
+      })
+      onPollTrack(res.track_id, res.task_id)
+      onGenerated()
+      onClose()
+    } catch (e) { showToast(e.message) }
+    finally { setGenerating(false) }
+  }
+
+  return (
+    <Modal open onClose={onClose} title="Generate Music" width="max-w-xl"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="default" loading={expanding} onClick={handleExpand}>✨ Expand with Gemini</Button>
+          <Button variant="primary" loading={generating} onClick={handleGenerate}>Generate</Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-[#9090a8] font-medium">General idea / description</label>
+          <textarea
+            value={expanded || idea}
+            onChange={e => { expanded ? setExpanded(e.target.value) : setIdea(e.target.value) }}
+            rows={3}
+            placeholder="e.g. upbeat energetic workout music with punchy beats"
+            className="bg-[#16161a] border border-[#2a2a32] rounded-lg px-3 py-1.5 text-sm text-[#e8e8f0] placeholder:text-[#5a5a70] focus:outline-none focus:border-[#7c6af7] resize-y"
+          />
+          {expanded && <p className="text-xs text-[#34d399]">✓ Expanded by Gemini — edit freely before generating</p>}
+        </div>
+
+        <MultiSelect label="Niches" options={niches.map(n => n.name)} value={selNiches} onChange={setSelNiches} />
+        <MultiSelect label="Moods"  options={MOODS}  value={selMoods}  onChange={setSelMoods} />
+        <MultiSelect label="Genres" options={GENRES} value={selGenres} onChange={setSelGenres} />
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-[#9090a8] font-medium">Provider</label>
+            <select value={provider} onChange={e => setProvider(e.target.value)}
+              className="bg-[#16161a] border border-[#2a2a32] rounded-lg px-3 py-1.5 text-sm text-[#e8e8f0] focus:outline-none focus:border-[#7c6af7]">
+              <option value="suno">Suno</option>
+              <option value="lyria-clip">Lyria Clip (30s)</option>
+              <option value="lyria-pro">Lyria Pro (full song)</option>
+            </select>
+          </div>
+          <div className="flex flex-col justify-end">
+            <label className="flex items-center gap-2 cursor-pointer text-sm text-[#9090a8] pb-1.5">
+              <input type="checkbox" checked={isVocal} onChange={e => setIsVocal(e.target.checked)} className="accent-[#7c6af7]" />
+              With vocals
+            </label>
+          </div>
+        </div>
+      </div>
+      {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+    </Modal>
+  )
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function MusicPage() {
   const [filterNiche,  setFilterNiche]  = useState('')
@@ -170,6 +262,7 @@ export default function MusicPage() {
   const [editingTrack, setEditingTrack] = useState(null)
   const [playingTrack, setPlayingTrack] = useState(null)
   const [deletingId,   setDeletingId]   = useState(null)
+  const [showGenerate, setShowGenerate] = useState(false)
   const [toast,        setToast]        = useState(null)
   const [pendingPolls, setPendingPolls] = useState({}) // trackId → celeryTaskId
 
@@ -233,7 +326,7 @@ export default function MusicPage() {
         </div>
         <div className="flex gap-2">
           <Button variant="default" onClick={() => {/* ImportModal - Task 12 */}}>↑ Import</Button>
-          <Button variant="primary" onClick={() => {/* GenerateModal - Task 11 */}}>+ Generate</Button>
+          <Button variant="primary" onClick={() => setShowGenerate(true)}>+ Generate</Button>
         </div>
       </div>
 
@@ -335,6 +428,15 @@ export default function MusicPage() {
       {editingTrack && (
         <EditModal track={editingTrack} niches={niches}
           onClose={() => setEditingTrack(null)} onSaved={refetch} />
+      )}
+
+      {showGenerate && (
+        <GenerateModal
+          niches={niches}
+          onClose={() => setShowGenerate(false)}
+          onGenerated={refetch}
+          onPollTrack={(trackId, taskId) => setPendingPolls(p => ({ ...p, [trackId]: taskId }))}
+        />
       )}
 
       <AudioPlayer track={playingTrack} onClose={() => setPlayingTrack(null)} />
