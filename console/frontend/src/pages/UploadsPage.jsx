@@ -344,21 +344,26 @@ function CredentialsTab() {
 
 // ── Channels Sub-tab ──────────────────────────────────────────────────────────
 function ChannelsTab({ onChannelsLoaded }) {
-  const [channels, setChannels]   = useState([])
-  const [loading,  setLoading]    = useState(true)
-  const [modal,    setModal]      = useState(false)
-  const [editing,  setEditing]    = useState(null)
-  const [form,     setForm]       = useState({})
-  const [toast,    setToast]      = useState(null)
+  const [channels,    setChannels]    = useState([])
+  const [credentials, setCredentials] = useState([])
+  const [loading,     setLoading]     = useState(true)
+  const [modal,       setModal]       = useState(false)
+  const [editing,     setEditing]     = useState(null)
+  const [form,        setForm]        = useState({})
+  const [toast,       setToast]       = useState(null)
 
   const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000) }
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await fetchApi('/api/channels')
-      setChannels(data)
-      onChannelsLoaded?.(data)
+      const [chData, credData] = await Promise.all([
+        fetchApi('/api/channels'),
+        fetchApi('/api/credentials'),
+      ])
+      setChannels(chData)
+      setCredentials(credData)
+      onChannelsLoaded?.(chData)
     } catch { setChannels([]) }
     finally { setLoading(false) }
   }, [onChannelsLoaded])
@@ -367,7 +372,7 @@ function ChannelsTab({ onChannelsLoaded }) {
 
   const openCreate = () => {
     setEditing(null)
-    setForm({ name: '', platform: 'youtube', status: 'active', default_language: 'vi', monetized: false })
+    setForm({ name: '', platform: 'youtube', status: 'active', default_language: 'en', monetized: false, credential_id: null })
     setModal(true)
   }
 
@@ -469,6 +474,20 @@ function ChannelsTab({ onChannelsLoaded }) {
           <Select label="Status" value={form.status || 'active'} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
             <option value="active">Active</option>
             <option value="paused">Paused</option>
+          </Select>
+          <Select
+            label="OAuth Credential"
+            value={form.credential_id ?? ''}
+            onChange={e => setForm(f => ({ ...f, credential_id: e.target.value ? Number(e.target.value) : null }))}
+          >
+            <option value="">— None —</option>
+            {credentials
+              .filter(c => c.platform === (form.platform || 'youtube'))
+              .map(c => (
+                <option key={c.id} value={c.id}>
+                  {c.name} ({c.status})
+                </option>
+              ))}
           </Select>
           <label className="flex items-center gap-2 text-sm text-[#e8e8f0] cursor-pointer">
             <input
