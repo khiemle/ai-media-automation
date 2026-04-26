@@ -70,6 +70,11 @@ function VideosTab({ channels }) {
 
   const handleUpload = async (videoId) => {
     try {
+      const channelIds = targets[videoId] || []
+      await fetchApi(`/api/uploads/videos/${videoId}/targets`, {
+        method: 'PUT',
+        body: JSON.stringify({ channel_ids: channelIds }),
+      })
       const res = await fetchApi(`/api/uploads/videos/${videoId}/upload`, { method: 'POST' })
       showToast(`${res.queued} upload task(s) queued`)
       load()
