@@ -10,7 +10,7 @@ from console.backend.schemas.script import ScriptListItem, ScriptDetail
 
 # Valid script status transitions
 VALID_TRANSITIONS = {
-    "draft": ["pending_review"],
+    "draft": ["pending_review", "approved"],
     "pending_review": ["approved", "draft"],   # draft = rejected
     "approved": ["editing", "producing"],
     "editing": ["approved"],
@@ -124,7 +124,7 @@ class ScriptService:
         row = self.db.query(Script).filter(Script.id == script_id).first()
         if not row:
             raise KeyError(f"Script {script_id} not found")
-        if row.status not in ("pending_review", "editing"):
+        if row.status not in ("draft", "pending_review", "editing"):
             raise ValueError(f"Cannot approve a script with status '{row.status}'")
 
         row.status = "approved"
