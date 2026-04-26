@@ -1,5 +1,5 @@
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ScriptListItem(BaseModel):
@@ -36,12 +36,8 @@ class ScriptGenerateRequest(BaseModel):
     raw_content: str | None = None         # free-form text from Composer
 
 
-class SceneRegenerateRequest(BaseModel):
-    scene_index: int
-
-
 class ExpandRequest(BaseModel):
-    content: str
+    content: str = Field(..., min_length=10, max_length=8000)
 
 
 class ExpandResponse(BaseModel):

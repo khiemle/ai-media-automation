@@ -124,7 +124,7 @@ class ScriptService:
         row = self.db.query(Script).filter(Script.id == script_id).first()
         if not row:
             raise KeyError(f"Script {script_id} not found")
-        if row.status not in ("pending_review", "editing", "draft"):
+        if row.status not in ("pending_review", "editing"):
             raise ValueError(f"Cannot approve a script with status '{row.status}'")
 
         row.status = "approved"
@@ -141,6 +141,10 @@ class ScriptService:
         row = self.db.query(Script).filter(Script.id == script_id).first()
         if not row:
             raise KeyError(f"Script {script_id} not found")
+
+        rejectable = {"pending_review", "draft", "editing"}
+        if row.status not in rejectable:
+            raise ValueError(f"Cannot reject a script with status '{row.status}'")
 
         row.status = "draft"
         _audit(self.db, user_id, "reject_script", "script", script_id)
@@ -176,9 +180,11 @@ class ScriptService:
             except Exception:
                 pass
 
-        # Fetch article content for rewrite mode
+        # Fetch article content for rewrite mode — raw_content (Composer) wins when provided
         article_content: str | None = None
-        if source_article_id:
+        if raw_content:
+            article_content = raw_content
+        elif source_article_id:
             try:
                 from database.models import NewsArticle
                 article = self.db.query(NewsArticle).filter(NewsArticle.id == source_article_id).first()
@@ -189,10 +195,6 @@ class ScriptService:
                         language = article.language
             except Exception:
                 pass
-
-        # Composer raw content overrides article lookup
-        if raw_content and not article_content:
-            article_content = raw_content
 
         # Call the core script writer
         from rag.script_writer import generate_script as _generate
@@ -214,13 +216,14 @@ class ScriptService:
             status="draft",
         )
         self.db.add(row)
-        _audit(self.db, user_id, "generate_script", "script", "new", {
+        self.db.commit()
+        self.db.refresh(row)
+        _audit(self.db, user_id, "generate_script", "script", row.id, {
             "topic": topic,
             "source_article_id": source_article_id,
             "from_composer": bool(raw_content),
         })
         self.db.commit()
-        self.db.refresh(row)
         return ScriptDetail.model_validate(row)
 
     # ── Regenerate full script ────────────────────────────────────────────────
@@ -259,8 +262,8 @@ class ScriptService:
         meta = script_json.get("meta", {})
 
         try:
-            from rag.llm_router import LLMRouter
-            router_instance = LLMRouter()
+            from rag.llm_router import get_router
+            router_instance = get_router()
             prompt = (
                 f"Rewrite only this scene for a {meta.get('template','tiktok_viral')} video "
                 f"about '{meta.get('topic','')}' in niche '{meta.get('niche','')}'. "

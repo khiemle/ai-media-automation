@@ -46,8 +46,10 @@ def generate_script(
             source_article_id=body.source_article_id,
             raw_content=body.raw_content,
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/expand", response_model=ExpandResponse)
@@ -67,8 +69,10 @@ def expand_content(
         )
         result = router_instance.generate(prompt, expect_json=False)
         return ExpandResponse(expanded_outline=str(result))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/{script_id}", response_model=ScriptDetail)
@@ -127,6 +131,8 @@ def reject_script(
         return ScriptService(db).reject_script(script_id, user.id)
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/{script_id}/regenerate", response_model=ScriptDetail)

@@ -30,8 +30,12 @@ export default function ComposerPage() {
         method: 'POST',
         body: JSON.stringify({ content: content.trim() }),
       })
-      setOutline(res.expanded_outline || '')
-      setOutlineReady(true)
+      if (res.expanded_outline?.trim()) {
+        setOutline(res.expanded_outline)
+        setOutlineReady(true)
+      } else {
+        showToast('Expansion returned empty — try rephrasing your idea', 'error')
+      }
     } catch (e) { showToast(e.message, 'error') }
     finally { setExpanding(false) }
   }
@@ -39,7 +43,7 @@ export default function ComposerPage() {
   const handleGenerate = async () => {
     const finalContent = outlineReady ? outline : content
     if (!finalContent.trim() || !niche) return
-    const topic = finalContent.trim().split('\n')[0].slice(0, 120)
+    const topic = finalContent.trim().split('\n').find(l => l.trim())?.replace(/^[#*\s]+/, '').slice(0, 120) ?? finalContent.trim().slice(0, 120)
     setGenerating(true)
     try {
       await scriptsApi.generate({
@@ -49,7 +53,7 @@ export default function ComposerPage() {
         language,
         raw_content: finalContent.trim(),
       })
-      showToast('Script queued — check the Scripts tab', 'success')
+      showToast('Script created — check the Scripts tab', 'success')
       // Reset
       setContent(''); setOutline(''); setOutlineReady(false); setNiche('')
     } catch (e) { showToast(e.message, 'error') }
