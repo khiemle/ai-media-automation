@@ -23,6 +23,9 @@ python-multipart==0.0.9
 celery==5.3.6
 redis==5.0.4
 
+# Gemini API (used for prompt expansion and Lyria music generation)
+google-genai>=1.0.0
+
 # Encryption (OAuth secrets at rest)
 cryptography==42.0.5
 

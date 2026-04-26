@@ -1,5 +1,4 @@
 """Lyria music generation via the Gemini API (google-genai SDK)."""
-import base64
 import os
 
 try:
@@ -42,9 +41,11 @@ class LyriaProvider:
         )
 
         for candidate in response.candidates:
+            if not candidate.content:
+                continue
             for part in candidate.content.parts:
                 if hasattr(part, "inline_data") and part.inline_data:
-                    mime_type = getattr(part.inline_data, "mime_type", "audio/wav") or "audio/wav"
-                    return base64.b64decode(part.inline_data.data), mime_type
+                    mime_type = getattr(part.inline_data, "mime_type", "audio/mpeg") or "audio/mpeg"
+                    return part.inline_data.data, mime_type
 
         raise RuntimeError("Lyria returned no audio data")

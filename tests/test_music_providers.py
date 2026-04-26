@@ -59,13 +59,10 @@ def test_suno_provider_poll_returns_none_when_pending():
 
 
 def test_lyria_provider_generate_returns_bytes():
-    import base64
-    fake_audio = base64.b64encode(b"FAKE_MP3_DATA").decode()
-
     mock_part = MagicMock()
     mock_part.inline_data = MagicMock()
-    mock_part.inline_data.data = fake_audio
-    mock_part.inline_data.mime_type = "audio/wav"
+    mock_part.inline_data.data = b"FAKE_MP3_DATA"   # SDK returns raw bytes, no base64
+    mock_part.inline_data.mime_type = "audio/mpeg"
 
     mock_content = MagicMock()
     mock_content.parts = [mock_part]
@@ -91,4 +88,4 @@ def test_lyria_provider_generate_returns_bytes():
             )
 
     assert audio_bytes == b"FAKE_MP3_DATA"
-    assert mime_type == "audio/wav"
+    assert mime_type == "audio/mpeg"
