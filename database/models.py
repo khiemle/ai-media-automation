@@ -20,6 +20,29 @@ Table(
 )
 
 
+class MusicTrack(Base):
+    """Background music tracks — generated via Suno/Lyria or imported."""
+    __tablename__ = "music_tracks"
+
+    id                = Column(Integer, primary_key=True, autoincrement=True)
+    title             = Column(String(200), nullable=False)
+    file_path         = Column(String(500))
+    duration_s        = Column(Float)
+    niches            = Column(ARRAY(String), default=list)
+    moods             = Column(ARRAY(String), default=list)
+    genres            = Column(ARRAY(String), default=list)
+    is_vocal          = Column(Boolean, default=False)
+    is_favorite       = Column(Boolean, default=False)
+    volume            = Column(Float, default=0.15)
+    usage_count       = Column(Integer, default=0)
+    quality_score     = Column(Integer, default=80)
+    provider          = Column(String(20))   # suno | lyria-clip | lyria-pro | import
+    provider_task_id  = Column(String(200))
+    generation_status = Column(String(20), default="pending")  # pending | ready | failed
+    generation_prompt = Column(Text)
+    created_at        = Column(DateTime(timezone=True), server_default=func.now())
+
+
 class ViralVideo(Base):
     """Scraped TikTok videos used as RAG context for script generation."""
     __tablename__ = "viral_videos"
@@ -77,6 +100,8 @@ class GeneratedScript(Base):
     platform_video_id = Column(String)                           # YouTube/TikTok video ID after upload
     # Language extension (added by migration 004)
     language         = Column(String, default="vietnamese")
+    # Music extension (added by migration 006)
+    music_track_id   = Column(Integer, ForeignKey("music_tracks.id"), nullable=True)
     created_at       = Column(DateTime(timezone=True), server_default=func.now())
     updated_at       = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
