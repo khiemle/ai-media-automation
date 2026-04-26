@@ -127,7 +127,7 @@ function SceneCard({ scene, index, scriptId, onUpdate, onToast }) {
             <div className="text-xs font-semibold text-[#9090a8] uppercase tracking-wider">Audio</div>
             {scene.tts_audio_url ? (
               <audio controls src={scene.tts_audio_url}
-                className="w-full h-8 accent-[#7c6af7]" />
+                className="w-full" />
             ) : (
               <div className="text-xs text-[#5a5a70] py-2 border border-dashed border-[#2a2a32] rounded text-center">No audio yet</div>
             )}
@@ -340,7 +340,7 @@ export default function ProductionPage() {
                 <div className="space-y-2">
                   {scenes.map((sc, i) => (
                     <SceneCard
-                      key={i}
+                      key={`${i}-${sc.asset_id ?? 'none'}`}
                       scene={sc}
                       index={i}
                       scriptId={activeId}
