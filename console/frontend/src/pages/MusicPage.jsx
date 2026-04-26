@@ -356,7 +356,7 @@ export default function MusicPage() {
 
   // Poll pending tracks every 10s
   useEffect(() => {
-    const pending = tracks.filter(t => t.generation_status === 'pending' && pendingPolls[t.id])
+    const pending = (tracks || []).filter(t => t.generation_status === 'pending' && pendingPolls[t.id])
     if (!pending.length) return
     const timer = setInterval(async () => {
       for (const t of pending) {
@@ -391,11 +391,12 @@ export default function MusicPage() {
   }
 
   // Stats
-  const totalTracks  = tracks.length
-  const sunoCount    = tracks.filter(t => t.provider === 'suno').length
-  const lyriaCount   = tracks.filter(t => t.provider?.startsWith('lyria')).length
-  const importCount  = tracks.filter(t => t.provider === 'import').length
-  const favCount     = tracks.filter(t => t.is_favorite).length
+  const trackList    = tracks || []
+  const totalTracks  = trackList.length
+  const sunoCount    = trackList.filter(t => t.provider === 'suno').length
+  const lyriaCount   = trackList.filter(t => t.provider?.startsWith('lyria')).length
+  const importCount  = trackList.filter(t => t.provider === 'import').length
+  const favCount     = trackList.filter(t => t.is_favorite).length
 
   return (
     <div className="flex flex-col gap-5" style={{ paddingBottom: playingTrack ? 80 : 0 }}>
@@ -451,7 +452,7 @@ export default function MusicPage() {
       <Card>
         {loading ? (
           <div className="flex justify-center py-10"><Spinner /></div>
-        ) : tracks.length === 0 ? (
+        ) : trackList.length === 0 ? (
           <EmptyState icon="🎵" title="No music tracks yet" description="Generate new tracks via Suno or Lyria, or import your own files." />
         ) : (
           <div className="overflow-x-auto">
@@ -464,7 +465,7 @@ export default function MusicPage() {
                 </tr>
               </thead>
               <tbody>
-                {tracks.map(t => (
+                {trackList.map(t => (
                   <tr key={t.id} className="border-b border-[#2a2a32] hover:bg-[#16161a] transition-colors">
                     <td className="py-2.5 pr-4">
                       <div className="font-medium text-[#e8e8f0] max-w-[180px] truncate">{t.title}</div>
