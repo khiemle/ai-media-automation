@@ -4,6 +4,7 @@ Scrapes article listings from CNN homepage and full article content.
 """
 import hashlib
 import logging
+import re
 from datetime import datetime
 from typing import Optional
 from urllib.parse import urljoin, urlparse
@@ -40,7 +41,6 @@ def _is_article_url(url: str) -> bool:
       2. Static slug:    /some/path/index.html
     Section hubs, videos, podcasts, games, and schedules are excluded.
     """
-    import re
     parsed = urlparse(url)
     path = parsed.path
 

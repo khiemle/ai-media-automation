@@ -46,25 +46,25 @@ def run_scrape(source_ids: list[str] | None = None) -> dict:
             ids    = fn()
             total_inserted += len(ids)
             all_inserted_ids.extend(ids)
-            logger.info(f"[Scraper] {source['id']} → {len(ids)} new videos")
+            logger.info(f"[Scraper] {source['id']} → {len(ids)} new records")
         except Exception as e:
             msg = f"[Scraper] {source['id']} failed: {e}"
             logger.error(msg)
             errors.append(msg)
 
-    # Run trend analysis on newly scraped data
-    if all_inserted_ids:
+    # Run trend analysis only for video sources (not news articles)
+    video_inserted = any(s.get("type") != "news" for s in to_run)
+    if all_inserted_ids and video_inserted:
         try:
             from scraper.trend_analyzer import analyze
             analyze()
             logger.info("[Scraper] Trend analysis complete")
         except Exception as e:
-            logger.error(f"[Scraper] Trend analysis failed: {e}")
-            errors.append(f"trend_analyzer: {e}")
+            logger.warning(f"[Scraper] Trend analysis failed: {e}")
 
     return {
         "sources_run":     len(to_run),
-        "videos_inserted": total_inserted,
+        "records_inserted": total_inserted,
         "inserted_ids":    all_inserted_ids,
         "errors":          errors,
     }

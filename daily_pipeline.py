@@ -54,7 +54,7 @@ def run_daily(topics: list[str] | None = None, dry_run: bool = False) -> dict:
             from scraper.main import run_scrape
             scrape_result = run_scrape()
             summary["steps"]["scrape"] = scrape_result
-            logger.info(f"[Pipeline] Scrape: {scrape_result.get('videos_inserted', 0)} new videos")
+            logger.info(f"[Pipeline] Scrape: {scrape_result.get('records_inserted', 0)} new records")
         except Exception as e:
             msg = f"Scrape failed: {e}"
             logger.error(f"[Pipeline] {msg}")

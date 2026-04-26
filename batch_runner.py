@@ -102,7 +102,7 @@ def _log_summary(summary: dict):
 
     if "scrape" in steps:
         s = steps["scrape"]
-        logger.info(f"  Scrape: {s.get('videos_inserted', 0)} new videos")
+        logger.info(f"  Scrape: {s.get('records_inserted', 0)} new records")
 
     if "generate" in steps:
         g = steps["generate"]

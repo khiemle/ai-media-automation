@@ -4,7 +4,7 @@ Scrapes article listings from vnexpress.net homepage and full article content.
 """
 import hashlib
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 from urllib.parse import urljoin, urlparse
 

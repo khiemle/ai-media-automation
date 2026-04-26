@@ -1,7 +1,7 @@
 """
 Abstract base class for all scraper adapters.
-Each adapter must implement `scrape() → list[ScrapedVideo]`.
-News adapters must implement `fetch_homepage()` and `fetch_article()`.
+Each adapter must implement `scrape() → list[ScrapedVideo]` for video sources,
+or `fetch_homepage()` / `fetch_article()` for news sources.
 """
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -13,7 +13,7 @@ from typing import Optional
 class ScrapedVideo:
     """Normalized video data returned by any scraper adapter."""
     video_id:      str
-    source:        str                      # tiktok_research | tiktok_playwright | apify
+    source:        str                      # tiktok_research | tiktok_playwright | apify | vnexpress | cnn
     author:        str = ""
     hook_text:     str = ""                 # first caption line / first 3s text
     play_count:    int = 0
