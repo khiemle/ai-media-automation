@@ -86,6 +86,7 @@ def _get_stats() -> dict:
                     "running":   counts.get("running", 0),
                     "completed": counts.get("completed", 0),
                     "failed":    counts.get("failed", 0),
+                    "cancelled": counts.get("cancelled", 0),  # Issue 7: was missing
                     "total":     sum(counts.values()),
                 },
                 "recent_jobs": jobs,
@@ -103,17 +104,14 @@ async def pipeline_ws(websocket: WebSocket):
     await manager.connect(websocket)
     try:
         while True:
-            data = _get_stats()
+            # Issue 3: offload blocking sync DB+Redis I/O to a thread pool executor
+            data = await asyncio.get_event_loop().run_in_executor(None, _get_stats)
             await manager.broadcast({
                 "type":      "pipeline_update",
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 **data,
             })
-            # Also listen for client messages (ping/pong keepalive)
-            try:
-                await asyncio.wait_for(websocket.receive_text(), timeout=2.0)
-            except asyncio.TimeoutError:
-                pass
+            await asyncio.sleep(2.0)
     except WebSocketDisconnect:
         manager.disconnect(websocket)
     except Exception as e:

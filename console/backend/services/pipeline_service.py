@@ -4,28 +4,42 @@ import math
 import logging
 from datetime import datetime, timezone
 
+import redis as _redis
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from console.backend.config import settings
 from console.backend.models.pipeline_job import PipelineJob
 from console.backend.schemas.common import PaginatedResponse
 
 logger = logging.getLogger(__name__)
 
+# Issue 1 & 2: shared module-level Redis client (lazy init), uses settings.REDIS_URL
+_redis_client: "_redis.Redis | None" = None
+
+
+def _get_redis() -> "_redis.Redis":
+    global _redis_client
+    if _redis_client is None:
+        _redis_client = _redis.from_url(settings.REDIS_URL, socket_connect_timeout=1)
+    return _redis_client
+
 
 def emit_log(job_id: int, level: str, msg: str) -> None:
     """Push a log line to Redis for the given job. Fails silently if Redis unavailable."""
     try:
-        import redis as _redis
-        import os
-        r = _redis.from_url(os.environ.get("REDIS_URL", "redis://localhost:6379/0"), socket_connect_timeout=1)
+        r = _get_redis()
         entry = json.dumps({"ts": datetime.now(timezone.utc).isoformat(), "level": level, "msg": msg})
         key = f"pipeline:job:{job_id}:logs"
-        r.lpush(key, entry)
-        r.ltrim(key, 0, 199)
-        r.expire(key, 86400)  # 24h TTL
-    except Exception:
-        logger.debug(f"[emit_log] job={job_id} {level}: {msg}")
+        # Issue 6: pipeline the 3 Redis commands atomically
+        pipe = r.pipeline()
+        pipe.lpush(key, entry)
+        pipe.ltrim(key, 0, 199)
+        pipe.expire(key, 86400)  # 24h TTL
+        pipe.execute()
+    except Exception as exc:
+        # Issue 10: include the actual exception in the debug log
+        logger.debug("[emit_log] job=%s %s: %s (suppressed: %s)", job_id, level, msg, exc)
 
 JOB_TYPES = ("scrape", "generate", "tts", "render", "upload", "batch")
 STATUSES   = ("queued", "running", "completed", "failed", "cancelled")
@@ -174,9 +188,7 @@ class PipelineService:
     def get_job_logs(self, job_id: int) -> list[dict]:
         """Read accumulated logs from Redis for a job."""
         try:
-            import redis as _redis
-            import os
-            r = _redis.from_url(os.environ.get("REDIS_URL", "redis://localhost:6379/0"), socket_connect_timeout=1)
+            r = _get_redis()
             key = f"pipeline:job:{job_id}:logs"
             raw = r.lrange(key, 0, -1)
             # Redis LPUSH prepends, so reverse to get chronological order

@@ -22,7 +22,7 @@ function LogPanel({ logs }) {
       {!logs || logs.length === 0
         ? <span className="text-[#5a5a70]">No logs yet…</span>
         : logs.map((l, i) => (
-          <div key={i} className="flex gap-1.5">
+          <div key={`${l.ts}-${i}`} className="flex gap-1.5">
             <span className="text-[#5a5a70] flex-shrink-0">{l.ts ? l.ts.slice(11, 19) : ''}</span>
             <span className={`flex-shrink-0 ${l.level === 'ERROR' ? 'text-[#f87171]' : l.level === 'WARNING' ? 'text-[#fbbf24]' : 'text-[#34d399]'}`}>[{l.level}]</span>
             <span className={l.level === 'ERROR' ? 'text-[#f87171]' : l.level === 'WARNING' ? 'text-[#fbbf24]' : 'text-[#9090a8]'}>{l.msg}</span>
@@ -32,21 +32,29 @@ function LogPanel({ logs }) {
   )
 }
 
-function JobRow({ job, onRetry, onCancel }) {
+function JobRow({ job, onRetry, onCancel, onError }) {
   const [expanded,   setExpanded]   = useState(false)
   const [staticLogs, setStaticLogs] = useState(null)
   const [loadingLog, setLoadingLog] = useState(false)
+  // Issue 8: preserve last-seen live logs so they don't vanish on job completion
+  const prevLiveLogsRef = useRef(null)
 
   const handleViewLogs = async () => {
     setLoadingLog(true)
     try {
       const res = await fetchApi(`/api/pipeline/jobs/${job.id}/logs`)
       setStaticLogs(res.logs || [])
-    } catch (_) { setStaticLogs([]) }
+    } catch (e) {
+      // Issue 9: surface fetch errors via the parent toast system
+      setStaticLogs([])
+      onError?.(`Could not load logs for job ${job.id}: ${e.message}`)
+    }
     finally { setLoadingLog(false) }
   }
 
   const liveLogs = job.live_logs  // populated from WS when status === 'running'
+  // Issue 8: keep snapshot of the last live logs received
+  if (liveLogs) prevLiveLogsRef.current = liveLogs
 
   return (
     <div className="border border-[#2a2a32] rounded-lg overflow-hidden">
@@ -85,7 +93,12 @@ function JobRow({ job, onRetry, onCancel }) {
           {['completed', 'failed', 'cancelled'].includes(job.status) && (
             staticLogs
               ? <LogPanel logs={staticLogs} />
-              : <Button variant="ghost" size="sm" loading={loadingLog} onClick={handleViewLogs}>View Logs</Button>
+              : <>
+                  {prevLiveLogsRef.current && <LogPanel logs={prevLiveLogsRef.current} />}
+                  <Button variant="ghost" size="sm" loading={loadingLog} onClick={handleViewLogs}>
+                    {prevLiveLogsRef.current ? 'Reload Logs' : 'View Logs'}
+                  </Button>
+                </>
           )}
         </div>
       )}
@@ -229,7 +242,7 @@ export default function PipelinePage() {
         ) : (
           <div className="space-y-2">
             {filtered.map(job => (
-              <JobRow key={job.id} job={job} onRetry={handleRetry} onCancel={handleCancel} />
+              <JobRow key={job.id} job={job} onRetry={handleRetry} onCancel={handleCancel} onError={(msg) => showToast(msg, 'error')} />
             ))}
           </div>
         )}

@@ -80,8 +80,9 @@ def get_job_logs(
     _user=Depends(require_editor_or_admin),
 ):
     try:
-        PipelineService(db).get_job(job_id)  # validates job exists
-        logs = PipelineService(db).get_job_logs(job_id)
+        svc = PipelineService(db)
+        svc.get_job(job_id)  # validates job exists
+        logs = svc.get_job_logs(job_id)
         return {"job_id": job_id, "logs": logs}
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e))
