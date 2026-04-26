@@ -37,6 +37,7 @@ def compose_video(script_id: int) -> Path:
         if not script:
             raise ValueError(f"Script {script_id} not found")
         script_json = script.script_json
+        music_track_id = getattr(script, "music_track_id", None)
     finally:
         db.close()
 
@@ -213,11 +214,28 @@ def _assemble(
     final = concatenate_videoclips(composed_clips, method="compose")
 
     # Mix background music (if available)
-    music_track = _select_music(meta.get("mood", "uplifting"), meta.get("niche", "lifestyle"), final.duration)
-    if music_track:
+    _assigned_track = None
+    _track_volume = MUSIC_VOLUME
+    if music_track_id:
+        try:
+            from database.connection import get_session as _gs
+            from database.models import MusicTrack
+            _db2 = _gs()
+            try:
+                _t = _db2.query(MusicTrack).filter(MusicTrack.id == music_track_id, MusicTrack.generation_status == "ready").first()
+                if _t and _t.file_path and Path(_t.file_path).exists():
+                    _assigned_track = _t.file_path
+                    _track_volume = float(_t.volume or MUSIC_VOLUME)
+            finally:
+                _db2.close()
+        except Exception as _e:
+            logger.warning(f"[Composer] Could not load assigned music track {music_track_id}: {_e}")
+
+    music_track_path = _assigned_track or _select_music(meta.get("mood", "uplifting"), meta.get("niche", "lifestyle"), final.duration)
+    if music_track_path:
         try:
             from moviepy import AudioFileClip, CompositeAudioClip
-            music = AudioFileClip(music_track).with_volume_scaled(MUSIC_VOLUME)
+            music = AudioFileClip(music_track_path).with_volume_scaled(_track_volume)
             if music.duration < final.duration:
                 # Loop music
                 import math
@@ -232,6 +250,22 @@ def _assemble(
                 final = final.with_audio(mixed)
             else:
                 final = final.with_audio(music)
+
+            # Increment usage count for DB-tracked tracks
+            if music_track_id and _assigned_track:
+                try:
+                    from database.connection import get_session as _gs3
+                    from database.models import MusicTrack
+                    _db3 = _gs3()
+                    try:
+                        _mt = _db3.query(MusicTrack).filter(MusicTrack.id == music_track_id).first()
+                        if _mt:
+                            _mt.usage_count = (_mt.usage_count or 0) + 1
+                            _db3.commit()
+                    finally:
+                        _db3.close()
+                except Exception:
+                    pass
         except Exception as e:
             logger.warning(f"[Composer] Music mix failed: {e}")
 
