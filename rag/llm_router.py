@@ -15,7 +15,7 @@ load_dotenv(_root / ".env", override=False)
 
 logger = logging.getLogger(__name__)
 
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+# GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")  # No longer used at runtime
 GEMINI_KEY   = os.environ.get("GEMINI_API_KEY", "")
 
 try:
@@ -42,7 +42,8 @@ class GeminiRouter:
             raise RuntimeError("google-genai not installed. Run: pip install google-genai")
 
         client = genai.Client(api_key=GEMINI_KEY)
-        logger.info(f"[GeminiRouter] model={GEMINI_MODEL} template={template}")
+        model = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+        logger.info(f"[GeminiRouter] model={model} template={template}")
 
         for attempt in range(3):
             try:
@@ -53,8 +54,9 @@ class GeminiRouter:
                         temperature=0.8,
                         response_mime_type="application/json",
                     )
+                model = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
                 response = client.models.generate_content(
-                    model=GEMINI_MODEL,
+                    model=model,
                     contents=prompt,
                     config=config,
                 )
@@ -71,8 +73,9 @@ class GeminiRouter:
         return {}  # unreachable
 
     def status(self) -> dict:
+        model = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
         return {
-            "model":           GEMINI_MODEL,
+            "model":           model,
             "gemini_key_set":  bool(GEMINI_KEY),
             "gemini_usage":    self._limiter.usage(),
         }

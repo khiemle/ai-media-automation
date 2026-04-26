@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, Button, Select, Spinner, Toast } from '../components/index.jsx'
 import { fetchApi } from '../api/client.js'
 
@@ -9,7 +9,12 @@ export default function LLMPage() {
   const [saving,  setSaving]  = useState(false)
   const [toast,   setToast]   = useState(null)
 
-  const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000) }
+  const toastTimer = useRef(null)
+  const showToast = (msg, type = 'success') => {
+    if (toastTimer.current) clearTimeout(toastTimer.current)
+    setToast({ msg, type })
+    toastTimer.current = setTimeout(() => setToast(null), 3000)
+  }
 
   const load = () => {
     setLoading(true)
@@ -18,7 +23,7 @@ export default function LLMPage() {
       fetchApi('/api/llm/quota'),
     ])
       .then(([s, q]) => { setStatus(s); setQuota(q) })
-      .catch(() => {})
+      .catch((e) => showToast(e.message || 'Failed to load LLM status', 'error'))
       .finally(() => setLoading(false))
   }
 
@@ -29,7 +34,7 @@ export default function LLMPage() {
     try {
       await fetchApi('/api/llm/model', {
         method: 'PUT',
-        body: JSON.stringify({ provider: 'gemini', model }),
+        body: JSON.stringify({ provider: status?.provider ?? 'gemini', model }),
       })
       setStatus(s => ({ ...s, model }))
       showToast(`Model set to ${model}`)

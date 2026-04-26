@@ -75,10 +75,15 @@ class LLMService:
             for m in client.models.list():
                 name = getattr(m, 'name', '') or ''
                 # Filter to text-generation models; skip embedding/vision-only
-                if 'gemini' in name.lower():
-                    # Strip "models/" prefix if present
-                    short = name.replace("models/", "")
-                    names.append(short)
+                supported = getattr(m, 'supported_actions', None) or getattr(m, 'supportedActions', None)
+                if supported is not None:
+                    if 'generateContent' not in supported:
+                        continue
+                elif 'gemini' not in name.lower() or 'embedding' in name.lower():
+                    continue
+                # Strip "models/" prefix if present
+                short = name.replace("models/", "")
+                names.append(short)
             return sorted(set(names))
         except Exception as e:
             logger.warning(f"Could not fetch Gemini model list: {e}")
