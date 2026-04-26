@@ -145,8 +145,8 @@ def regenerate_script(
         return ScriptService(db).regenerate_script(script_id)
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/{script_id}/scenes/{scene_index}/regenerate", response_model=ScriptDetail)

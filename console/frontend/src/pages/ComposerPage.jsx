@@ -43,7 +43,12 @@ export default function ComposerPage() {
   const handleGenerate = async () => {
     const finalContent = outlineReady ? outline : content
     if (!finalContent.trim() || !niche) return
-    const topic = finalContent.trim().split('\n').find(l => l.trim())?.replace(/^[#*\s]+/, '').slice(0, 120) ?? finalContent.trim().slice(0, 120)
+    const topic = (
+  finalContent.trim().split('\n')
+    .map(l => l.replace(/^[#*\s]+/, '').trim())
+    .find(l => l)
+  ?? finalContent.trim().slice(0, 120)
+).slice(0, 120)
     setGenerating(true)
     try {
       await scriptsApi.generate({
