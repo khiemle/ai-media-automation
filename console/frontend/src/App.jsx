@@ -11,6 +11,7 @@ import SystemPage from './pages/SystemPage.jsx'
 import LLMPage from './pages/LLMPage.jsx'
 import NichesPage from './pages/NichesPage.jsx'
 import ComposerPage from './pages/ComposerPage.jsx'
+import MusicPage from './pages/MusicPage.jsx'
 
 // ── Tab icons (inline SVG) ────────────────────────────────────────────────────
 const Icons = {
@@ -59,6 +60,11 @@ const Icons = {
       <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>
     </svg>
   ),
+  Music: () => (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+    </svg>
+  ),
   Composer: () => (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
@@ -68,6 +74,7 @@ const Icons = {
 
 const ALL_TABS = [
   { id: 'niches',     label: 'Niches',     Icon: Icons.Niches,     roles: ['admin', 'editor'] },
+  { id: 'music',      label: 'Music',      Icon: Icons.Music,      roles: ['admin', 'editor'] },
   { id: 'composer',   label: 'Composer',   Icon: Icons.Composer,   roles: ['admin', 'editor'] },
   { id: 'scraper',    label: 'Scraper',    Icon: Icons.Scraper,    roles: ['admin', 'editor'] },
   { id: 'scripts',    label: 'Scripts',    Icon: Icons.Scripts,    roles: ['admin', 'editor'] },
@@ -128,6 +135,7 @@ export default function App() {
   const renderPage = () => {
     switch (activeTab) {
       case 'niches':   return <NichesPage />
+      case 'music':    return <MusicPage />
       case 'composer': return <ComposerPage />
       case 'scraper':    return <ScraperPage />
       case 'scripts':    return <ScriptsPage />
