@@ -44,3 +44,4 @@ assets
 pipeline.env
 models/kokoro/kokoro.onnx
 models/kokoro/voices
+logs

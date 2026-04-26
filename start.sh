@@ -136,7 +136,7 @@ echo "✅  Celery beat started"
 # ── 10. Start FastAPI backend ─────────────────────────────────────
 echo "🔄  Starting FastAPI backend on :${CONSOLE_PORT:-8080}..."
 RELOAD_FLAG=""
-[[ "${DEV_MODE:-1}" == "1" ]] && RELOAD_FLAG="--reload"
+[[ "${DEV_MODE:-1}" == "1" ]] && RELOAD_FLAG="--reload --reload-dir console"
 uvicorn console.backend.main:app \
   --host 0.0.0.0 \
   --port "${CONSOLE_PORT:-8080}" \

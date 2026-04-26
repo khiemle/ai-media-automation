@@ -123,10 +123,9 @@ class UploadService:
             except Exception:
                 pass
 
-        # Delete existing pending targets
+        # Delete all existing targets so re-upload doesn't hit a unique constraint
         self.db.query(UploadTarget).filter(
             UploadTarget.video_id == str(video_id),
-            UploadTarget.status == "pending",
         ).delete()
 
         for cid in channel_ids:
