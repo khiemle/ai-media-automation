@@ -1,6 +1,6 @@
 """
 Shared SQLAlchemy engine + session factory.
-Reads DATABASE_URL from environment (pipeline.env or console/.env).
+Reads DATABASE_URL from environment (.env at project root).
 """
 import os
 from pathlib import Path
@@ -9,15 +9,10 @@ from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 
-# Load pipeline.env from project root if not already loaded
-_env_path = Path(__file__).parent.parent / "pipeline.env"
+# Load .env from project root if not already set
+_env_path = Path(__file__).parent.parent / ".env"
 if _env_path.exists():
     load_dotenv(_env_path, override=False)
-
-# Fallback to console/.env
-_console_env = Path(__file__).parent.parent / "console" / ".env"
-if _console_env.exists():
-    load_dotenv(_console_env, override=False)
 
 DATABASE_URL = os.environ.get(
     "DATABASE_URL",
