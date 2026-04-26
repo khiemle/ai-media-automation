@@ -16,8 +16,14 @@ function SceneCard({ scene, index, scriptId, onUpdate, onToast }) {
   const [overlay, setOverlay]             = useState(scene.text_overlay || '')
   const [ttsLoading, setTtsLoading]       = useState(false)
   const [veoLoading, setVeoLoading]       = useState(false)
+  const [thumbBroken, setThumbBroken]     = useState(false)
+
+  const isDirty = narration !== (scene.narration || '') ||
+                  visualHint !== (scene.visual_hint || '') ||
+                  overlay !== (scene.text_overlay || '')
 
   const handleAssetSelect = async (asset) => {
+    if (isDirty && !window.confirm('Unsaved text changes will be lost. Continue?')) return
     try {
       await fetchApi(`/api/production/scripts/${scriptId}/scenes/${index}/asset`, {
         method: 'PUT',
@@ -41,6 +47,7 @@ function SceneCard({ scene, index, scriptId, onUpdate, onToast }) {
   }
 
   const handleVeoGen = async () => {
+    if (isDirty && !window.confirm('Unsaved text changes will be lost. Continue?')) return
     setVeoLoading(true)
     try {
       const res = await fetchApi(`/api/production/scripts/${scriptId}/scenes/${index}/veo`, { method: 'POST' })
@@ -83,9 +90,10 @@ function SceneCard({ scene, index, scriptId, onUpdate, onToast }) {
           <div className="space-y-3">
             <div className="text-xs font-semibold text-[#9090a8] uppercase tracking-wider">Visual Asset</div>
             <div className="aspect-[9/16] max-h-48 bg-[#0d0d0f] rounded-lg border border-[#2a2a32] flex items-center justify-center overflow-hidden">
-              {scene.asset_thumbnail_url ? (
+              {scene.asset_thumbnail_url && !thumbBroken ? (
                 <img src={scene.asset_thumbnail_url} alt="asset thumbnail"
-                  className="w-full h-full object-cover" />
+                  className="w-full h-full object-cover"
+                  onError={() => setThumbBroken(true)} />
               ) : scene.asset_id ? (
                 <div className="text-xs text-[#7c6af7] font-mono">Asset #{scene.asset_id}</div>
               ) : (
@@ -183,8 +191,9 @@ export default function ProductionPage() {
   }, [])
 
   const loadScript = useCallback(async (id) => {
-    setLoading(true)
     setActiveId(id)
+    setScript(null)  // clear stale data so readyCount doesn't show stale values
+    setLoading(true)
     try {
       const data = await fetchApi(`/api/production/scripts/${id}`)
       setScript(data)
