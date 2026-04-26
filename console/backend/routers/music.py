@@ -164,8 +164,8 @@ def get_track(
 def stream_track(
     track_id: int,
     db: Session = Depends(get_db),
-    _user=Depends(require_editor_or_admin),
 ):
+    """Stream audio file — no auth required so <audio> tags can load it directly."""
     try:
         track = MusicService(db).get_track(track_id)
     except KeyError:
