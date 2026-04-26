@@ -1,24 +1,19 @@
-// ── Token storage (localStorage + memory) ─────────────────────────────────────
-const TOKEN_KEY = 'ai_media_token'
+// ── Token storage (memory only — never persisted to localStorage/sessionStorage) ──
 let _token = null
 
 export function setToken(token) {
   _token = token
-  localStorage.setItem(TOKEN_KEY, token)
 }
 
 export function clearToken() {
   _token = null
-  localStorage.removeItem(TOKEN_KEY)
 }
 
 export function getToken() { return _token }
 
-/** Restore token from localStorage into memory. Returns the token or null. */
+/** No-op: token is memory-only; returns null on every page load. */
 export function loadPersistedToken() {
-  const saved = localStorage.getItem(TOKEN_KEY)
-  if (saved) _token = saved
-  return saved
+  return null
 }
 
 // ── Base fetch wrapper ─────────────────────────────────────────────────────────
