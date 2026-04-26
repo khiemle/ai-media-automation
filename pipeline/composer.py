@@ -271,6 +271,7 @@ def _assemble(
         fps=TARGET_FPS,
         codec="libx264",
         audio_codec="aac",
+        audio_fps=44100,
         preset="ultrafast",
         logger=None,
     )

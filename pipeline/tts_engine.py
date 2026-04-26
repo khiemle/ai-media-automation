@@ -167,20 +167,24 @@ def generate_tts(
             )
 
             # Resample to 44.1kHz if needed
+            write_sr = SAMPLE_RATE
             if sr != SAMPLE_RATE:
                 try:
                     from scipy.signal import resample_poly
                     from math import gcd
                     g = gcd(SAMPLE_RATE, sr)
                     samples = resample_poly(samples, SAMPLE_RATE // g, sr // g)
-                except Exception:
-                    pass  # use as-is if scipy not available
+                    logger.debug(f"[TTS] Resampled {sr}→{SAMPLE_RATE}Hz, {len(samples)} samples")
+                except Exception as e:
+                    # Write at native rate rather than mislabeling 24kHz samples as 44.1kHz
+                    logger.error(f"[TTS] Resample {sr}→{SAMPLE_RATE} failed ({e}), writing at native {sr}Hz")
+                    write_sr = sr
 
             # Ensure mono
             if samples.ndim > 1:
                 samples = samples.mean(axis=1)
 
-            sf.write(str(output_path), samples.astype(np.float32), SAMPLE_RATE)
+            sf.write(str(output_path), samples.astype(np.float32), write_sr)
             logger.info(f"[TTS] Generated {output_path} ({len(samples)/SAMPLE_RATE:.1f}s)")
             return output_path
 
