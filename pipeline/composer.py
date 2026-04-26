@@ -163,7 +163,7 @@ def _assemble(
                         f"[Composer] Scene {idx} clip is {raw_clip.duration:.1f}s, "
                         f"scene needs {duration:.1f}s — clamping to clip length"
                     )
-                clip = raw_clip.with_subclip(0, clip_end)
+                clip = raw_clip.subclipped(0, clip_end)
                 # Ensure correct size
                 if clip.w != TARGET_W or clip.h != TARGET_H:
                     clip = clip.resized((TARGET_W, TARGET_H))
@@ -196,7 +196,7 @@ def _assemble(
                 audio = AudioFileClip(assets["audio_path"])
                 # Trim or pad audio to match scene duration
                 if audio.duration > duration:
-                    audio = audio.with_subclip(0, duration)
+                    audio = audio.subclipped(0, duration)
                 scene_clip = scene_clip.with_audio(audio)
             except Exception as e:
                 logger.warning(f"[Composer] Scene {idx} audio failed: {e}")
@@ -237,9 +237,9 @@ def _assemble(
                 import math
                 loops = math.ceil(final.duration / music.duration)
                 from moviepy import concatenate_audioclips
-                music = concatenate_audioclips([music] * loops).with_subclip(0, final.duration)
+                music = concatenate_audioclips([music] * loops).subclipped(0, final.duration)
             else:
-                music = music.with_subclip(0, final.duration)
+                music = music.subclipped(0, final.duration)
 
             if final.audio:
                 mixed = CompositeAudioClip([final.audio, music])
