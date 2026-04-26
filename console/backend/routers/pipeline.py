@@ -73,6 +73,20 @@ def retry_job(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.get("/jobs/{job_id}/logs")
+def get_job_logs(
+    job_id: int,
+    db: Session = Depends(get_db),
+    _user=Depends(require_editor_or_admin),
+):
+    try:
+        PipelineService(db).get_job(job_id)  # validates job exists
+        logs = PipelineService(db).get_job_logs(job_id)
+        return {"job_id": job_id, "logs": logs}
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
 @router.patch("/jobs/{job_id}/cancel")
 def cancel_job(
     job_id: int,

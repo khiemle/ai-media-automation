@@ -1,4 +1,5 @@
 """PipelineService — job management and Celery task orchestration."""
+import json
 import math
 import logging
 from datetime import datetime, timezone
@@ -10,6 +11,21 @@ from console.backend.models.pipeline_job import PipelineJob
 from console.backend.schemas.common import PaginatedResponse
 
 logger = logging.getLogger(__name__)
+
+
+def emit_log(job_id: int, level: str, msg: str) -> None:
+    """Push a log line to Redis for the given job. Fails silently if Redis unavailable."""
+    try:
+        import redis as _redis
+        import os
+        r = _redis.from_url(os.environ.get("REDIS_URL", "redis://localhost:6379/0"), socket_connect_timeout=1)
+        entry = json.dumps({"ts": datetime.now(timezone.utc).isoformat(), "level": level, "msg": msg})
+        key = f"pipeline:job:{job_id}:logs"
+        r.lpush(key, entry)
+        r.ltrim(key, 0, 199)
+        r.expire(key, 86400)  # 24h TTL
+    except Exception:
+        logger.debug(f"[emit_log] job={job_id} {level}: {msg}")
 
 JOB_TYPES = ("scrape", "generate", "tts", "render", "upload", "batch")
 STATUSES   = ("queued", "running", "completed", "failed", "cancelled")
@@ -154,6 +170,25 @@ class PipelineService:
             "cancelled": counts.get("cancelled", 0),
             "total":     sum(counts.values()),
         }
+
+    def get_job_logs(self, job_id: int) -> list[dict]:
+        """Read accumulated logs from Redis for a job."""
+        try:
+            import redis as _redis
+            import os
+            r = _redis.from_url(os.environ.get("REDIS_URL", "redis://localhost:6379/0"), socket_connect_timeout=1)
+            key = f"pipeline:job:{job_id}:logs"
+            raw = r.lrange(key, 0, -1)
+            # Redis LPUSH prepends, so reverse to get chronological order
+            entries = []
+            for item in reversed(raw):
+                try:
+                    entries.append(json.loads(item))
+                except Exception:
+                    pass
+            return entries
+        except Exception:
+            return []
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 

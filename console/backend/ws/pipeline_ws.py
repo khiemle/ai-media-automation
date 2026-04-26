@@ -43,6 +43,7 @@ def _get_stats() -> dict:
     try:
         from console.backend.database import SessionLocal
         from console.backend.models.pipeline_job import PipelineJob
+        from console.backend.services.pipeline_service import PipelineService
         from sqlalchemy import func
 
         db = SessionLocal()
@@ -71,6 +72,14 @@ def _get_stats() -> dict:
                 }
                 for j in recent
             ]
+
+            # Fetch live logs only for running jobs
+            svc = PipelineService(db)
+            job_logs = {}
+            for j in recent:
+                if j.status == "running":
+                    job_logs[j.id] = svc.get_job_logs(j.id)
+
             return {
                 "stats": {
                     "queued":    counts.get("queued", 0),
@@ -80,12 +89,13 @@ def _get_stats() -> dict:
                     "total":     sum(counts.values()),
                 },
                 "recent_jobs": jobs,
+                "job_logs": job_logs,
             }
         finally:
             db.close()
     except Exception as e:
         logger.warning(f"WS stats fetch failed: {e}")
-        return {"stats": {}, "recent_jobs": []}
+        return {"stats": {}, "recent_jobs": [], "job_logs": {}}
 
 
 @router.websocket("/ws/pipeline")
