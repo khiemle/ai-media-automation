@@ -149,3 +149,27 @@ class ViralPattern(Base):
     sample_count     = Column(Integer, default=0)
     created_at       = Column(DateTime(timezone=True), server_default=func.now())
     updated_at       = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class MusicTrack(Base):
+    """Background music library with niche/mood/genre metadata and generation tracking."""
+    __tablename__ = "music_tracks"
+
+    id                = Column(Integer, primary_key=True, autoincrement=True)
+    title             = Column(String, nullable=False)
+    file_path         = Column(Text, nullable=True)              # path to audio file (NULL while pending)
+    duration_s        = Column(Float, nullable=True)             # seconds
+    niches            = Column(ARRAY(String))                    # ["fitness", "wellness"]
+    moods             = Column(ARRAY(String))                    # ["energetic", "calm"]
+    genres            = Column(ARRAY(String))                    # ["pop", "electronic"]
+    is_vocal          = Column(Boolean, default=False)
+    is_favorite       = Column(Boolean, default=False)
+    volume            = Column(Float, default=0.15)              # 0.0-1.0
+    usage_count       = Column(Integer, default=0)
+    quality_score     = Column(Float, default=0.0)               # 0-100
+    provider          = Column(String, default="import")         # import | suno | lyria | musico
+    provider_task_id  = Column(String, nullable=True)            # async task ID
+    generation_status = Column(String, default="ready")          # pending | ready | failed
+    generation_prompt = Column(Text, nullable=True)              # full prompt used for generation
+    created_at        = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at        = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
