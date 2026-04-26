@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { Card, Badge, Button, StatBox, ProgressBar, Spinner, EmptyState, Toast } from '../components/index.jsx'
 import { useWebSocket } from '../hooks/useWebSocket.js'
 import { fetchApi } from '../api/client.js'
@@ -11,41 +11,63 @@ const STATUS_COLOR = {
   queued: 'planned', running: 'editing', completed: 'completed', failed: 'rejected', cancelled: 'standby',
 }
 
+function LogPanel({ logs }) {
+  const ref = useRef(null)
+  useEffect(() => {
+    if (ref.current) ref.current.scrollTop = ref.current.scrollHeight
+  }, [logs?.length])
+
+  return (
+    <div ref={ref} className="bg-[#0d0d0f] px-3 py-2.5 max-h-52 overflow-y-auto font-mono text-xs leading-5 space-y-0.5 mt-2 rounded-lg border border-[#2a2a32]">
+      {!logs || logs.length === 0
+        ? <span className="text-[#5a5a70]">No logs yet…</span>
+        : logs.map((l, i) => (
+          <div key={i} className="flex gap-1.5">
+            <span className="text-[#5a5a70] flex-shrink-0">{l.ts ? l.ts.slice(11, 19) : ''}</span>
+            <span className={`flex-shrink-0 ${l.level === 'ERROR' ? 'text-[#f87171]' : l.level === 'WARNING' ? 'text-[#fbbf24]' : 'text-[#34d399]'}`}>[{l.level}]</span>
+            <span className={l.level === 'ERROR' ? 'text-[#f87171]' : l.level === 'WARNING' ? 'text-[#fbbf24]' : 'text-[#9090a8]'}>{l.msg}</span>
+          </div>
+        ))}
+    </div>
+  )
+}
+
 function JobRow({ job, onRetry, onCancel }) {
-  const [expanded, setExpanded] = useState(false)
+  const [expanded,   setExpanded]   = useState(false)
+  const [staticLogs, setStaticLogs] = useState(null)
+  const [loadingLog, setLoadingLog] = useState(false)
+
+  const handleViewLogs = async () => {
+    setLoadingLog(true)
+    try {
+      const res = await fetchApi(`/api/pipeline/jobs/${job.id}/logs`)
+      setStaticLogs(res.logs || [])
+    } catch (_) { setStaticLogs([]) }
+    finally { setLoadingLog(false) }
+  }
+
+  const liveLogs = job.live_logs  // populated from WS when status === 'running'
 
   return (
     <div className="border border-[#2a2a32] rounded-lg overflow-hidden">
-      <div
-        className="flex items-center gap-3 px-4 py-2.5 hover:bg-[#1c1c22] cursor-pointer"
-        onClick={() => setExpanded(e => !e)}
-      >
+      <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-[#1c1c22] cursor-pointer"
+        onClick={() => setExpanded(e => !e)}>
         <span className="text-xs font-mono text-[#5a5a70] w-8">#{job.id}</span>
         <Badge status={STATUS_COLOR[job.status]} label={job.status} />
         <span className="text-xs font-mono text-[#9090a8] w-20">{JOB_TYPE_LABELS[job.job_type] || job.job_type}</span>
-        <div className="flex-1">
-          <ProgressBar value={job.progress || 0} max={100} />
-        </div>
+        <div className="flex-1"><ProgressBar value={job.progress || 0} max={100} /></div>
         <span className="text-xs font-mono text-[#9090a8] w-8 text-right">{job.progress || 0}%</span>
-        {job.script_id && (
-          <span className="text-xs text-[#5a5a70] font-mono">script#{job.script_id}</span>
-        )}
+        {job.script_id && <span className="text-xs text-[#5a5a70] font-mono">script#{job.script_id}</span>}
         <div className="flex gap-1">
           {['failed', 'cancelled'].includes(job.status) && (
-            <Button variant="ghost" className="text-xs px-2 py-0.5" onClick={e => { e.stopPropagation(); onRetry(job.id) }}>
-              Retry
-            </Button>
+            <Button variant="ghost" className="text-xs px-2 py-0.5" onClick={e => { e.stopPropagation(); onRetry(job.id) }}>Retry</Button>
           )}
           {['queued', 'running'].includes(job.status) && (
-            <Button variant="danger" className="text-xs px-2 py-0.5" onClick={e => { e.stopPropagation(); onCancel(job.id) }}>
-              Cancel
-            </Button>
+            <Button variant="danger" className="text-xs px-2 py-0.5" onClick={e => { e.stopPropagation(); onCancel(job.id) }}>Cancel</Button>
           )}
         </div>
-        <svg
-          width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-          className={`text-[#5a5a70] transition-transform ${expanded ? 'rotate-180' : ''}`}
-        >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+          className={`text-[#5a5a70] transition-transform ${expanded ? 'rotate-180' : ''}`}>
           <polyline points="6 9 12 15 18 9"/>
         </svg>
       </div>
@@ -57,6 +79,14 @@ function JobRow({ job, onRetry, onCancel }) {
           {job.completed_at && <div>Completed: <span className="text-[#e8e8f0]">{new Date(job.completed_at).toLocaleString()}</span></div>}
           {job.error && <div className="text-[#f87171]">Error: {job.error}</div>}
           {job.details && <div>Details: <span className="text-[#e8e8f0]">{JSON.stringify(job.details)}</span></div>}
+
+          {/* Logs */}
+          {job.status === 'running' && <LogPanel logs={liveLogs} />}
+          {['completed', 'failed', 'cancelled'].includes(job.status) && (
+            staticLogs
+              ? <LogPanel logs={staticLogs} />
+              : <Button variant="ghost" size="sm" loading={loadingLog} onClick={handleViewLogs}>View Logs</Button>
+          )}
         </div>
       )}
     </div>
@@ -81,7 +111,13 @@ export default function PipelinePage() {
   const handleWsMessage = useCallback((data) => {
     if (data.type === 'pipeline_update') {
       if (data.stats)       setStats(data.stats)
-      if (data.recent_jobs) setJobs(data.recent_jobs)
+      if (data.recent_jobs) {
+        const jobLogs = data.job_logs || {}
+        setJobs(data.recent_jobs.map(j => ({
+          ...j,
+          live_logs: jobLogs[j.id] || undefined,
+        })))
+      }
     }
   }, [])
 
