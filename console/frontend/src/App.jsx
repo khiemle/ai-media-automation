@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { getToken, setToken, clearToken, authApi } from './api/client.js'
+import { useState, useEffect } from 'react'
+import { setToken, clearToken, loadPersistedToken, authApi } from './api/client.js'
 import LoginPage from './pages/LoginPage.jsx'
 import ScraperPage from './pages/ScraperPage.jsx'
 import ScriptsPage from './pages/ScriptsPage.jsx'
@@ -9,6 +9,8 @@ import UploadsPage from './pages/UploadsPage.jsx'
 import PerformancePage from './pages/PerformancePage.jsx'
 import SystemPage from './pages/SystemPage.jsx'
 import LLMPage from './pages/LLMPage.jsx'
+import NichesPage from './pages/NichesPage.jsx'
+import ComposerPage from './pages/ComposerPage.jsx'
 
 // ── Tab icons (inline SVG) ────────────────────────────────────────────────────
 const Icons = {
@@ -52,17 +54,29 @@ const Icons = {
       <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
     </svg>
   ),
+  Niches: () => (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>
+    </svg>
+  ),
+  Composer: () => (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+    </svg>
+  ),
 }
 
 const ALL_TABS = [
-  { id: 'scraper',     label: 'Scraper',     Icon: Icons.Scraper,     roles: ['admin', 'editor'] },
-  { id: 'scripts',     label: 'Scripts',     Icon: Icons.Scripts,     roles: ['admin', 'editor'] },
-  { id: 'production',  label: 'Production',  Icon: Icons.Production,  roles: ['admin', 'editor'] },
-  { id: 'uploads',     label: 'Uploads',     Icon: Icons.Uploads,     roles: ['admin', 'editor'] },
-  { id: 'pipeline',    label: 'Pipeline',    Icon: Icons.Pipeline,    roles: ['admin', 'editor'] },
-  { id: 'llm',         label: 'LLM',         Icon: Icons.LLM,         roles: ['admin'] },
-  { id: 'performance', label: 'Performance', Icon: Icons.Performance, roles: ['admin', 'editor'] },
-  { id: 'system',      label: 'System',      Icon: Icons.System,      roles: ['admin'] },
+  { id: 'niches',     label: 'Niches',     Icon: Icons.Niches,     roles: ['admin', 'editor'] },
+  { id: 'composer',   label: 'Composer',   Icon: Icons.Composer,   roles: ['admin', 'editor'] },
+  { id: 'scraper',    label: 'Scraper',    Icon: Icons.Scraper,    roles: ['admin', 'editor'] },
+  { id: 'scripts',    label: 'Scripts',    Icon: Icons.Scripts,    roles: ['admin', 'editor'] },
+  { id: 'production', label: 'Production', Icon: Icons.Production, roles: ['admin', 'editor'] },
+  { id: 'uploads',    label: 'Uploads',    Icon: Icons.Uploads,    roles: ['admin', 'editor'] },
+  { id: 'pipeline',   label: 'Pipeline',   Icon: Icons.Pipeline,   roles: ['admin', 'editor'] },
+  { id: 'llm',        label: 'LLM',        Icon: Icons.LLM,        roles: ['admin'] },
+  { id: 'performance',label: 'Performance',Icon: Icons.Performance,roles: ['admin', 'editor'] },
+  { id: 'system',     label: 'System',     Icon: Icons.System,     roles: ['admin'] },
 ]
 
 // ── Placeholder page ──────────────────────────────────────────────────────────
@@ -81,8 +95,19 @@ function ComingSoon({ name }) {
 
 // ── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
-  const [user, setUser]       = useState(null)
-  const [activeTab, setTab]   = useState('scraper')
+  const [user, setUser]         = useState(null)
+  const [activeTab, setTab]     = useState('niches')
+  const [restoring, setRestoring] = useState(true)  // true while checking saved token
+
+  // ── Restore session on mount ───────────────────────────────────────────────
+  useEffect(() => {
+    const token = loadPersistedToken()
+    if (!token) { setRestoring(false); return }
+    authApi.me()
+      .then(userData => { setUser(userData) })
+      .catch(() => { clearToken() })
+      .finally(() => { setRestoring(false) })
+  }, [])
 
   // ── Auth handlers ──────────────────────────────────────────────────────────
   const handleLogin = (token, userData) => {
@@ -95,6 +120,12 @@ export default function App() {
     setUser(null)
   }
 
+  if (restoring) return (
+    <div className="min-h-screen bg-[#0d0d0f] flex items-center justify-center">
+      <div className="w-5 h-5 border-2 border-[#7c6af7] border-t-transparent rounded-full animate-spin" />
+    </div>
+  )
+
   if (!user) return <LoginPage onLogin={handleLogin} />
 
   // ── Visible tabs based on role ─────────────────────────────────────────────
@@ -103,6 +134,8 @@ export default function App() {
   // ── Render current page ────────────────────────────────────────────────────
   const renderPage = () => {
     switch (activeTab) {
+      case 'niches':   return <NichesPage />
+      case 'composer': return <ComposerPage />
       case 'scraper':    return <ScraperPage />
       case 'scripts':    return <ScriptsPage />
       case 'production': return <ProductionPage />
