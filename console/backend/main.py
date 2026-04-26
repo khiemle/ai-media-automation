@@ -124,6 +124,12 @@ def register_routers():
     except ImportError:
         pass
 
+    try:
+        from console.backend.routers import music
+        app.include_router(music.router, prefix="/api")
+    except ImportError:
+        pass
+
 
 register_routers()
 
