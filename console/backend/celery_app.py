@@ -12,6 +12,7 @@ celery_app = Celery(
         "console.backend.tasks.production_tasks",
         "console.backend.tasks.upload_tasks",
         "console.backend.tasks.token_refresh",
+        "console.backend.tasks.music_tasks",
     ],
 )
 
@@ -27,6 +28,7 @@ celery_app.conf.update(
         "console.backend.tasks.production_tasks.*": {"queue": "render_q"},
         "console.backend.tasks.upload_tasks.*": {"queue": "upload_q"},
         "console.backend.tasks.token_refresh.*": {"queue": "scrape_q"},
+        "console.backend.tasks.music_tasks.*": {"queue": "render_q"},
     },
     beat_schedule={
         # Refresh expiring OAuth tokens every 30 minutes
