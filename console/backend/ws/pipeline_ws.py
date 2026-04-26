@@ -105,7 +105,7 @@ async def pipeline_ws(websocket: WebSocket, token: str = Query(...)):
     try:
         decode_token(token)
     except Exception:
-        await websocket.close(code=1008)
+        await websocket.close(code=4001)
         return
     await manager.connect(websocket)
     try:

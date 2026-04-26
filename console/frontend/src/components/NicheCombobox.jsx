@@ -41,7 +41,7 @@ export default function NicheCombobox({ value, onChange, label = 'Niche', placeh
       setNiches(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)))
       select(created.name)
     } catch (e) {
-      if (e.message?.includes('already exists')) {
+      if (e.status === 409) {
         // Race condition: niche was created concurrently — just select it
         select(name)
       } else {

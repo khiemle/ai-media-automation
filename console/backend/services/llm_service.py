@@ -34,7 +34,7 @@ class LLMService:
         if provider not in PROVIDER_REGISTRY:
             raise ValueError(f"Unknown provider '{provider}'. Available: {list(PROVIDER_REGISTRY.keys())}")
         available = self._fetch_gemini_models()
-        if available and model_name not in available:
+        if model_name not in available:
             raise ValueError(f"Unknown model '{model_name}'. Available: {available}")
         os.environ["LLM_PROVIDER"] = provider
         os.environ["LLM_MODEL"]    = model_name
