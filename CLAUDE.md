@@ -10,10 +10,11 @@
 A fully automated AI media pipeline with a **web-based Management Console** as the human control layer. Editors can curate content, review scripts, edit scenes, manage upload channels, and monitor the pipeline in real time.
 
 **Status (April 2026):**
-- **Management Console** (all 8 tabs) — complete ✅
-- **Core Pipeline** (scraper → RAG → production → upload → feedback) — complete ✅
+- **Management Console** (all 8 tabs) — implemented; active integration/debugging still in progress
+- **Core Pipeline** — mostly implemented end to end, with scraper currently using browser-based fallback strategy for TikTok
+- **TikTok scraping** — official Research API is not production-ready yet in this repo; active path is `tiktok_playwright` with broader page-state extraction, optional headful retry, and Selenium + Chromium fallback
 
-**Stack:** FastAPI (Python 3.11+) backend · React 18 + Vite + Tailwind CSS frontend · PostgreSQL · Celery + Redis · Ollama/Qwen2.5 (local LLM) · Gemini 2.5 Flash (cloud LLM) · Kokoro ONNX (TTS) · ChromaDB (vector search) · MoviePy + ffmpeg (video)
+**Stack:** FastAPI (Python 3.11+) backend · React 18 + Vite + Tailwind CSS frontend · PostgreSQL · Celery + Redis · Ollama/Qwen2.5 (local LLM) · Gemini 2.5 Flash (cloud LLM) · Kokoro ONNX (TTS) · ChromaDB (vector search) · MoviePy + ffmpeg (video) · Playwright + Selenium/Chromium (TikTok scraping fallback)
 
 **Team:** 1 engineer + 1 business user
 
@@ -52,6 +53,11 @@ alembic upgrade head
 ```bash
 # Install pipeline dependencies
 pip install -r requirements.pipeline.txt
+
+# Browser scraping prerequisites for TikTok
+playwright install chromium
+# Optional local fallback for visible-browser or Selenium runs:
+# install Google Chrome / Chromium on the machine
 
 # First-time setup (ChromaDB collections)
 python3 database/setup_chromadb.py
@@ -171,8 +177,10 @@ ai-media-automation/
 │
 ├── scraper/
 │   ├── base_scraper.py               ← ScrapedVideo dataclass + BaseScraper abstract class
+│   ├── tiktok_browser_common.py      ← shared TikTok browser config + parsing helpers
 │   ├── tiktok_research_api.py        ← TikTok Research API adapter
-│   ├── tiktok_playwright.py          ← Playwright headless scraper
+│   ├── tiktok_playwright.py          ← Playwright-first TikTok scraper with headful + Selenium fallback
+│   ├── tiktok_selenium.py            ← Selenium + Chromium TikTok fallback scraper
 │   ├── apify_scraper.py              ← Apify cloud scraper
 │   ├── trend_analyzer.py             ← extracts patterns → viral_patterns table
 │   └── main.py                       ← run_scrape() orchestrator
@@ -226,7 +234,7 @@ ai-media-automation/
 
 ## Core Rules (Always Follow)
 
-1. **Never modify the core pipeline.** The console imports from `scraper/`, `rag/`, `pipeline/`, `uploader/`, `feedback/`, `database/` — but never changes them. The pipeline still runs in full-auto mode via `batch_runner.py`.
+1. **Treat current code as the source of truth.** Planning docs may lag behind the repo. Prefer the real implementation and recent runtime behavior when they disagree.
 
 2. **Run uvicorn from the project root**, not from `console/`:
    ```bash
@@ -294,6 +302,33 @@ PATCH  /api/scripts/{id}/reject
 POST   /api/scripts/{id}/regenerate
 POST   /api/scripts/{id}/scenes/{n}/regenerate
 ```
+
+## Current Scraper Reality
+
+- The active TikTok source is currently configured in `config/scraper_sources.yaml` and should be treated as operational config, not static documentation.
+- Right now the intended temporary production path is browser scraping through `tiktok_playwright`.
+- `tiktok_playwright` now tries broader page-state extraction first, can retry in visible-browser mode, and can fall back to Selenium + Chromium when Playwright returns empty results.
+- TikTok Research API support remains in the repo, but should be treated as a future official path that depends on external approval and valid research credentials.
+- Apify remains a fallback source only; do not assume quota is available.
+
+### Browser Scraper Runtime Settings
+
+Set these in `pipeline.env` when debugging TikTok scraping locally:
+
+```bash
+TIKTOK_SCRAPER_ENGINE=auto
+TIKTOK_BROWSER_HEADLESS=true
+TIKTOK_BROWSER_HEADFUL_RETRY_ON_EMPTY=true
+TIKTOK_SELENIUM_FALLBACK=true
+TIKTOK_BROWSER_TIMEOUT_MS=30000
+TIKTOK_BROWSER_SCROLL_COUNT=4
+TIKTOK_BROWSER_SCROLL_DELAY_MS=1800
+TIKTOK_BROWSER_CHANNEL=
+TIKTOK_CHROME_BINARY=
+```
+
+- Set `TIKTOK_BROWSER_HEADLESS=false` to force a real browser window/tab for local debugging.
+- Set `TIKTOK_SCRAPER_ENGINE=selenium` if you want Selenium to be the first browser engine instead of a fallback.
 
 ---
 

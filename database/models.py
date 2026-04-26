@@ -75,6 +75,8 @@ class GeneratedScript(Base):
     # Feedback extensions (added by migration 003)
     quality_score    = Column(Float)
     platform_video_id = Column(String)                           # YouTube/TikTok video ID after upload
+    # Language extension (added by migration 004)
+    language         = Column(String, default="vietnamese")
     created_at       = Column(DateTime(timezone=True), server_default=func.now())
     updated_at       = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -108,6 +110,27 @@ class VideoAsset(Base):
     quality_score = Column(Float, default=0.0)
     created_at    = Column(DateTime(timezone=True), server_default=func.now())
     expires_at    = Column(DateTime(timezone=True))              # NULL = permanent
+
+
+class NewsArticle(Base):
+    """Scraped news articles from newspaper sources."""
+    __tablename__ = "news_articles"
+
+    id            = Column(Integer, primary_key=True, autoincrement=True)
+    article_id    = Column(String, unique=True, nullable=False)    # sha256(url)[:16]
+    source        = Column(String, nullable=False)                  # vnexpress | tinhte | cnn
+    url           = Column(String, unique=True, nullable=False)
+    title         = Column(Text, nullable=False)
+    main_content  = Column(Text)
+    language      = Column(String, nullable=False, default="vietnamese")
+    author        = Column(String)
+    published_at  = Column(DateTime(timezone=True), nullable=True)
+    niche         = Column(String)
+    tags          = Column(ARRAY(String))
+    thumbnail_url = Column(String)
+    indexed_at    = Column(DateTime(timezone=True), nullable=True)
+    scraped_at    = Column(DateTime(timezone=True), server_default=func.now())
+    created_at    = Column(DateTime(timezone=True), server_default=func.now())
 
 
 class ViralPattern(Base):
