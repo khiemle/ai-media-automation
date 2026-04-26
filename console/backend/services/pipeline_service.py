@@ -4,6 +4,7 @@ import math
 import logging
 from datetime import datetime, timezone
 
+import threading
 import redis as _redis
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -14,14 +15,17 @@ from console.backend.schemas.common import PaginatedResponse
 
 logger = logging.getLogger(__name__)
 
-# Issue 1 & 2: shared module-level Redis client (lazy init), uses settings.REDIS_URL
+# Shared module-level Redis client — lazy init with double-checked locking for thread safety
 _redis_client: "_redis.Redis | None" = None
+_redis_lock = threading.Lock()
 
 
 def _get_redis() -> "_redis.Redis":
     global _redis_client
     if _redis_client is None:
-        _redis_client = _redis.from_url(settings.REDIS_URL, socket_connect_timeout=1)
+        with _redis_lock:
+            if _redis_client is None:
+                _redis_client = _redis.from_url(settings.REDIS_URL, socket_connect_timeout=1)
     return _redis_client
 
 

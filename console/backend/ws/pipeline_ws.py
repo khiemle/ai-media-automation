@@ -105,7 +105,7 @@ async def pipeline_ws(websocket: WebSocket):
     try:
         while True:
             # Issue 3: offload blocking sync DB+Redis I/O to a thread pool executor
-            data = await asyncio.get_event_loop().run_in_executor(None, _get_stats)
+            data = await asyncio.get_running_loop().run_in_executor(None, _get_stats)
             await manager.broadcast({
                 "type":      "pipeline_update",
                 "timestamp": datetime.now(timezone.utc).isoformat(),
