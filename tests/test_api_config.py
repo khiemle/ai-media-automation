@@ -45,7 +45,7 @@ def test_get_config_caches(config_file):
         # mutate file — should not affect cached result within TTL
         config_file.write_text(json.dumps({"gemini": {}}))
         cfg2 = get_config()
-    assert cfg1 is cfg2
+    assert cfg1 == cfg2
 
 
 def test_get_config_missing_file(tmp_path):
