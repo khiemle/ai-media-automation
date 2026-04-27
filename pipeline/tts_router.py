@@ -1,6 +1,9 @@
 """
-TTS Router — dispatches to ElevenLabs (Vietnamese) or Kokoro (English).
-Engine selection via TTS_ENGINE env var: auto | kokoro | elevenlabs
+TTS Router — dispatches to ElevenLabs or Kokoro.
+
+Engine selection priority:
+  1. tts_service kwarg ('kokoro' | 'elevenlabs') — explicit per-script choice
+  2. TTS_ENGINE env var ('auto' | 'kokoro' | 'elevenlabs') + language heuristic — legacy fallback
 """
 import logging
 import os
@@ -11,7 +14,7 @@ from config.api_config import get_config
 
 logger = logging.getLogger(__name__)
 
-TTS_ENGINE             = os.environ.get("TTS_ENGINE", "auto")
+TTS_ENGINE = os.environ.get("TTS_ENGINE", "auto")
 
 
 def generate_tts(
@@ -20,28 +23,50 @@ def generate_tts(
     speed:       float,
     language:    str,
     output_path: str,
+    tts_service: str = "",
 ) -> Path:
     """
     Generate TTS audio and write to output_path (WAV).
-    Engine selection:
-      auto      — vietnamese → ElevenLabs, english → Kokoro
-      kokoro    — always Kokoro
-      elevenlabs — always ElevenLabs
+
+    tts_service ('kokoro' | 'elevenlabs' | ''):
+      - 'kokoro'     → always Kokoro; voice_id is a Kokoro voice name
+      - 'elevenlabs' → always ElevenLabs; voice_id is an ElevenLabs UUID
+      - ''           → legacy: use TTS_ENGINE env var + language heuristic;
+                       voice_id is ignored for ElevenLabs (could be a Kokoro name)
+
     Raises RuntimeError on failure.
     """
-    engine = TTS_ENGINE
-    use_elevenlabs = (
-        engine == "elevenlabs"
-        or (engine == "auto" and language == "vietnamese")
-    )
+    if tts_service == "kokoro":
+        return _kokoro_generate(text, voice_id, speed, output_path)
+
+    if tts_service == "elevenlabs":
+        use_elevenlabs = True
+    else:
+        # Legacy: env var + language heuristic
+        use_elevenlabs = (
+            TTS_ENGINE == "elevenlabs"
+            or (TTS_ENGINE == "auto" and language == "vietnamese")
+        )
 
     if use_elevenlabs:
         cfg = get_config()
         if not cfg["elevenlabs"]["api_key"]:
             raise RuntimeError("ElevenLabs API key is not configured in config/api_keys.json")
-        voice = voice_id or cfg["elevenlabs"]["voice_id_vi"] or cfg["elevenlabs"]["voice_id_en"]
+
+        if tts_service == "elevenlabs":
+            # voice_id from script is an ElevenLabs UUID — use it, fall back to config if empty
+            voice = voice_id or cfg["elevenlabs"]["voice_id_vi"] or cfg["elevenlabs"]["voice_id_en"]
+        else:
+            # Legacy path: don't trust voice_id — it may be a Kokoro voice name
+            if language == "vietnamese":
+                voice = cfg["elevenlabs"]["voice_id_vi"] or cfg["elevenlabs"]["voice_id_en"]
+            else:
+                voice = cfg["elevenlabs"]["voice_id_en"] or cfg["elevenlabs"]["voice_id_vi"]
+
         if not voice:
-            raise RuntimeError("No ElevenLabs voice ID configured. Set voice_id in config/api_keys.json")
+            raise RuntimeError(
+                "No ElevenLabs voice ID configured. Set voice_id_en / voice_id_vi in config/api_keys.json"
+            )
 
         from pipeline.elevenlabs_tts import generate_tts_elevenlabs
         return generate_tts_elevenlabs(text, voice, speed, output_path)

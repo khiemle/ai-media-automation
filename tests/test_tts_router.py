@@ -69,3 +69,107 @@ def test_normalize_text_expands_currency():
     assert "500 triệu" in _normalize_text("giá 500tr đồng")
     assert _normalize_text("ok") == "ok"
     assert _normalize_text("trong") == "trong"
+
+
+def test_explicit_elevenlabs_service_uses_voice_id(tmp_path):
+    """When tts_service='elevenlabs', the passed voice_id is used as-is (ElevenLabs UUID)."""
+    out = tmp_path / "out.wav"
+    cfg = {**_FAKE_CONFIG}
+    with patch("pipeline.tts_router.get_config", return_value=cfg), \
+         patch("pipeline.elevenlabs_tts.generate_tts_elevenlabs") as mock_el:
+        mock_el.return_value = out
+        from pipeline.tts_router import generate_tts
+        generate_tts(
+            text="Hello",
+            voice_id="56AoDkrOh6qfVPDXZ7Pt",
+            speed=1.0,
+            language="english",
+            output_path=str(out),
+            tts_service="elevenlabs",
+        )
+    mock_el.assert_called_once()
+    call_args = mock_el.call_args
+    assert call_args.args[1] == "56AoDkrOh6qfVPDXZ7Pt"
+
+
+def test_explicit_kokoro_service_skips_elevenlabs(tmp_path):
+    """When tts_service='kokoro', Kokoro is used even for Vietnamese language."""
+    out = tmp_path / "out.wav"
+    import importlib
+    from pipeline import tts_router
+    importlib.reload(tts_router)
+    with patch.object(tts_router, "_kokoro_generate", return_value=out) as mock_kokoro, \
+         patch("pipeline.elevenlabs_tts.generate_tts_elevenlabs") as mock_el:
+        result = tts_router.generate_tts(
+            text="Xin chào",
+            voice_id="af_heart",
+            speed=1.0,
+            language="vietnamese",
+            output_path=str(out),
+            tts_service="kokoro",
+        )
+    mock_kokoro.assert_called_once()
+    mock_el.assert_not_called()
+    assert result == out
+
+
+def test_legacy_vietnamese_ignores_kokoro_voice_id(tmp_path):
+    """Legacy path (no tts_service): Vietnamese → ElevenLabs uses config voice, not af_heart."""
+    out = tmp_path / "out.wav"
+    with patch("pipeline.tts_router.get_config", return_value=_FAKE_CONFIG), \
+         patch.dict(os.environ, {"TTS_ENGINE": "auto"}), \
+         patch("pipeline.elevenlabs_tts.generate_tts_elevenlabs") as mock_el:
+        mock_el.return_value = out
+        from pipeline.tts_router import generate_tts
+        generate_tts(
+            text="Xin chào",
+            voice_id="af_heart",   # Kokoro name — must NOT be passed to ElevenLabs
+            speed=1.0,
+            language="vietnamese",
+            output_path=str(out),
+            # tts_service not passed → legacy path
+        )
+    mock_el.assert_called_once()
+    call_args = mock_el.call_args
+    # Should use config voice_id_vi, not "af_heart"
+    assert call_args.args[1] == "vi-voice-id"
+    assert call_args.args[1] != "af_heart"
+
+
+def test_legacy_english_elevenlabs_mode_uses_config_voice(tmp_path):
+    """Legacy path with TTS_ENGINE=elevenlabs and English: uses config voice_id_en, not af_heart."""
+    out = tmp_path / "out.wav"
+    with patch("pipeline.tts_router.get_config", return_value=_FAKE_CONFIG), \
+         patch("pipeline.tts_router.TTS_ENGINE", "elevenlabs"), \
+         patch("pipeline.elevenlabs_tts.generate_tts_elevenlabs") as mock_el:
+        mock_el.return_value = out
+        from pipeline.tts_router import generate_tts
+        generate_tts(
+            text="Hello",
+            voice_id="af_heart",
+            speed=1.0,
+            language="english",
+            output_path=str(out),
+        )
+    call_args = mock_el.call_args
+    assert call_args.args[1] == "en-voice-id"
+    assert call_args.args[1] != "af_heart"
+
+
+def test_explicit_elevenlabs_empty_voice_falls_back_to_config(tmp_path):
+    """When tts_service='elevenlabs' but voice_id is empty, falls back to config voice."""
+    out = tmp_path / "out.wav"
+    with patch("pipeline.tts_router.get_config", return_value=_FAKE_CONFIG), \
+         patch("pipeline.elevenlabs_tts.generate_tts_elevenlabs") as mock_el:
+        mock_el.return_value = out
+        from pipeline.tts_router import generate_tts
+        generate_tts(
+            text="Xin chào",
+            voice_id="",
+            speed=1.0,
+            language="vietnamese",
+            output_path=str(out),
+            tts_service="elevenlabs",
+        )
+    call_args = mock_el.call_args
+    assert call_args.args[1] in ("vi-voice-id", "en-voice-id")
