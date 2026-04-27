@@ -60,6 +60,31 @@ def generate_captions(audio_path: str | Path) -> Path:
         return _empty_srt(srt_path)
 
 
+def extract_word_timing(audio_path: str | Path, language: str = "vi") -> list[dict]:
+    """
+    Transcribe audio and return word-level timestamps.
+    Returns [{"word": str, "start": float, "end": float}, ...].
+    Returns [] if faster-whisper is unavailable.
+    """
+    audio_path = Path(audio_path)
+    model = _get_model()
+    if model is None:
+        return []
+    try:
+        segments, _ = model.transcribe(
+            str(audio_path), language=language, word_timestamps=True
+        )
+        return [
+            {"word": w.word.strip(), "start": w.start, "end": w.end}
+            for seg in segments
+            for w in (seg.words or [])
+            if w.word.strip()
+        ]
+    except Exception as e:
+        logger.error(f"[Caption] extract_word_timing failed: {e}")
+        return []
+
+
 def merge_audio_files(audio_paths: list[str | Path], output_path: str | Path) -> Path:
     """Concatenate multiple WAV files into a single file for Whisper transcription."""
     output_path = Path(output_path)
