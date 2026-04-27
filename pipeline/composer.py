@@ -90,16 +90,29 @@ def _process_scene(scene: dict, meta: dict, video_cfg: dict, out_dir: Path, idx:
 
     # 1. TTS
     audio_path = out_dir / f"audio_{idx}.wav"
+    word_timing: list[dict] | None = None
+    subtitle_style = video_cfg.get("subtitle_style") or ""
     try:
-        from pipeline.tts_router import generate_tts
-        generate_tts(
-            text=scene.get("narration", ""),
-            voice_id=video_cfg.get("voice", ""),
-            speed=float(video_cfg.get("voice_speed", 1.1)),
-            language=meta.get("language", "vietnamese"),
-            output_path=str(audio_path),
-            tts_service=video_cfg.get("tts_service", ""),
-        )
+        if subtitle_style:
+            from pipeline.tts_router import generate_tts_with_timing
+            audio_path, word_timing = generate_tts_with_timing(
+                text=scene.get("narration", ""),
+                voice_id=video_cfg.get("voice", ""),
+                speed=float(video_cfg.get("voice_speed", 1.1)),
+                language=meta.get("language", "vietnamese"),
+                output_path=str(audio_path),
+                tts_service=video_cfg.get("tts_service", ""),
+            )
+        else:
+            from pipeline.tts_router import generate_tts
+            generate_tts(
+                text=scene.get("narration", ""),
+                voice_id=video_cfg.get("voice", ""),
+                speed=float(video_cfg.get("voice_speed", 1.1)),
+                language=meta.get("language", "vietnamese"),
+                output_path=str(audio_path),
+                tts_service=video_cfg.get("tts_service", ""),
+            )
     except Exception as e:
         logger.warning(f"[Composer] Scene {idx} TTS failed: {e}")
         audio_path = None
@@ -127,6 +140,7 @@ def _process_scene(scene: dict, meta: dict, video_cfg: dict, out_dir: Path, idx:
         "audio_path":   str(audio_path) if audio_path and audio_path.exists() else None,
         "clip_path":    str(clip_path)  if clip_path and clip_path.exists() else None,
         "overlay_path": str(overlay_path) if overlay_path and overlay_path.exists() else None,
+        "word_timing":  word_timing,
     }
 
 
@@ -271,6 +285,23 @@ def _assemble(
         except Exception as e:
             logger.warning(f"[Composer] Music mix failed: {e}")
 
+    # Build ASS subtitle file if subtitle_style is set
+    subtitle_style = video_cfg.get("subtitle_style") or "" if video_cfg else ""
+    if subtitle_style:
+        from pipeline.subtitle_builder import build_ass
+        scene_offsets = []
+        offset = 0.0
+        for idx in range(len(scenes)):
+            scene_offsets.append(offset)
+            offset += scene_assets.get(idx, {}).get("duration", 5)
+        scene_word_timings = [
+            (scene_offsets[idx], scene_assets.get(idx, {}).get("word_timing") or [])
+            for idx in range(len(scenes))
+        ]
+        ass_path = output_path.parent / "subtitles.ass"
+        build_ass(scene_word_timings, ass_path, subtitle_style)
+        logger.info(f"[Composer] ASS subtitles → {ass_path}")
+
     # Write raw video (libx264 fast, will be re-encoded by renderer)
     final.write_videofile(
         str(output_path),
@@ -313,4 +344,5 @@ def _fallback_scene_assets(scene: dict, out_dir: Path, idx: int) -> dict:
         "audio_path":   None,
         "clip_path":    None,
         "overlay_path": None,
+        "word_timing":  None,
     }
