@@ -2,9 +2,21 @@ import pytest
 from unittest.mock import patch, MagicMock
 
 
+_FAKE_CONFIG = {
+    "gemini": {
+        "script": {"api_key": "fake-key", "model": "gemini-2.5-flash"},
+        "media":  {"api_key": "", "model": "gemini-2.0-flash-exp"},
+        "music":  {"api_key": "", "model": "lyria-3-clip-preview"},
+    },
+    "elevenlabs": {"api_key": "", "voice_id_en": "", "voice_id_vi": "", "model": "eleven_multilingual_v2"},
+    "suno":   {"api_key": "", "model": "V4_5"},
+    "pexels": {"api_key": ""},
+}
+
+
 @pytest.fixture(autouse=True)
-def _fake_gemini_key():
-    with patch.dict("os.environ", {"GEMINI_API_KEY": "fake-key"}):
+def _fake_config():
+    with patch("rag.llm_router.get_config", return_value=_FAKE_CONFIG):
         yield
 
 

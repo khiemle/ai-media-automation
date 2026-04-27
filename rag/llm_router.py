@@ -8,10 +8,9 @@ import os
 import time
 from pathlib import Path
 
-from dotenv import load_dotenv
+from config.api_config import get_config
 
 _root = Path(__file__).parent.parent
-load_dotenv(_root / ".env", override=False)
 
 logger = logging.getLogger(__name__)
 
@@ -36,9 +35,10 @@ class GeminiRouter:
         Call Gemini and return parsed dict (expect_json=True) or raw string.
         Raises RuntimeError if Gemini is unavailable or returns an error.
         """
-        api_key = os.environ.get("GEMINI_API_KEY", "")
+        cfg = get_config()
+        api_key = cfg["gemini"]["script"]["api_key"]
         if not api_key:
-            raise RuntimeError("GEMINI_API_KEY is not set in .env")
+            raise RuntimeError("Gemini script API key is not configured in config/api_keys.json")
         if genai is None:
             raise RuntimeError("google-genai not installed. Run: pip install google-genai")
 
@@ -46,7 +46,7 @@ class GeminiRouter:
 
         for attempt in range(3):
             try:
-                model = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+                model = cfg["gemini"]["script"]["model"]
                 logger.info(f"[GeminiRouter] model={model} template={template}")
                 self._limiter.wait_if_needed()
                 config = genai.types.GenerateContentConfig(temperature=0.8)
@@ -73,10 +73,11 @@ class GeminiRouter:
         return {}  # unreachable
 
     def status(self) -> dict:
-        model = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+        cfg = get_config()
+        model = cfg["gemini"]["script"]["model"]
         return {
             "model":           model,
-            "gemini_key_set":  bool(os.environ.get("GEMINI_API_KEY", "")),
+            "gemini_key_set":  bool(cfg["gemini"]["script"]["api_key"]),
             "gemini_usage":    self._limiter.usage(),
         }
 
