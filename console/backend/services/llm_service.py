@@ -68,7 +68,8 @@ class LLMService:
         except Exception as e:
             result["gemini_script"] = {"error": str(e)}
 
-        # ElevenLabs — subscription endpoint
+        # ElevenLabs — try /user/subscription first; fall back to /user for
+        # restricted keys that only have the "text_to_speech" scope.
         el_key = cfg.get("elevenlabs", {}).get("api_key", "")
         if el_key:
             try:
@@ -77,11 +78,20 @@ class LLMService:
                     headers={"xi-api-key": el_key},
                     timeout=10,
                 )
+                if resp.status_code == 401:
+                    # Key has restricted scope (e.g. text_to_speech only) —
+                    # fall back to /user which works with any valid key.
+                    resp = httpx.get(
+                        "https://api.elevenlabs.io/v1/user",
+                        headers={"xi-api-key": el_key},
+                        timeout=10,
+                    )
                 resp.raise_for_status()
                 data = resp.json()
+                subscription = data.get("subscription", data)
                 result["elevenlabs"] = {
-                    "characters_used":  data.get("character_count", 0),
-                    "characters_limit": data.get("character_limit", 0),
+                    "characters_used":  subscription.get("character_count", 0),
+                    "characters_limit": subscription.get("character_limit", 0),
                 }
             except Exception as e:
                 result["elevenlabs"] = {"error": str(e)}
