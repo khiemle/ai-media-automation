@@ -60,3 +60,36 @@ def test_renderer_skips_empty_ass(tmp_path):
     cmd = mock_run.call_args.args[0]
     vf_str = cmd[cmd.index("-vf") + 1]
     assert "subtitles=" not in vf_str
+
+
+def test_renderer_no_subtitle_when_neither_file_exists(tmp_path):
+    raw = _make_raw(tmp_path)
+    # No srt_path, no subtitles.ass in tmp_path
+    with patch("pipeline.renderer._check_nvenc", return_value=False), \
+         patch("pipeline.renderer._check_subtitles_filter", return_value=True), \
+         patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0)
+        (tmp_path / "video_final.mp4").write_bytes(b"fake final")
+        from pipeline.renderer import render_final
+        render_final(raw_video_path=raw)
+    cmd = mock_run.call_args.args[0]
+    vf_str = cmd[cmd.index("-vf") + 1]
+    assert "subtitles=" not in vf_str
+
+
+def test_renderer_logs_warning_when_subtitles_filter_unavailable(tmp_path):
+    raw = _make_raw(tmp_path)
+    ass_file = tmp_path / "subtitles.ass"
+    ass_file.write_text("[Script Info]\nPlayResX: 1080\n")
+    with patch("pipeline.renderer._check_nvenc", return_value=False), \
+         patch("pipeline.renderer._check_subtitles_filter", return_value=False), \
+         patch("subprocess.run") as mock_run, \
+         patch("pipeline.renderer.logger") as mock_logger:
+        mock_run.return_value = MagicMock(returncode=0)
+        (tmp_path / "video_final.mp4").write_bytes(b"fake final")
+        from pipeline.renderer import render_final
+        render_final(raw_video_path=raw)
+    cmd = mock_run.call_args.args[0]
+    vf_str = cmd[cmd.index("-vf") + 1]
+    assert "subtitles=" not in vf_str
+    mock_logger.warning.assert_called()
