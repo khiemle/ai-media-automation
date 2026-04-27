@@ -15,9 +15,10 @@ load_dotenv(_root / ".env", override=False)
 
 import httpx
 
+from config.api_config import get_config
+
 logger = logging.getLogger(__name__)
 
-PEXELS_API_KEY = os.environ.get("PEXELS_API_KEY", "")
 ASSET_DB_PATH  = os.environ.get("ASSET_DB_PATH", "./assets/video_db")
 PEXELS_BASE    = "https://api.pexels.com/videos"
 
@@ -36,15 +37,16 @@ def search_and_download(
     download, trim, and resize to 1080×1920.
     Returns clip path or None on failure.
     """
-    if not PEXELS_API_KEY:
-        logger.warning("[Pexels] PEXELS_API_KEY not set — skipping")
+    pexels_key = get_config()["pexels"]["api_key"]
+    if not pexels_key:
+        logger.warning("[Pexels] pexels.api_key not configured — skipping")
         return None
 
     query = " ".join(keywords[:4])
-    video_data = _search(query, min_duration)
+    video_data = _search(query, min_duration, pexels_key)
     if not video_data:
         # Fallback: try niche as query
-        video_data = _search(niche, min_duration)
+        video_data = _search(niche, min_duration, pexels_key)
     if not video_data:
         logger.warning(f"[Pexels] No results for query='{query}'")
         return None
@@ -77,18 +79,18 @@ def search_and_download(
     return None
 
 
-def _search(query: str, min_duration: float) -> dict | None:
+def _search(query: str, min_duration: float, pexels_key: str) -> dict | None:
     """Call Pexels video search API and return the best matching video."""
     try:
         resp = httpx.get(
-            f"{PEXELS_BASE}/search",
+            "https://api.pexels.com/videos/search",
             params={
                 "query":       query,
                 "orientation": "portrait",
                 "size":        "large",
                 "per_page":    10,
             },
-            headers={"Authorization": PEXELS_API_KEY},
+            headers={"Authorization": pexels_key},
             timeout=20,
         )
         resp.raise_for_status()
