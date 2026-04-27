@@ -155,11 +155,12 @@ def _build_subtitle_clips(
     """
     try:
         from moviepy import TextClip
-        from pipeline.subtitle_builder import SUBTITLE_STYLES, _ass_color_to_rgb
+        from pipeline.subtitle_builder import SUBTITLE_STYLES, _ass_color_to_rgb, _ensure_roboto_fonts
     except ImportError as exc:
         logger.warning(f"[Composer] Subtitle clips unavailable: {exc}")
         return []
 
+    _ensure_roboto_fonts()
     style = SUBTITLE_STYLES.get(subtitle_style, SUBTITLE_STYLES["bold_center"])
     wpe           = style.get("words_per_entry", 1)
     font          = style.get("font", "Arial")
@@ -170,8 +171,13 @@ def _build_subtitle_clips(
     uppercase     = style.get("uppercase", False)
     margin_v      = style.get("margin_v", 200)
 
-    # Relative vertical position: fraction from top (0=top, 1=bottom)
-    y_pos = max(0.0, min(0.95, 1.0 - (margin_v + font_size * 1.2) / TARGET_H))
+    # Max text width = 90% of video width so long words never overflow
+    max_text_w = int(TARGET_W * 0.90)
+
+    # Vertical position: bottom-anchored, margin_v pixels above the bottom
+    # y_pos is the TOP of the text block as a fraction of video height
+    line_height = int(font_size * 1.5)  # conservative estimate for one wrapped line
+    y_pos = max(0.0, min(0.92, 1.0 - (margin_v + line_height) / TARGET_H))
 
     clips = []
     for scene_offset, word_list in scene_word_timings:
@@ -198,6 +204,9 @@ def _build_subtitle_clips(
                     color=primary_rgb,
                     stroke_color=outline_rgb if outline_width > 0 else None,
                     stroke_width=outline_width if outline_width > 0 else 0,
+                    size=(max_text_w, None),  # constrain width to prevent cropping
+                    method="caption",         # wrap text within max_text_w
+                    text_align="center",
                 ).with_start(abs_start).with_end(abs_end).with_position(
                     ("center", y_pos), relative=True
                 )

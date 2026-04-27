@@ -1,50 +1,80 @@
 """
 ASS subtitle file builder for word-by-word subtitle burn-in.
 """
+import logging
+import urllib.request
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 _VIDEO_W = 1080  # portrait 9:16 (TikTok / Reels)
 _VIDEO_H = 1920
 
+_FONTS_DIR = Path(__file__).parent.parent / "assets" / "fonts"
+FONT_ROBOTO_BOLD    = str(_FONTS_DIR / "Roboto-Bold.ttf")
+FONT_ROBOTO_BLACK   = str(_FONTS_DIR / "Roboto-Black.ttf")
+FONT_ROBOTO_REGULAR = str(_FONTS_DIR / "Roboto-Regular.ttf")
+
+_ROBOTO_SOURCES = {
+    "Roboto-Bold.ttf":    "https://raw.githubusercontent.com/googlefonts/roboto/main/src/hinted/Roboto-Bold.ttf",
+    "Roboto-Black.ttf":   "https://raw.githubusercontent.com/googlefonts/roboto/main/src/hinted/Roboto-Black.ttf",
+    "Roboto-Regular.ttf": "https://raw.githubusercontent.com/googlefonts/roboto/main/src/hinted/Roboto-Regular.ttf",
+}
+
+
+def _ensure_roboto_fonts() -> None:
+    """Download Roboto static TTF files into assets/fonts/ if not already present."""
+    _FONTS_DIR.mkdir(parents=True, exist_ok=True)
+    for filename, url in _ROBOTO_SOURCES.items():
+        dest = _FONTS_DIR / filename
+        if dest.exists() and dest.stat().st_size > 50_000:
+            continue
+        try:
+            logger.info(f"[SubtitleBuilder] Downloading {filename}...")
+            urllib.request.urlretrieve(url, dest)
+            logger.info(f"[SubtitleBuilder] Downloaded {filename} ({dest.stat().st_size // 1024}KB)")
+        except Exception as exc:
+            logger.warning(f"[SubtitleBuilder] Could not download {filename}: {exc}")
+
 SUBTITLE_STYLES: dict[str, dict] = {
     "bold_center": {
-        "font": "Arial Black", "font_size": 90,
+        "font": FONT_ROBOTO_BLACK, "font_size": 90,
         "primary_color": "&H00FFFFFF",
         "outline_color": "&H00000000",
         "outline_width": 5, "shadow": 0,
-        "bold": True, "uppercase": True,
+        "bold": True, "uppercase": False,
         "alignment": 2, "margin_v": 300,
         "words_per_entry": 1,
     },
     "tiktok_yellow": {
-        "font": "Arial Black", "font_size": 90,
+        "font": FONT_ROBOTO_BLACK, "font_size": 90,
         "primary_color": "&H0000FFFF",
         "outline_color": "&H00000000",
         "outline_width": 5, "shadow": 0,
-        "bold": True, "uppercase": True,
+        "bold": True, "uppercase": False,
         "alignment": 2, "margin_v": 400,
         "words_per_entry": 1,
     },
     "tiktok_white": {
-        "font": "Arial Black", "font_size": 90,
+        "font": FONT_ROBOTO_BLACK, "font_size": 90,
         "primary_color": "&H00FFFFFF",
         "outline_color": "&H00000000",
         "outline_width": 5, "shadow": 0,
-        "bold": True, "uppercase": True,
+        "bold": True, "uppercase": False,
         "alignment": 2, "margin_v": 400,
         "words_per_entry": 1,
     },
     "bold_orange": {
-        "font": "Arial Black", "font_size": 80,
+        "font": FONT_ROBOTO_BLACK, "font_size": 80,
         "primary_color": "&H0000A5FF",
         "outline_color": "&H00000000",
         "outline_width": 4, "shadow": 0,
-        "bold": True, "uppercase": True,
+        "bold": True, "uppercase": False,
         "alignment": 2, "margin_v": 400,
         "words_per_entry": 1,
     },
     "caption_dark": {
-        "font": "Arial", "font_size": 50,
+        "font": FONT_ROBOTO_BOLD, "font_size": 50,
         "primary_color": "&H00FFFFFF",
         "outline_color": "&H00000000",
         "outline_width": 2, "shadow": 1,
@@ -53,7 +83,7 @@ SUBTITLE_STYLES: dict[str, dict] = {
         "words_per_entry": 4,
     },
     "minimal": {
-        "font": "Arial", "font_size": 40,
+        "font": FONT_ROBOTO_REGULAR, "font_size": 40,
         "primary_color": "&H00FFFFFF",
         "outline_color": "&H00000000",
         "outline_width": 1, "shadow": 1,
