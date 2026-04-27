@@ -123,6 +123,14 @@ function ScriptEditorModal({ scriptId, onClose, onSaved }) {
     if (data) setLanguage(data.language || 'vietnamese')
   }, [data])
 
+  // Initialize subtitle_style default when editor opens for older scripts
+  useEffect(() => {
+    if (data?.script_json && !data.script_json.video?.subtitle_style && !draft) {
+      const json = data.script_json
+      setDraft({ ...json, video: { ...(json.video || {}), subtitle_style: 'bold_center' } })
+    }
+  }, [data])
+
   const showToast = (message, type = 'success') => {
     setToast({ message, type })
     setTimeout(() => setToast(null), 3000)

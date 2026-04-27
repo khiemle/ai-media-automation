@@ -123,19 +123,32 @@ def render_video_task(self, script_id: int):
             details={"step": "composing", "raw_path": str(raw_path)},
         )
 
-        # Step 2: Captions
-        from pipeline.caption_gen import generate_captions
-        self.update_state(state="PROGRESS", meta={"step": "captions"})
-        srt_path = generate_captions(raw_path)
-        emit_log(job.id, "INFO", f"Captions done → {srt_path}")
-        mark_job_progress(
-            db,
-            task_id=task_id,
-            job_type="render",
-            script_id=script_id,
-            progress=70,
-            details={"step": "captions", "raw_path": str(raw_path), "srt_path": str(srt_path)},
-        )
+        # Step 2: Captions — skip when subtitle_style is set (composer burned them in via MoviePy)
+        subtitle_style = (script.script_json or {}).get("video", {}).get("subtitle_style")
+        srt_path = None
+        if not subtitle_style:
+            from pipeline.caption_gen import generate_captions
+            self.update_state(state="PROGRESS", meta={"step": "captions"})
+            srt_path = generate_captions(raw_path)
+            emit_log(job.id, "INFO", f"Captions done → {srt_path}")
+            mark_job_progress(
+                db,
+                task_id=task_id,
+                job_type="render",
+                script_id=script_id,
+                progress=70,
+                details={"step": "captions", "raw_path": str(raw_path), "srt_path": str(srt_path)},
+            )
+        else:
+            emit_log(job.id, "INFO", f"Subtitle style '{subtitle_style}' set — subtitles burned in by composer")
+            mark_job_progress(
+                db,
+                task_id=task_id,
+                job_type="render",
+                script_id=script_id,
+                progress=70,
+                details={"step": "captions_skipped", "subtitle_style": subtitle_style},
+            )
 
         # Step 3: Render
         from pipeline.renderer import render_final

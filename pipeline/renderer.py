@@ -1,10 +1,12 @@
 """
 Final Renderer — ffmpeg h264_nvenc GPU encode with subtitle burn-in.
 CPU fallback (libx264) when NVENC is unavailable.
+MoviePy fallback for subtitle burn-in when ffmpeg lacks libass.
 Output: video_final.mp4 at 1080×1920, 30fps, AAC 192kbps.
 """
 import logging
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -20,6 +22,90 @@ OUTPUT_PATH = os.environ.get("OUTPUT_PATH", "./assets/output")
 TARGET_W    = int(os.environ.get("VIDEO_WIDTH",  "1080"))
 TARGET_H    = int(os.environ.get("VIDEO_HEIGHT", "1920"))
 TARGET_FPS  = int(os.environ.get("VIDEO_FPS",    "30"))
+
+
+def _parse_srt(path: Path) -> list[dict]:
+    """Parse SRT file → list of {start: float, end: float, text: str}."""
+    content = path.read_text(encoding="utf-8", errors="replace")
+    entries = []
+    for block in re.split(r"\n\s*\n", content.strip()):
+        lines = block.strip().splitlines()
+        if len(lines) < 2:
+            continue
+        for i, line in enumerate(lines):
+            m = re.match(
+                r"(\d{2}:\d{2}:\d{2}[,\.]\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2}[,\.]\d{3})",
+                line,
+            )
+            if m:
+                def _t(ts: str) -> float:
+                    h, mn, s = ts.replace(",", ".").split(":")
+                    return int(h) * 3600 + int(mn) * 60 + float(s)
+                text = " ".join(lines[i + 1:]).strip()
+                text = re.sub(r"<[^>]+>", "", text).strip()
+                if text:
+                    entries.append({"start": _t(m.group(1)), "end": _t(m.group(2)), "text": text})
+                break
+    return entries
+
+
+def _burn_subtitles_moviepy(raw_path: Path, subtitle_file: Path, final_path: Path) -> bool:
+    """
+    Burn SRT subtitles into video via MoviePy TextClip.
+    Used as fallback when ffmpeg lacks the libass subtitles filter.
+    Returns True on success, False on any failure.
+    """
+    try:
+        from moviepy import VideoFileClip, TextClip, CompositeVideoClip
+    except ImportError:
+        return False
+
+    try:
+        entries = _parse_srt(subtitle_file)
+        if not entries:
+            logger.warning("[Renderer] SRT parsed but no entries found")
+            return False
+
+        video = VideoFileClip(str(raw_path))
+        clips = [video]
+
+        for entry in entries:
+            end = min(entry["end"], video.duration)
+            if end <= entry["start"]:
+                continue
+            try:
+                txt = TextClip(
+                    text=entry["text"],
+                    font="Arial",
+                    font_size=55,
+                    color=(255, 255, 255),
+                    stroke_color=(0, 0, 0),
+                    stroke_width=2,
+                ).with_start(entry["start"]).with_end(end).with_position(
+                    ("center", 0.85), relative=True
+                )
+                clips.append(txt)
+            except Exception as exc:
+                logger.debug(f"[Renderer] TextClip skipped for entry: {exc}")
+
+        composed = CompositeVideoClip(clips)
+        audio = video.audio
+        if audio:
+            composed = composed.with_audio(audio)
+        composed.write_videofile(
+            str(final_path),
+            fps=TARGET_FPS,
+            codec="libx264",
+            audio_codec="aac",
+            bitrate="4M",
+            logger=None,
+        )
+        video.close()
+        logger.info(f"[Renderer] Subtitles burned via MoviePy fallback → {final_path}")
+        return True
+    except Exception as exc:
+        logger.error(f"[Renderer] MoviePy subtitle burn failed: {exc}")
+        return False
 
 
 def render_final(
@@ -67,7 +153,10 @@ def render_final(
         escaped = subtitle_file.resolve().as_posix().replace(":", "\\:")
         vf_filters.append(f"subtitles=filename='{escaped}'")
     elif subtitle_file:
-        logger.warning("[Renderer] ffmpeg subtitles filter unavailable, skipping subtitle burn-in")
+        logger.warning("[Renderer] ffmpeg subtitles filter unavailable; trying MoviePy fallback")
+        if _burn_subtitles_moviepy(raw_path_obj, subtitle_file, final_path):
+            return final_path
+        logger.warning("[Renderer] MoviePy subtitle burn failed; producing video without subtitles")
 
     vf = ",".join(vf_filters)
 
