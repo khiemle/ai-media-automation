@@ -4,7 +4,11 @@ import { fetchApi } from '../api/client.js'
 
 const GEMINI_MEDIA_MODELS = ['veo-3.1-lite-generate-preview', 'veo-2.0-flash', 'veo-2.0-flash-lite']
 const GEMINI_MUSIC_MODELS = ['lyria-3-clip-preview', 'lyria-3-pro-preview']
-const ELEVENLABS_MODELS   = ['eleven_multilingual_v2', 'eleven_turbo_v2', 'eleven_monolingual_v1']
+const ELEVENLABS_MODELS   = [
+  { value: 'eleven_flash_v2_5',      label: 'Eleven 2.5 Flash',   hint: 'Fast, low-latency. Best for most uses.' },
+  { value: 'eleven_v3',              label: 'Eleven 3',           hint: 'Highest quality, most expressive.' },
+  { value: 'eleven_multilingual_v2', label: 'Multilingual v2',    hint: 'Legacy. Broad language support.' },
+]
 const SUNO_MODELS         = ['V4_5', 'V4', 'V3_5']
 
 function KeyInput({ value, onChange, placeholder = '••••••••' }) {
@@ -40,7 +44,8 @@ export default function LLMPage() {
   const [status,   setStatus]   = useState(null)
   const [quota,    setQuota]    = useState(null)
   const [loading,  setLoading]  = useState(true)
-  const [saving,   setSaving]   = useState(null)  // 'script'|'media'|'music'|'elevenlabs'|'suno'|'pexels'
+  const [saving,   setSaving]   = useState(null)  // 'script'|'media'|'music'|'elevenlabs'|'kokoro'|'suno'|'pexels'
+  const [voices,   setVoices]   = useState(null)
   const [toast,    setToast]    = useState(null)
   const timerRef = useRef(null)
 
@@ -53,14 +58,16 @@ export default function LLMPage() {
   const load = async () => {
     setLoading(true)
     try {
-      const [cfg, st, q] = await Promise.all([
+      const [cfg, st, q, v] = await Promise.all([
         fetchApi('/api/llm/config/raw'),
         fetchApi('/api/llm/status'),
         fetchApi('/api/llm/quota'),
+        fetchApi('/api/llm/voices'),
       ])
       setFormData(cfg)
       setStatus(st)
       setQuota(q)
+      setVoices(v)
     } catch (e) {
       showToast(e.message || 'Failed to load config', 'error')
     } finally {
@@ -104,6 +111,7 @@ export default function LLMPage() {
   const el = formData.elevenlabs || {}
   const su = formData.suno || {}
   const px = formData.pexels || {}
+  const ko = formData.kokoro || {}
   const st = status || {}
   const q  = quota  || {}
 
@@ -197,34 +205,76 @@ export default function LLMPage() {
         <div className="space-y-3">
           <label className="text-xs text-[#9090a8]">API Key</label>
           <KeyInput value={el.api_key || ''} onChange={v => patch('elevenlabs.api_key', v)} />
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs text-[#9090a8] block mb-1">Voice ID (EN)</label>
-              <input
-                type="text"
-                value={el.voice_id_en || ''}
-                onChange={e => patch('elevenlabs.voice_id_en', e.target.value)}
-                placeholder="voice ID"
-                className="w-full bg-[#16161a] border border-[#2a2a32] rounded px-3 py-1.5 text-sm font-mono text-[#e8e8f0] placeholder-[#5a5a70] focus:outline-none focus:border-[#7c6af7]"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-[#9090a8] block mb-1">Voice ID (VI)</label>
-              <input
-                type="text"
-                value={el.voice_id_vi || ''}
-                onChange={e => patch('elevenlabs.voice_id_vi', e.target.value)}
-                placeholder="voice ID"
-                className="w-full bg-[#16161a] border border-[#2a2a32] rounded px-3 py-1.5 text-sm font-mono text-[#e8e8f0] placeholder-[#5a5a70] focus:outline-none focus:border-[#7c6af7]"
-              />
-            </div>
+
+          {/* Model */}
+          <div>
+            <label className="text-xs text-[#9090a8] block mb-1">Model</label>
+            <select
+              value={el.model || 'eleven_flash_v2_5'}
+              onChange={e => patch('elevenlabs.model', e.target.value)}
+              className="w-full bg-[#16161a] border border-[#2a2a32] rounded-lg px-3 py-1.5 text-sm text-[#e8e8f0] focus:outline-none focus:border-[#7c6af7] transition-colors appearance-none cursor-pointer"
+            >
+              {ELEVENLABS_MODELS.map(m => (
+                <option key={m.value} value={m.value}>{m.label}</option>
+              ))}
+            </select>
+            <p className="text-[10px] text-[#5a5a70] mt-1 font-mono">
+              {ELEVENLABS_MODELS.find(m => m.value === (el.model || 'eleven_flash_v2_5'))?.hint}
+            </p>
           </div>
-          <Select
-            label="Model"
-            value={el.model || ''}
-            onChange={e => patch('elevenlabs.model', e.target.value)}
-            options={ELEVENLABS_MODELS.map(m => ({ value: m, label: m }))}
-          />
+
+          {/* Default EN voice */}
+          <div>
+            <label className="text-xs text-[#9090a8] block mb-1">Default English Voice</label>
+            <select
+              value={el.voice_id_en || ''}
+              onChange={e => patch('elevenlabs.voice_id_en', e.target.value)}
+              className="w-full bg-[#16161a] border border-[#2a2a32] rounded-lg px-3 py-1.5 text-sm text-[#e8e8f0] focus:outline-none focus:border-[#7c6af7] transition-colors appearance-none cursor-pointer"
+            >
+              <option value="">— select —</option>
+              {voices && (
+                <>
+                  <optgroup label="Male">
+                    {voices.elevenlabs?.en?.male?.map(v => (
+                      <option key={v.id} value={v.id}>{v.name}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Female">
+                    {voices.elevenlabs?.en?.female?.map(v => (
+                      <option key={v.id} value={v.id}>{v.name}</option>
+                    ))}
+                  </optgroup>
+                </>
+              )}
+            </select>
+          </div>
+
+          {/* Default VI voice */}
+          <div>
+            <label className="text-xs text-[#9090a8] block mb-1">Default Vietnamese Voice</label>
+            <select
+              value={el.voice_id_vi || ''}
+              onChange={e => patch('elevenlabs.voice_id_vi', e.target.value)}
+              className="w-full bg-[#16161a] border border-[#2a2a32] rounded-lg px-3 py-1.5 text-sm text-[#e8e8f0] focus:outline-none focus:border-[#7c6af7] transition-colors appearance-none cursor-pointer"
+            >
+              <option value="">— select —</option>
+              {voices && (
+                <>
+                  <optgroup label="Male">
+                    {voices.elevenlabs?.vi?.male?.map(v => (
+                      <option key={v.id} value={v.id}>{v.name}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Female">
+                    {voices.elevenlabs?.vi?.female?.map(v => (
+                      <option key={v.id} value={v.id}>{v.name}</option>
+                    ))}
+                  </optgroup>
+                </>
+              )}
+            </select>
+          </div>
+
           {q.elevenlabs && !q.elevenlabs.error && !q.elevenlabs.scope_restricted && (
             <div>
               <div className="flex justify-between text-xs text-[#9090a8] mb-1">
@@ -244,6 +294,52 @@ export default function LLMPage() {
         </div>
       </Card>
 
+      {/* Kokoro TTS */}
+      <Card title={
+        <span className="flex items-center gap-2">
+          <StatusDot available={st.kokoro?.available} />
+          Kokoro TTS
+        </span>
+      } actions={saving === 'kokoro' && <Spinner size={16} />}>
+        <div className="space-y-3">
+          <p className="text-xs text-[#9090a8]">Local neural TTS — no API key required.</p>
+          <div>
+            <label className="text-xs text-[#9090a8] block mb-1">Default English Voice</label>
+            <select
+              value={ko.default_voice_en || 'af_heart'}
+              onChange={e => patch('kokoro.default_voice_en', e.target.value)}
+              className="w-full bg-[#16161a] border border-[#2a2a32] rounded-lg px-3 py-1.5 text-sm text-[#e8e8f0] focus:outline-none focus:border-[#7c6af7] transition-colors appearance-none cursor-pointer"
+            >
+              {voices && (
+                <>
+                  <optgroup label="American English — Female">
+                    {voices.kokoro?.american_english?.female?.map(v => (
+                      <option key={v.id} value={v.id}>{v.name} ({v.id})</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="American English — Male">
+                    {voices.kokoro?.american_english?.male?.map(v => (
+                      <option key={v.id} value={v.id}>{v.name} ({v.id})</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="British English — Female">
+                    {voices.kokoro?.british_english?.female?.map(v => (
+                      <option key={v.id} value={v.id}>{v.name} ({v.id})</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="British English — Male">
+                    {voices.kokoro?.british_english?.male?.map(v => (
+                      <option key={v.id} value={v.id}>{v.name} ({v.id})</option>
+                    ))}
+                  </optgroup>
+                </>
+              )}
+            </select>
+          </div>
+          <Button size="sm" onClick={() => saveCard('kokoro')}>Save</Button>
+        </div>
+      </Card>
+
       {/* Suno */}
       <Card title={
         <span className="flex items-center gap-2">
@@ -260,8 +356,8 @@ export default function LLMPage() {
             onChange={e => patch('suno.model', e.target.value)}
             options={SUNO_MODELS.map(m => ({ value: m, label: m }))}
           />
-          {q.suno?.tracks_generated != null && (
-            <p className="text-xs text-[#9090a8] font-mono">{q.suno.tracks_generated} tracks generated</p>
+          {q.suno?.credits != null && (
+            <p className="text-xs text-[#9090a8] font-mono">Credits remaining: {q.suno.credits}</p>
           )}
           {q.suno?.error && <p className="text-xs text-[#f87171] font-mono">{q.suno.error}</p>}
           <Button size="sm" onClick={() => saveCard('suno')}>Save</Button>
