@@ -51,9 +51,10 @@ set +a
 echo "✅  Environment loaded"
 
 # ── 4. Validate required vars ─────────────────────────────────────
+# API keys (Gemini, Pexels, ElevenLabs, Suno) are now in config/api_keys.json
 MISSING=""
-for var in DATABASE_URL GEMINI_API_KEY FERNET_KEY PEXELS_API_KEY; do
-  if [ -z "${!var}" ]; then
+for var in DATABASE_URL FERNET_KEY; do
+  if [ -z "$(printenv "$var" 2>/dev/null)" ]; then
     MISSING="$MISSING $var"
   fi
 done
