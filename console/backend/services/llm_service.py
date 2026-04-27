@@ -113,7 +113,7 @@ class LLMService:
         if suno_key:
             try:
                 resp = httpx.get(
-                    "https://api.sunoapi.org/api/v1/credits",
+                    "https://api.sunoapi.org/api/v1/generate/credit",
                     headers={"Authorization": f"Bearer {suno_key}"},
                     timeout=10,
                 )
