@@ -3,13 +3,13 @@ ElevenLabs TTS client — for Vietnamese (and other non-English) narration.
 Requests PCM output directly, writes as WAV via soundfile.
 """
 import logging
-import os
 import re
 from pathlib import Path
 
+from config.api_config import get_config
+
 logger = logging.getLogger(__name__)
 
-ELEVENLABS_MODEL = "eleven_multilingual_v2"
 SAMPLE_RATE            = 44100  # pcm_44100 output
 
 
@@ -41,9 +41,10 @@ def generate_tts_elevenlabs(
     Generate WAV audio from text using ElevenLabs.
     Raises RuntimeError on any failure.
     """
-    api_key = os.environ.get("ELEVENLABS_API_KEY", "")  # read dynamically, not from import-time constant
+    cfg = get_config()
+    api_key = cfg["elevenlabs"]["api_key"]
     if not api_key:
-        raise RuntimeError("ELEVENLABS_API_KEY is not set in .env")
+        raise RuntimeError("ElevenLabs API key is not configured in config/api_keys.json")
 
     if not voice_id:
         raise RuntimeError("voice_id is required for ElevenLabs TTS")
@@ -59,7 +60,7 @@ def generate_tts_elevenlabs(
     }
     payload = {
         "text": text,
-        "model_id": ELEVENLABS_MODEL,
+        "model_id": cfg["elevenlabs"]["model"],
         "output_format": "pcm_44100",
         "voice_settings": {
             "stability": 0.5,
