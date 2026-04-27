@@ -73,3 +73,13 @@ def test_build_ass_empty_timings_writes_empty_file(tmp_path):
     result = build_ass([], out, "tiktok_yellow")
     assert result == out
     assert out.read_text() == ""
+
+
+def test_build_ass_skips_blank_words(tmp_path):
+    from pipeline.subtitle_builder import build_ass
+    out = tmp_path / "subs.ass"
+    build_ass([(0.0, [{"word": "  ", "start": 0.0, "end": 1.0}])], out, "tiktok_yellow")
+    content = out.read_text()
+    dialogues = [l for l in content.splitlines() if l.startswith("Dialogue:")]
+    assert len(dialogues) == 0
+

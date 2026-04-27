@@ -3,6 +3,9 @@ ASS subtitle file builder for word-by-word subtitle burn-in.
 """
 from pathlib import Path
 
+_VIDEO_W = 1080  # portrait 9:16 (TikTok / Reels)
+_VIDEO_H = 1920
+
 SUBTITLE_STYLES: dict[str, dict] = {
     "tiktok_yellow": {
         "font": "Arial Black", "font_size": 90,
@@ -54,6 +57,7 @@ SUBTITLE_STYLES: dict[str, dict] = {
 
 def _fmt_ass_time(seconds: float) -> str:
     """Format seconds to ASS timecode H:MM:SS.cc (centiseconds)."""
+    seconds = max(0.0, seconds)
     h  = int(seconds // 3600)
     m  = int((seconds % 3600) // 60)
     s  = int(seconds % 60)
@@ -86,8 +90,8 @@ def build_ass(
     lines = [
         "[Script Info]",
         "ScriptType: v4.00+",
-        "PlayResX: 1080",
-        "PlayResY: 1920",
+        f"PlayResX: {_VIDEO_W}",
+        f"PlayResY: {_VIDEO_H}",
         "",
         "[V4+ Styles]",
         "Format: Name, Fontname, Fontsize, PrimaryColour, OutlineColour, BackColour, "
@@ -117,6 +121,8 @@ def build_ass(
             text = " ".join(w["word"] for w in chunk)
             if style["uppercase"]:
                 text = text.upper()
+            if not text.strip():
+                continue
             lines.append(
                 f"Dialogue: 0,{_fmt_ass_time(abs_start)},{_fmt_ass_time(abs_end)},"
                 f"Default,,0,0,0,,{text}"
