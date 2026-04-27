@@ -4,15 +4,27 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 
+_FAKE_CONFIG = {
+    "gemini": {
+        "script": {"api_key": "", "model": "gemini-2.5-flash"},
+        "media":  {"api_key": "", "model": "gemini-2.0-flash-exp"},
+        "music":  {"api_key": "", "model": "lyria-3-clip-preview"},
+    },
+    "elevenlabs": {"api_key": "test-key", "voice_id_en": "en-voice-id", "voice_id_vi": "vi-voice-id", "model": "eleven_multilingual_v2"},
+    "suno":   {"api_key": "", "model": "V4_5"},
+    "pexels": {"api_key": ""},
+}
+
+
 def test_auto_vietnamese_calls_elevenlabs(tmp_path):
     out = tmp_path / "out.wav"
-    with patch.dict(os.environ, {"TTS_ENGINE": "auto", "ELEVENLABS_API_KEY": "test-key",
-                                  "ELEVENLABS_VOICE_ID_VI": "vi-voice-id"}):
-        with patch("pipeline.elevenlabs_tts.generate_tts_elevenlabs") as mock_el:
-            mock_el.return_value = out
-            from pipeline.tts_router import generate_tts
-            result = generate_tts("Xin chào", "vi-voice-id", 1.0, "vietnamese", str(out))
-        mock_el.assert_called_once()
+    with patch("pipeline.tts_router.get_config", return_value=_FAKE_CONFIG), \
+         patch.dict(os.environ, {"TTS_ENGINE": "auto"}), \
+         patch("pipeline.elevenlabs_tts.generate_tts_elevenlabs") as mock_el:
+        mock_el.return_value = out
+        from pipeline.tts_router import generate_tts
+        result = generate_tts("Xin chào", "vi-voice-id", 1.0, "vietnamese", str(out))
+    mock_el.assert_called_once()
     assert result == out
 
 
@@ -31,23 +43,23 @@ def test_auto_english_calls_kokoro(tmp_path):
 
 def test_force_elevenlabs_mode(tmp_path):
     out = tmp_path / "out.wav"
-    with patch.dict(os.environ, {"TTS_ENGINE": "elevenlabs", "ELEVENLABS_API_KEY": "key",
-                                  "ELEVENLABS_VOICE_ID_VI": "vi-id"}):
-        with patch("pipeline.elevenlabs_tts.generate_tts_elevenlabs") as mock_el:
-            mock_el.return_value = out
-            from pipeline import tts_router
-            import importlib; importlib.reload(tts_router)
-            result = tts_router.generate_tts("Xin chào", "vi-id", 1.0, "vietnamese", str(out))
-            assert result == out
-        mock_el.assert_called_once()
+    with patch("pipeline.tts_router.get_config", return_value=_FAKE_CONFIG), \
+         patch.dict(os.environ, {"TTS_ENGINE": "elevenlabs"}), \
+         patch("pipeline.elevenlabs_tts.generate_tts_elevenlabs") as mock_el:
+        mock_el.return_value = out
+        from pipeline.tts_router import generate_tts
+        result = generate_tts("Xin chào", "vi-id", 1.0, "vietnamese", str(out))
+    assert result == out
+    mock_el.assert_called_once()
 
 
 def test_missing_elevenlabs_key_raises():
-    with patch.dict(os.environ, {"TTS_ENGINE": "elevenlabs", "ELEVENLABS_API_KEY": ""}):
-        from pipeline import tts_router
-        import importlib; importlib.reload(tts_router)
-        with pytest.raises(RuntimeError, match="ELEVENLABS_API_KEY"):
-            tts_router.generate_tts("text", "voice", 1.0, "vietnamese", "output.wav")
+    empty_config = {**_FAKE_CONFIG, "elevenlabs": {**_FAKE_CONFIG["elevenlabs"], "api_key": ""}}
+    with patch("pipeline.tts_router.get_config", return_value=empty_config), \
+         patch.dict(os.environ, {"TTS_ENGINE": "elevenlabs"}):
+        from pipeline.tts_router import generate_tts
+        with pytest.raises(RuntimeError, match="ElevenLabs"):
+            generate_tts("text", "voice", 1.0, "vietnamese", "output.wav")
 
 
 def test_normalize_text_expands_currency():

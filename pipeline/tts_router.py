@@ -7,12 +7,11 @@ import os
 from pathlib import Path
 
 import pipeline.elevenlabs_tts  # register in sys.modules so it can be patched in tests
+from config.api_config import get_config
 
 logger = logging.getLogger(__name__)
 
 TTS_ENGINE             = os.environ.get("TTS_ENGINE", "auto")
-ELEVENLABS_VOICE_ID_VI = os.environ.get("ELEVENLABS_VOICE_ID_VI", "")
-ELEVENLABS_VOICE_ID_EN = os.environ.get("ELEVENLABS_VOICE_ID_EN", "")
 
 
 def generate_tts(
@@ -37,12 +36,12 @@ def generate_tts(
     )
 
     if use_elevenlabs:
-        elevenlabs_api_key = os.environ.get("ELEVENLABS_API_KEY", "")
-        if not elevenlabs_api_key:
-            raise RuntimeError("ELEVENLABS_API_KEY is not set in .env")
-        voice = voice_id or ELEVENLABS_VOICE_ID_VI or ELEVENLABS_VOICE_ID_EN
+        cfg = get_config()
+        if not cfg["elevenlabs"]["api_key"]:
+            raise RuntimeError("ElevenLabs API key is not configured in config/api_keys.json")
+        voice = voice_id or cfg["elevenlabs"]["voice_id_vi"] or cfg["elevenlabs"]["voice_id_en"]
         if not voice:
-            raise RuntimeError("No ElevenLabs voice ID configured. Set ELEVENLABS_VOICE_ID_VI in .env")
+            raise RuntimeError("No ElevenLabs voice ID configured. Set voice_id in config/api_keys.json")
 
         from pipeline.elevenlabs_tts import generate_tts_elevenlabs
         return generate_tts_elevenlabs(text, voice, speed, output_path)
