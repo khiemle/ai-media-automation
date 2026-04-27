@@ -83,6 +83,7 @@ if ! command -v pg_isready &>/dev/null; then
 fi
 DB_NAME=$(echo "$DATABASE_URL" | sed -E 's|.*/([^/]+)$|\1|')
 DB_USER=$(echo "$DATABASE_URL" | sed -E 's|postgresql://([^:]+):.*|\1|')
+DB_PASS=$(echo "$DATABASE_URL" | sed -E 's|postgresql://[^:]+:([^@]+)@.*|\1|')
 DB_HOST=$(echo "$DATABASE_URL" | sed -E 's|.*@([^:/]+)[:/].*|\1|')
 DB_PORT=$(echo "$DATABASE_URL" | sed -E 's|.*:([0-9]+)/.*|\1|')
 DB_PORT="${DB_PORT:-5432}"
@@ -90,9 +91,9 @@ if ! pg_isready -h "$DB_HOST" -p "$DB_PORT" -q 2>/dev/null; then
   echo "❌  PostgreSQL not running on $DB_HOST:$DB_PORT. Start: brew services start postgresql@16"
   exit 1
 fi
-if ! psql -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" -lqt 2>/dev/null | cut -d'|' -f1 | grep -qw "$DB_NAME"; then
+if ! PGPASSWORD="$DB_PASS" psql -U "$DB_USER" -h "$DB_HOST" -p "$DB_PORT" -lqt 2>/dev/null | cut -d'|' -f1 | grep -qw "$DB_NAME"; then
   echo "❌  Database \"$DB_NAME\" does not exist."
-  echo "   Run once: psql postgres -c \"CREATE USER $DB_USER WITH PASSWORD 'yourpass'; CREATE DATABASE $DB_NAME OWNER $DB_USER;\""
+  echo "   Run once: psql postgres -c \"CREATE USER $DB_USER WITH PASSWORD '$DB_PASS'; CREATE DATABASE $DB_NAME OWNER $DB_USER;\""
   exit 1
 fi
 echo "✅  PostgreSQL ready (db: $DB_NAME)"
