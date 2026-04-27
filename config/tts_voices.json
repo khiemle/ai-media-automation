@@ -1,0 +1,85 @@
+{
+  "kokoro": {
+    "american_english": {
+      "female": [
+        {"id": "af_heart",   "name": "Heart"},
+        {"id": "af_bella",   "name": "Bella"},
+        {"id": "af_nicole",  "name": "Nicole"},
+        {"id": "af_aoede",   "name": "Aoede"},
+        {"id": "af_sky",     "name": "Sky"},
+        {"id": "af_sarah",   "name": "Sarah"},
+        {"id": "af_nova",    "name": "Nova"},
+        {"id": "af_river",   "name": "River"},
+        {"id": "af_jessica", "name": "Jessica"},
+        {"id": "af_alloy",   "name": "Alloy"}
+      ],
+      "male": [
+        {"id": "am_adam",    "name": "Adam"},
+        {"id": "am_michael", "name": "Michael"},
+        {"id": "am_echo",    "name": "Echo"},
+        {"id": "am_eric",    "name": "Eric"},
+        {"id": "am_liam",    "name": "Liam"},
+        {"id": "am_onyx",    "name": "Onyx"},
+        {"id": "am_fenrir",  "name": "Fenrir"},
+        {"id": "am_puck",    "name": "Puck"},
+        {"id": "am_fable",   "name": "Fable"}
+      ]
+    },
+    "british_english": {
+      "female": [
+        {"id": "bf_emma",     "name": "Emma"},
+        {"id": "bf_isabella", "name": "Isabella"},
+        {"id": "bf_alice",    "name": "Alice"},
+        {"id": "bf_lily",     "name": "Lily"}
+      ],
+      "male": [
+        {"id": "bm_george", "name": "George"},
+        {"id": "bm_lewis",  "name": "Lewis"},
+        {"id": "bm_daniel", "name": "Daniel"}
+      ]
+    }
+  },
+  "elevenlabs": {
+    "en": {
+      "male": [
+        {"id": "UgBBYS2sOqTuMpoF3BR0", "name": "Unknown"},
+        {"id": "NOpBlnGInO9m6vDvFkFC",  "name": "Unknown"},
+        {"id": "EkK5I93UQWFDigLMpZcX",  "name": "Unknown"},
+        {"id": "uju3wxzG5OhpWcoi3SMy",  "name": "Unknown"},
+        {"id": "NFG5qt843uXKj4pFvR7C",  "name": "Unknown"}
+      ],
+      "female": [
+        {"id": "56AoDkrOh6qfVPDXZ7Pt", "name": "Unknown"},
+        {"id": "tnSpp4vdxKPjI9w0GnoV",  "name": "Unknown"},
+        {"id": "Z3R5wn05IrDiVCyEkUrK",  "name": "Unknown"},
+        {"id": "kPzsL2i3teMYv0FxEYQ6",  "name": "Unknown"},
+        {"id": "aMSt68OGf4xUZAnLpTU8",  "name": "Unknown"},
+        {"id": "RILOU7YmBhvwJGDGjNmP",  "name": "Unknown"},
+        {"id": "flHkNRp1BlvT73UL6gyz",  "name": "Unknown"},
+        {"id": "KoVIHoyLDrQyd4pGalbs",  "name": "Unknown"},
+        {"id": "yj30vwTGJxSHezdAGsv9",  "name": "Unknown"}
+      ]
+    },
+    "vi": {
+      "female": [
+        {"id": "A5w1fw5x0uXded1LDvZp", "name": "Unknown"},
+        {"id": "d5HVupAWCwe4e6GvMCAL",  "name": "Unknown"},
+        {"id": "DvG3I1kDzdBY3u4EzYh6",  "name": "Unknown"},
+        {"id": "foH7s9fX31wFFH2yqrFa",  "name": "Unknown"},
+        {"id": "jdlxsPOZOHdGEfcItXVu",  "name": "Unknown"},
+        {"id": "BlZK9tHPU6XXjwOSIiYA",  "name": "Unknown"},
+        {"id": "a3AkyqGG4v8Pg7SWQ0Y3",  "name": "Unknown"},
+        {"id": "HQZkBNMmZF5aISnrU842",  "name": "Unknown"},
+        {"id": "qByVAGjXwGlkcRDJoiHg",  "name": "Unknown"}
+      ],
+      "male": [
+        {"id": "3VnrjnYrskPMDsapTr8X", "name": "Unknown"},
+        {"id": "aN7cv9yXNrfIR87bDmyD",  "name": "Unknown"},
+        {"id": "ueSxRO0nLF1bj93J2hVt",  "name": "Unknown"},
+        {"id": "UsgbMVmY3U59ijwK5mdh",  "name": "Unknown"},
+        {"id": "XBDAUT8ybuJTTCoOLSUj",  "name": "Unknown"},
+        {"id": "9EE00wK5qV6tPtpQIxvy",  "name": "Unknown"}
+      ]
+    }
+  }
+}
