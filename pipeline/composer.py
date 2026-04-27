@@ -144,6 +144,70 @@ def _process_scene(scene: dict, meta: dict, video_cfg: dict, out_dir: Path, idx:
     }
 
 
+def _build_subtitle_clips(
+    scene_word_timings: list[tuple[float, list[dict]]],
+    subtitle_style: str,
+) -> list:
+    """
+    Build MoviePy TextClip overlays from per-scene word timing data.
+    Returns a list of positioned, timed TextClip objects ready for compositing.
+    No libass or ffmpeg subtitle filter needed.
+    """
+    try:
+        from moviepy import TextClip
+        from pipeline.subtitle_builder import SUBTITLE_STYLES, _ass_color_to_rgb
+    except ImportError as exc:
+        logger.warning(f"[Composer] Subtitle clips unavailable: {exc}")
+        return []
+
+    style = SUBTITLE_STYLES.get(subtitle_style, SUBTITLE_STYLES["bold_center"])
+    wpe           = style.get("words_per_entry", 1)
+    font          = style.get("font", "Arial")
+    font_size     = style.get("font_size", 80)
+    primary_rgb   = _ass_color_to_rgb(style.get("primary_color", "&H00FFFFFF"))
+    outline_rgb   = _ass_color_to_rgb(style.get("outline_color", "&H00000000"))
+    outline_width = style.get("outline_width", 0)
+    uppercase     = style.get("uppercase", False)
+    margin_v      = style.get("margin_v", 200)
+
+    # Relative vertical position: fraction from top (0=top, 1=bottom)
+    y_pos = max(0.0, min(0.95, 1.0 - (margin_v + font_size * 1.2) / TARGET_H))
+
+    clips = []
+    for scene_offset, word_list in scene_word_timings:
+        if not word_list:
+            continue
+        for i in range(0, len(word_list), wpe):
+            chunk = word_list[i:i + wpe]
+            if not chunk:
+                continue
+            text = " ".join(w["word"] for w in chunk)
+            if uppercase:
+                text = text.upper()
+            if not text.strip():
+                continue
+            abs_start = max(0.0, scene_offset + chunk[0]["start"])
+            abs_end   = scene_offset + chunk[-1]["end"]
+            if abs_end <= abs_start:
+                continue
+            try:
+                txt = TextClip(
+                    text=text,
+                    font=font,
+                    font_size=font_size,
+                    color=primary_rgb,
+                    stroke_color=outline_rgb if outline_width > 0 else None,
+                    stroke_width=outline_width if outline_width > 0 else 0,
+                ).with_start(abs_start).with_end(abs_end).with_position(
+                    ("center", y_pos), relative=True
+                )
+                clips.append(txt)
+            except Exception as exc:
+                logger.warning(f"[Composer] TextClip error for '{text}': {exc}")
+
+    return clips
+
+
 def _assemble(
     scenes:         list[dict],
     scene_assets:   dict[int, dict],
@@ -285,10 +349,9 @@ def _assemble(
         except Exception as e:
             logger.warning(f"[Composer] Music mix failed: {e}")
 
-    # Build ASS subtitle file if subtitle_style is set
-    subtitle_style = video_cfg.get("subtitle_style") or "" if video_cfg else ""
+    # Burn-in subtitles via MoviePy TextClip (no libass required)
+    subtitle_style = (video_cfg.get("subtitle_style") or "") if video_cfg else ""
     if subtitle_style:
-        from pipeline.subtitle_builder import build_ass
         scene_offsets = []
         offset = 0.0
         for idx in range(len(scenes)):
@@ -298,9 +361,15 @@ def _assemble(
             (scene_offsets[idx], scene_assets.get(idx, {}).get("word_timing") or [])
             for idx in range(len(scenes))
         ]
-        ass_path = output_path.parent / "subtitles.ass"
-        build_ass(scene_word_timings, ass_path, subtitle_style)
-        logger.info(f"[Composer] ASS subtitles → {ass_path}")
+        subtitle_clips = _build_subtitle_clips(scene_word_timings, subtitle_style)
+        if subtitle_clips:
+            logger.info(f"[Composer] Compositing {len(subtitle_clips)} subtitle entries via MoviePy")
+            audio = final.audio
+            final = CompositeVideoClip([final] + subtitle_clips)
+            if audio:
+                final = final.with_audio(audio)
+        else:
+            logger.info("[Composer] No word timing data available; subtitles skipped")
 
     # Write raw video (libx264 fast, will be re-encoded by renderer)
     final.write_videofile(

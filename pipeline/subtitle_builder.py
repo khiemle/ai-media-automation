@@ -64,6 +64,15 @@ SUBTITLE_STYLES: dict[str, dict] = {
 }
 
 
+def _ass_color_to_rgb(ass_color: str) -> tuple[int, int, int]:
+    """Convert ASS color &HAABBGGRR to an (R, G, B) tuple for MoviePy."""
+    c = ass_color.lstrip("&H").lstrip("#").zfill(8)
+    bb = int(c[2:4], 16)
+    gg = int(c[4:6], 16)
+    rr = int(c[6:8], 16)
+    return (rr, gg, bb)
+
+
 def _fmt_ass_time(seconds: float) -> str:
     """Format seconds to ASS timecode H:MM:SS.cc (centiseconds)."""
     seconds = max(0.0, seconds)
