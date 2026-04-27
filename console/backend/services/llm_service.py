@@ -1,12 +1,16 @@
 """LLMService — config CRUD + per-provider status and quota."""
+import json
 import logging
 from datetime import datetime, timezone
+from pathlib import Path as _Path
 
 import httpx
 
 from config import api_config
 
 logger = logging.getLogger(__name__)
+
+_VOICES_PATH = _Path(__file__).parent.parent.parent.parent / "config" / "tts_voices.json"
 
 
 def _mask(key: str) -> str:
@@ -54,8 +58,15 @@ class LLMService:
             "elevenlabs": self._simple_status(cfg.get("elevenlabs", {}).get("api_key", "")),
             "suno":       self._simple_status(cfg.get("suno", {}).get("api_key", "")),
             "pexels":     self._simple_status(cfg.get("pexels", {}).get("api_key", "")),
+            "kokoro":     {"available": True},
             "timestamp":  datetime.now(timezone.utc).isoformat(),
         }
+
+    def get_voices(self) -> dict:
+        try:
+            return json.loads(_VOICES_PATH.read_text())
+        except Exception:
+            return {}
 
     def get_quota(self, db=None) -> dict:
         cfg = api_config.get_config()

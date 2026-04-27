@@ -8,6 +8,11 @@ from console.backend.services.llm_service import LLMService
 router = APIRouter(prefix="/llm", tags=["llm"])
 
 
+@router.get("/voices")
+def get_voices(_user=Depends(require_editor_or_admin)):
+    return LLMService().get_voices()
+
+
 @router.get("/status")
 def get_status(_user=Depends(require_editor_or_admin)):
     return LLMService().get_status()

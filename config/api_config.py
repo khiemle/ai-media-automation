@@ -17,9 +17,10 @@ _DEFAULT: dict = {
         "media":  {"api_key": "", "model": "gemini-2.0-flash-exp"},
         "music":  {"api_key": "", "model": "lyria-3-clip-preview"},
     },
-    "elevenlabs": {"api_key": "", "voice_id_en": "", "voice_id_vi": "", "model": "eleven_multilingual_v2"},
+    "elevenlabs": {"api_key": "", "voice_id_en": "", "voice_id_vi": "", "model": "eleven_flash_v2_5"},
     "suno":   {"api_key": "", "model": "V4_5"},
     "pexels": {"api_key": ""},
+    "kokoro": {"default_voice_en": "af_heart"},
 }
 
 
