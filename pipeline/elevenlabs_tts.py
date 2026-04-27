@@ -2,8 +2,11 @@
 ElevenLabs TTS client — uses the official ElevenLabs Python SDK.
 Output: 44.1kHz mono WAV via soundfile.
 """
+import base64
 import logging
 import re
+import subprocess
+import tempfile
 from pathlib import Path
 
 from config.api_config import get_config
@@ -28,6 +31,23 @@ def _normalize_text(text: str) -> str:
     text = re.sub(r'(?<![a-zA-ZÀ-ỹ])k(?![a-zA-ZÀ-ỹ])', ' nghìn', text)
     text = re.sub(r'(?<![a-zA-ZÀ-ỹ])tr(?![a-zA-ZÀ-ỹ])', ' triệu', text)
     return re.sub(r"\s+", " ", text).strip()
+
+
+def _mp3_to_wav(mp3_bytes: bytes, output_path: Path) -> None:
+    """Write mp3_bytes to a temp file, convert to WAV via ffmpeg, delete temp."""
+    tmp = Path(tempfile.mktemp(suffix=".mp3"))
+    try:
+        tmp.write_bytes(mp3_bytes)
+        output_path = Path(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        result = subprocess.run(
+            ["ffmpeg", "-y", "-i", str(tmp), str(output_path)],
+            capture_output=True, text=True, timeout=120,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"ffmpeg MP3→WAV failed: {result.stderr[-500:]}")
+    finally:
+        tmp.unlink(missing_ok=True)
 
 
 def generate_tts_elevenlabs(
@@ -55,8 +75,6 @@ def generate_tts_elevenlabs(
 
     from elevenlabs.client import ElevenLabs
     from elevenlabs import VoiceSettings
-    import numpy as np
-    import soundfile as sf
 
     try:
         client = ElevenLabs(api_key=api_key)
@@ -64,30 +82,22 @@ def generate_tts_elevenlabs(
             voice_id=voice_id,
             text=text,
             model_id=model_id,
-            output_format="pcm_44100",
+            output_format="mp3_44100_128",
             voice_settings=VoiceSettings(
                 stability=0.5,
                 similarity_boost=0.75,
                 speed=min(max(speed, 0.7), 1.3),
             ),
         )
-        pcm_bytes = b"".join(audio_gen)
+        mp3_bytes = b"".join(audio_gen)
     except Exception as e:
         raise RuntimeError(f"ElevenLabs SDK error: {e}") from e
 
-    if not pcm_bytes:
+    if not mp3_bytes:
         raise RuntimeError("ElevenLabs returned empty audio content")
-    if len(pcm_bytes) % 2 != 0:
-        # Trailing half-sample from streaming — drop it, it's inaudible
-        logger.debug(f"[ElevenLabs] Trimming trailing byte ({len(pcm_bytes)} → {len(pcm_bytes) - 1})")
-        pcm_bytes = pcm_bytes[:-1]
-
-    # PCM_44100 = signed 16-bit little-endian, mono
-    samples = np.frombuffer(pcm_bytes, dtype=np.int16).astype(np.float32) / 32768.0
 
     output_path = Path(output_path)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    sf.write(str(output_path), samples, SAMPLE_RATE)
+    _mp3_to_wav(mp3_bytes, output_path)
 
-    logger.info(f"[ElevenLabs] Generated {output_path} ({len(samples) / SAMPLE_RATE:.1f}s)")
+    logger.info(f"[ElevenLabs] Generated {output_path}")
     return output_path
