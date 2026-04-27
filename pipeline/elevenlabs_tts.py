@@ -78,9 +78,9 @@ def generate_tts_elevenlabs(
     if not pcm_bytes:
         raise RuntimeError("ElevenLabs returned empty audio content")
     if len(pcm_bytes) % 2 != 0:
-        raise RuntimeError(
-            f"ElevenLabs returned malformed PCM: {len(pcm_bytes)} bytes (not 16-bit aligned)"
-        )
+        # Trailing half-sample from streaming — drop it, it's inaudible
+        logger.debug(f"[ElevenLabs] Trimming trailing byte ({len(pcm_bytes)} → {len(pcm_bytes) - 1})")
+        pcm_bytes = pcm_bytes[:-1]
 
     # PCM_44100 = signed 16-bit little-endian, mono
     samples = np.frombuffer(pcm_bytes, dtype=np.int16).astype(np.float32) / 32768.0
