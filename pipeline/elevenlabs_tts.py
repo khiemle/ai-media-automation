@@ -1,6 +1,6 @@
 """
 ElevenLabs TTS client — uses the official ElevenLabs Python SDK.
-Output: 44.1kHz mono WAV via soundfile.
+Output: 44.1kHz mono WAV via ffmpeg (decoded from MP3 stream).
 """
 import base64
 import logging
@@ -13,7 +13,7 @@ from config.api_config import get_config
 
 logger = logging.getLogger(__name__)
 
-SAMPLE_RATE = 44100  # pcm_44100 output
+SAMPLE_RATE = 44100  # target sample rate for WAV output
 
 
 def _normalize_text(text: str) -> str:
@@ -35,9 +35,10 @@ def _normalize_text(text: str) -> str:
 
 def _mp3_to_wav(mp3_bytes: bytes, output_path: Path) -> None:
     """Write mp3_bytes to a temp file, convert to WAV via ffmpeg, delete temp."""
-    tmp = Path(tempfile.mktemp(suffix=".mp3"))
+    with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
+        tmp = Path(f.name)
+        f.write(mp3_bytes)
     try:
-        tmp.write_bytes(mp3_bytes)
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         result = subprocess.run(

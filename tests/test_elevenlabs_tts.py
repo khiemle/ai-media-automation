@@ -1,7 +1,6 @@
 import base64
-import os
 from pathlib import Path
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch, MagicMock
 import pytest
 
 
@@ -13,11 +12,15 @@ _FAKE_CONFIG = {
 def test_mp3_to_wav_calls_ffmpeg_and_deletes_temp(tmp_path):
     from pipeline.elevenlabs_tts import _mp3_to_wav
     out = tmp_path / "out.wav"
-    with patch("subprocess.run") as mock_run, \
-         patch("tempfile.mktemp", return_value=str(tmp_path / "tmp.mp3")):
+    tmp_mp3 = tmp_path / "tmp.mp3"
+    tmp_mp3.write_bytes(b"")  # pre-create so unlink works
+    ntf_instance = MagicMock()
+    ntf_instance.name = str(tmp_mp3)
+    ntf_instance.__enter__ = MagicMock(return_value=ntf_instance)
+    ntf_instance.__exit__ = MagicMock(return_value=False)
+    with patch("tempfile.NamedTemporaryFile", return_value=ntf_instance) as mock_ntf, \
+         patch("subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=0)
-        # Create the temp file so unlink doesn't fail
-        (tmp_path / "tmp.mp3").write_bytes(b"")
         _mp3_to_wav(b"fake mp3 bytes", out)
     assert mock_run.called
     cmd = mock_run.call_args.args[0]
@@ -28,9 +31,14 @@ def test_mp3_to_wav_calls_ffmpeg_and_deletes_temp(tmp_path):
 def test_mp3_to_wav_raises_on_ffmpeg_failure(tmp_path):
     from pipeline.elevenlabs_tts import _mp3_to_wav
     out = tmp_path / "out.wav"
-    with patch("subprocess.run") as mock_run, \
-         patch("tempfile.mktemp", return_value=str(tmp_path / "tmp.mp3")):
-        (tmp_path / "tmp.mp3").write_bytes(b"")
+    tmp_mp3 = tmp_path / "tmp.mp3"
+    tmp_mp3.write_bytes(b"")
+    ntf_instance = MagicMock()
+    ntf_instance.name = str(tmp_mp3)
+    ntf_instance.__enter__ = MagicMock(return_value=ntf_instance)
+    ntf_instance.__exit__ = MagicMock(return_value=False)
+    with patch("tempfile.NamedTemporaryFile", return_value=ntf_instance), \
+         patch("subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=1, stderr="ffmpeg error")
         with pytest.raises(RuntimeError, match="ffmpeg"):
             _mp3_to_wav(b"bad bytes", out)
