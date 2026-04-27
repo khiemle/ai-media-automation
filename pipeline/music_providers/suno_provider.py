@@ -1,17 +1,19 @@
 """Suno API client — submit generation tasks and poll for results."""
-import os
 import requests
+
+from config.api_config import get_config
 
 
 SUNO_BASE = "https://api.sunoapi.org/api/v1"
-SUNO_MODEL = "V4_5"
 
 
 class SunoProvider:
     def __init__(self):
-        self._key = os.environ.get("SUNO_API_KEY", "")
+        cfg = get_config()
+        self._key = cfg["suno"]["api_key"]
+        self._model = cfg["suno"]["model"]
         if not self._key:
-            raise RuntimeError("SUNO_API_KEY is not set")
+            raise RuntimeError("Suno API key is not configured in config/api_keys.json")
 
     def _headers(self) -> dict:
         return {"Authorization": f"Bearer {self._key}", "Content-Type": "application/json"}
@@ -27,7 +29,7 @@ class SunoProvider:
         """Submit a generation request. Returns Suno taskId."""
         payload = {
             "customMode": True,
-            "model": SUNO_MODEL,
+            "model": self._model,
             "instrumental": instrumental,
             "prompt": prompt,
             "style": style,
