@@ -94,10 +94,11 @@ def _process_scene(scene: dict, meta: dict, video_cfg: dict, out_dir: Path, idx:
         from pipeline.tts_router import generate_tts
         generate_tts(
             text=scene.get("narration", ""),
-            voice_id=video_cfg.get("voice", "af_heart"),
+            voice_id=video_cfg.get("voice", ""),
             speed=float(video_cfg.get("voice_speed", 1.1)),
             language=meta.get("language", "vietnamese"),
             output_path=str(audio_path),
+            tts_service=video_cfg.get("tts_service", ""),
         )
     except Exception as e:
         logger.warning(f"[Composer] Scene {idx} TTS failed: {e}")
