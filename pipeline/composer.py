@@ -227,7 +227,12 @@ def _assemble(
         except Exception as _e:
             logger.warning(f"[Composer] Could not load assigned music track {music_track_id}: {_e}")
 
-    music_track_path = _assigned_track or _select_music(meta.get("mood", "uplifting"), meta.get("niche", "lifestyle"), final.duration)
+    music_disabled = video_cfg.get("music_disabled", False) if video_cfg else False
+    music_track_path = None
+    if not music_disabled:
+        music_track_path = _assigned_track or _select_music(
+            meta.get("mood", "uplifting"), meta.get("niche", "lifestyle"), final.duration
+        )
     if music_track_path:
         try:
             from moviepy import AudioFileClip, CompositeAudioClip
