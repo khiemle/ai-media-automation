@@ -68,31 +68,30 @@ class LLMService:
         except Exception as e:
             result["gemini_script"] = {"error": str(e)}
 
-        # ElevenLabs — try /user/subscription first; fall back to /user for
-        # restricted keys that only have the "text_to_speech" scope.
+        # ElevenLabs — try /user/subscription, then /user; TTS-only keys
+        # lack user_read scope and can't access either endpoint.
         el_key = cfg.get("elevenlabs", {}).get("api_key", "")
         if el_key:
             try:
-                resp = httpx.get(
+                for url in (
                     "https://api.elevenlabs.io/v1/user/subscription",
-                    headers={"xi-api-key": el_key},
-                    timeout=10,
-                )
-                if resp.status_code == 401:
-                    # Key has restricted scope (e.g. text_to_speech only) —
-                    # fall back to /user which works with any valid key.
-                    resp = httpx.get(
-                        "https://api.elevenlabs.io/v1/user",
-                        headers={"xi-api-key": el_key},
-                        timeout=10,
-                    )
-                resp.raise_for_status()
-                data = resp.json()
-                subscription = data.get("subscription", data)
-                result["elevenlabs"] = {
-                    "characters_used":  subscription.get("character_count", 0),
-                    "characters_limit": subscription.get("character_limit", 0),
-                }
+                    "https://api.elevenlabs.io/v1/user",
+                ):
+                    resp = httpx.get(url, headers={"xi-api-key": el_key}, timeout=10)
+                    if resp.status_code not in (401, 403):
+                        break
+
+                if resp.status_code in (401, 403):
+                    # Key is valid but lacks user_read scope (e.g. TTS-only key)
+                    result["elevenlabs"] = {"scope_restricted": True}
+                else:
+                    resp.raise_for_status()
+                    data = resp.json()
+                    subscription = data.get("subscription", data)
+                    result["elevenlabs"] = {
+                        "characters_used":  subscription.get("character_count", 0),
+                        "characters_limit": subscription.get("character_limit", 0),
+                    }
             except Exception as e:
                 result["elevenlabs"] = {"error": str(e)}
         else:

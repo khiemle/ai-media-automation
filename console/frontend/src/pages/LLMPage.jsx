@@ -225,7 +225,7 @@ export default function LLMPage() {
             onChange={e => patch('elevenlabs.model', e.target.value)}
             options={ELEVENLABS_MODELS.map(m => ({ value: m, label: m }))}
           />
-          {q.elevenlabs && !q.elevenlabs.error && (
+          {q.elevenlabs && !q.elevenlabs.error && !q.elevenlabs.scope_restricted && (
             <div>
               <div className="flex justify-between text-xs text-[#9090a8] mb-1">
                 <span>Characters this month</span>
@@ -233,6 +233,11 @@ export default function LLMPage() {
               </div>
               <ProgressBar value={q.elevenlabs.characters_used} max={q.elevenlabs.characters_limit} />
             </div>
+          )}
+          {q.elevenlabs?.scope_restricted && (
+            <p className="text-xs text-[#9090a8]">
+              Quota unavailable — add <span className="font-mono">user_read</span> permission to the API key to see usage
+            </p>
           )}
           {q.elevenlabs?.error && <p className="text-xs text-[#f87171] font-mono">{q.elevenlabs.error}</p>}
           <Button size="sm" onClick={() => saveCard('elevenlabs')}>Save</Button>
