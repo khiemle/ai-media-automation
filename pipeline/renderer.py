@@ -55,14 +55,19 @@ def render_final(
         f"fps={TARGET_FPS}",
     ]
 
-    # Burn-in subtitles
+    # Burn-in subtitles: SRT takes priority; fall back to subtitles.ass in same directory
+    ass_candidate = raw_path_obj.parent / "subtitles.ass"
+    subtitle_file = None
     if srt_path and Path(srt_path).exists() and Path(srt_path).stat().st_size > 0:
-        if _check_subtitles_filter():
-            srt_escaped = Path(srt_path).resolve().as_posix().replace(":", "\\:")
-            sub_filter = f"subtitles=filename='{srt_escaped}'"
-            vf_filters.append(sub_filter)
-        else:
-            logger.warning("[Renderer] ffmpeg subtitles filter unavailable, skipping subtitle burn-in")
+        subtitle_file = Path(srt_path)
+    elif ass_candidate.exists() and ass_candidate.stat().st_size > 0:
+        subtitle_file = ass_candidate
+
+    if subtitle_file and _check_subtitles_filter():
+        escaped = subtitle_file.resolve().as_posix().replace(":", "\\:")
+        vf_filters.append(f"subtitles=filename='{escaped}'")
+    elif subtitle_file:
+        logger.warning("[Renderer] ffmpeg subtitles filter unavailable, skipping subtitle burn-in")
 
     vf = ",".join(vf_filters)
 
