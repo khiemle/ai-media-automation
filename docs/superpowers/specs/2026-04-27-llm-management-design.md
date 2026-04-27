@@ -105,9 +105,10 @@ GET  /api/llm/config       → returns config with keys masked (last 4 chars vis
 PUT  /api/llm/config       → saves full config to JSON (admin only)
 ```
 
-**Masking rule:** any non-empty key value is returned as `"••••" + last_4_chars`. Empty string stays `""`. The frontend sends back the full unmasked value on save; if the user has not changed a masked field, the frontend re-submits the current value as-is (the `GET` returns the real value to the frontend only in a `_raw` field used internally — see Section 5).
-
-**Simpler alternative:** `GET /api/llm/config` returns masked values for display; a separate `GET /api/llm/config/raw` (admin only) returns unmasked values used to pre-fill the edit form. The `PUT` always expects unmasked values.
+**Two endpoints for config:**
+- `GET /api/llm/config` — returns masked values (`"••••a1b2"`) for display only.
+- `GET /api/llm/config/raw` — returns actual key values; used by the edit form to pre-fill inputs (admin only).
+- `PUT /api/llm/config` — always expects full unmasked values.
 
 ### Extended existing endpoints
 
