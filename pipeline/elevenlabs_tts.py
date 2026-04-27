@@ -50,6 +50,31 @@ def _mp3_to_wav(mp3_bytes: bytes, output_path: Path) -> None:
         tmp.unlink(missing_ok=True)
 
 
+def _chars_to_words(
+    chars:  list[str],
+    starts: list[float],
+    ends:   list[float],
+) -> list[dict]:
+    """Reconstruct word-level timing from ElevenLabs character-level alignment."""
+    words = []
+    buf = []
+    word_start = 0.0
+    word_end = 0.0
+    for ch, s, e in zip(chars, starts, ends):
+        if ch == " ":
+            if buf:
+                words.append({"word": "".join(buf), "start": word_start, "end": word_end})
+                buf = []
+        else:
+            if not buf:
+                word_start = s
+            buf.append(ch)
+            word_end = e
+    if buf:
+        words.append({"word": "".join(buf), "start": word_start, "end": word_end})
+    return words
+
+
 def generate_tts_elevenlabs(
     text:        str,
     voice_id:    str,
@@ -101,3 +126,53 @@ def generate_tts_elevenlabs(
 
     logger.info(f"[ElevenLabs] Generated {output_path}")
     return output_path
+
+
+def generate_tts_elevenlabs_with_timing(
+    text:        str,
+    voice_id:    str,
+    speed:       float,
+    output_path: str,
+) -> tuple[Path, list[dict]]:
+    """
+    Generate WAV audio + word timing via ElevenLabs convert_with_timestamps().
+    Returns (output_path, word_list) where word_list is
+    [{"word": str, "start": float, "end": float}, ...].
+    """
+    cfg = get_config()
+    api_key = cfg["elevenlabs"]["api_key"]
+    if not api_key:
+        raise RuntimeError("ElevenLabs API key is not configured in config/api_keys.json")
+    if not voice_id:
+        raise RuntimeError("voice_id is required for ElevenLabs TTS")
+
+    text = _normalize_text(text)
+    if not text:
+        raise RuntimeError("TTS text is empty after normalization")
+
+    model_id = cfg["elevenlabs"].get("model", "eleven_flash_v2_5")
+
+    from elevenlabs.client import ElevenLabs
+
+    try:
+        client = ElevenLabs(api_key=api_key)
+        response = client.text_to_speech.convert_with_timestamps(
+            voice_id=voice_id,
+            text=text,
+            model_id=model_id,
+        )
+    except Exception as e:
+        raise RuntimeError(f"ElevenLabs SDK error: {e}") from e
+
+    mp3_bytes = base64.b64decode(response.audio_base64)
+    output_path = Path(output_path)
+    _mp3_to_wav(mp3_bytes, output_path)
+
+    words = _chars_to_words(
+        response.alignment.characters,
+        response.alignment.character_start_times_seconds,
+        response.alignment.character_end_times_seconds,
+    )
+    logger.info(f"[ElevenLabs] Generated {output_path} with {len(words)} word timings")
+    return output_path, words
+

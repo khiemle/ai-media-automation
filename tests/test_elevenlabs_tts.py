@@ -51,3 +51,45 @@ def test_generate_tts_elevenlabs_uses_mp3_format(tmp_path):
     assert call_kwargs["output_format"] == "mp3_44100_128"
     mock_convert.assert_called_once()
     assert result == out
+
+
+def test_chars_to_words_basic():
+    from pipeline.elevenlabs_tts import _chars_to_words
+    # "hi there" — space at index 2 flushes "hi"; final flush gives "there"
+    chars  = list("hi there")
+    starts = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]
+    ends   = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
+    words = _chars_to_words(chars, starts, ends)
+    assert len(words) == 2
+    assert words[0] == {"word": "hi",    "start": 0.0, "end": 0.2}
+    assert words[1] == {"word": "there", "start": 0.3, "end": 0.8}
+
+
+def test_chars_to_words_trailing_space():
+    from pipeline.elevenlabs_tts import _chars_to_words
+    chars  = list("ok ")
+    starts = [0.0, 0.1, 0.2]
+    ends   = [0.1, 0.2, 0.3]
+    words = _chars_to_words(chars, starts, ends)
+    assert len(words) == 1
+    assert words[0]["word"] == "ok"
+
+
+def test_generate_tts_elevenlabs_with_timing_returns_word_list(tmp_path):
+    from pipeline.elevenlabs_tts import generate_tts_elevenlabs_with_timing
+    out = tmp_path / "speech.wav"
+    mock_response = MagicMock()
+    mock_response.audio_base64 = base64.b64encode(b"fake mp3 content").decode()
+    mock_response.alignment.characters = list("hi")
+    mock_response.alignment.character_start_times_seconds = [0.0, 0.1]
+    mock_response.alignment.character_end_times_seconds   = [0.1, 0.2]
+    with patch("pipeline.elevenlabs_tts.get_config", return_value=_FAKE_CONFIG), \
+         patch("pipeline.elevenlabs_tts._mp3_to_wav") as mock_convert, \
+         patch("elevenlabs.client.ElevenLabs") as mock_client_class:
+        mock_client = MagicMock()
+        mock_client_class.return_value = mock_client
+        mock_client.text_to_speech.convert_with_timestamps.return_value = mock_response
+        audio_path, words = generate_tts_elevenlabs_with_timing("hi", "voice-id", 1.0, str(out))
+    assert audio_path == Path(out)
+    assert words == [{"word": "hi", "start": 0.0, "end": 0.2}]
+    mock_convert.assert_called_once()
