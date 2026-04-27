@@ -19,7 +19,7 @@ def test_extract_word_timing_returns_word_dicts(tmp_path):
         result = extract_word_timing(audio, "vi")
     assert result == [{"word": "hello", "start": 0.5, "end": 1.0}]
     mock_model.transcribe.assert_called_once_with(
-        str(audio), language="vi", word_timestamps=True
+        str(audio), language="vi", word_timestamps=True, task="transcribe"
     )
 
 
@@ -53,3 +53,15 @@ def test_extract_word_timing_skips_empty_words(tmp_path):
         result = extract_word_timing(audio, "en")
     assert len(result) == 1
     assert result[0]["word"] == "hi"
+
+
+def test_extract_word_timing_returns_empty_on_transcription_error(tmp_path):
+    from pipeline.caption_gen import extract_word_timing
+    audio = tmp_path / "audio.wav"
+    audio.write_bytes(b"fake wav")
+    with patch("pipeline.caption_gen._get_model") as mock_get:
+        mock_model = MagicMock()
+        mock_model.transcribe.side_effect = RuntimeError("CUDA OOM")
+        mock_get.return_value = mock_model
+        result = extract_word_timing(audio, "vi")
+    assert result == []

@@ -72,7 +72,7 @@ def extract_word_timing(audio_path: str | Path, language: str = "vi") -> list[di
         return []
     try:
         segments, _ = model.transcribe(
-            str(audio_path), language=language, word_timestamps=True
+            str(audio_path), language=language, word_timestamps=True, task="transcribe"
         )
         return [
             {"word": w.word.strip(), "start": w.start, "end": w.end}
