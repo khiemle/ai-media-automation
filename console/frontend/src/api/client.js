@@ -1,19 +1,24 @@
-// ── Token storage (memory only — never persisted to localStorage/sessionStorage) ──
+// ── Token storage ────────────────────────────────────────────────────────────
+const TOKEN_KEY = 'auth_token'
 let _token = null
 
 export function setToken(token) {
+  if (!token) return
   _token = token
+  localStorage.setItem(TOKEN_KEY, token)
 }
 
 export function clearToken() {
   _token = null
+  localStorage.removeItem(TOKEN_KEY)
 }
 
 export function getToken() { return _token }
 
-/** No-op: token is memory-only; returns null on every page load. */
 export function loadPersistedToken() {
-  return null
+  const stored = localStorage.getItem(TOKEN_KEY)
+  if (stored) _token = stored
+  return stored
 }
 
 // ── Base fetch wrapper ─────────────────────────────────────────────────────────
@@ -28,7 +33,7 @@ export async function fetchApi(url, options = {}) {
 
   if (res.status === 401) {
     clearToken()
-    window.location.href = '/login'
+    window.location.href = '/'
     return
   }
 
