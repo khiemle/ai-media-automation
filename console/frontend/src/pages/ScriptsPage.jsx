@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { scriptsApi, musicApi } from '../api/client.js'
+import { useState, useEffect } from 'react'
+import { scriptsApi, musicApi, fetchApi } from '../api/client.js'
 import { useApi } from '../hooks/useApi.js'
 import { Card, Badge, Button, Modal, Tabs, Select, Input, Textarea, StatBox, Toast, Spinner, EmptyState } from '../components/index.jsx'
 
@@ -13,7 +13,6 @@ const STATUS_TABS = [
   { id: 'completed',      label: 'Done' },
 ]
 
-const VOICES    = ['af_heart', 'af_bella', 'am_adam', 'am_michael', 'bf_emma', 'bm_george']
 const MOODS     = ['uplifting', 'calm_focus', 'energetic', 'dramatic', 'neutral']
 const SCENE_TYPES = ['hook', 'body', 'transition', 'cta']
 const OVERLAY_STYLES = ['bold_center', 'subtitle_bottom', 'corner_tag', 'full_overlay', 'minimal']
@@ -100,10 +99,20 @@ function SceneRow({ scene, index, total, onChange, onMove, onDelete, onRegen, re
 function ScriptEditorModal({ scriptId, onClose, onSaved }) {
   const { data, loading } = useApi(() => scriptsApi.get(scriptId), [scriptId])
   const [draft, setDraft] = useState(null)
+  const [language, setLanguage] = useState('vietnamese')
+  const [voices, setVoices] = useState(null)
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
   const [regenLoading, setRegenLoading] = useState(null)
   const [toast, setToast] = useState(null)
+
+  useEffect(() => {
+    fetchApi('/api/llm/voices').then(setVoices).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    if (data) setLanguage(data.language || 'vietnamese')
+  }, [data])
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type })
@@ -162,7 +171,7 @@ function ScriptEditorModal({ scriptId, onClose, onSaved }) {
   const handleSave = async () => {
     setSaving(true)
     try {
-      await scriptsApi.update(scriptId, { script_json: scriptJson, editor_notes: notes })
+      await scriptsApi.update(scriptId, { script_json: scriptJson, editor_notes: notes, language })
       showToast('Script saved', 'success')
       onSaved?.()
     } catch (e) {
@@ -200,6 +209,19 @@ function ScriptEditorModal({ scriptId, onClose, onSaved }) {
             <Input label="Niche"    value={meta.niche    || ''} onChange={e => setScriptField('meta', 'niche', e.target.value)} />
             <Input label="Template" value={meta.template || ''} onChange={e => setScriptField('meta', 'template', e.target.value)} />
             <Input label="Region"   value={meta.region   || ''} onChange={e => setScriptField('meta', 'region', e.target.value)} />
+            <Select
+              label="Language"
+              value={language}
+              onChange={e => {
+                setLanguage(e.target.value)
+                setScriptField('video', 'tts_service', '')
+                setScriptField('video', 'voice', '')
+              }}
+              options={[
+                { value: 'vietnamese', label: 'Vietnamese' },
+                { value: 'english',    label: 'English' },
+              ]}
+            />
           </div>
         </div>
 
@@ -210,17 +232,97 @@ function ScriptEditorModal({ scriptId, onClose, onSaved }) {
             <Input label="Title"        value={video.title       || ''} onChange={e => setScriptField('video', 'title', e.target.value)} />
             <Textarea label="Description" value={video.description || ''} onChange={e => setScriptField('video', 'description', e.target.value)} rows={2} />
             <Input label="Hashtags (comma-sep)" value={(video.hashtags || []).join(', ')} onChange={e => setScriptField('video', 'hashtags', e.target.value.split(',').map(h => h.trim()).filter(Boolean))} />
-            <Select label="Voice"   value={video.voice   || ''} onChange={e => setScriptField('video', 'voice', e.target.value)}   placeholder="Default" options={VOICES.map(v => ({ value: v, label: v }))} />
+            {/* TTS Service */}
+            <div>
+              <label className="text-xs text-[#9090a8] font-medium block mb-1">TTS Service</label>
+              <select
+                value={video.tts_service || (language === 'vietnamese' ? 'elevenlabs' : 'kokoro')}
+                onChange={e => {
+                  setScriptField('video', 'tts_service', e.target.value)
+                  setScriptField('video', 'voice', '')
+                }}
+                disabled={language === 'vietnamese'}
+                className="w-full bg-[#16161a] border border-[#2a2a32] rounded-lg px-3 py-1.5 text-sm text-[#e8e8f0] focus:outline-none focus:border-[#7c6af7] transition-colors appearance-none cursor-pointer disabled:opacity-50"
+              >
+                {language === 'english' && <option value="kokoro">Kokoro</option>}
+                <option value="elevenlabs">ElevenLabs</option>
+              </select>
+              {language === 'vietnamese' && (
+                <p className="text-[10px] text-[#5a5a70] mt-0.5 font-mono">Vietnamese requires ElevenLabs</p>
+              )}
+            </div>
+            {/* Voice */}
+            <div>
+              <label className="text-xs text-[#9090a8] font-medium block mb-1">Voice</label>
+              <select
+                value={video.voice || ''}
+                onChange={e => setScriptField('video', 'voice', e.target.value)}
+                className="w-full bg-[#16161a] border border-[#2a2a32] rounded-lg px-3 py-1.5 text-sm text-[#e8e8f0] focus:outline-none focus:border-[#7c6af7] transition-colors appearance-none cursor-pointer"
+              >
+                <option value="">— select —</option>
+                {voices && (() => {
+                  const svc = video.tts_service || (language === 'vietnamese' ? 'elevenlabs' : 'kokoro')
+                  if (svc === 'kokoro') {
+                    return (
+                      <>
+                        <optgroup label="American English — Female">
+                          {voices.kokoro?.american_english?.female?.map(v => <option key={v.id} value={v.id}>{v.name} ({v.id})</option>)}
+                        </optgroup>
+                        <optgroup label="American English — Male">
+                          {voices.kokoro?.american_english?.male?.map(v => <option key={v.id} value={v.id}>{v.name} ({v.id})</option>)}
+                        </optgroup>
+                        <optgroup label="British English — Female">
+                          {voices.kokoro?.british_english?.female?.map(v => <option key={v.id} value={v.id}>{v.name} ({v.id})</option>)}
+                        </optgroup>
+                        <optgroup label="British English — Male">
+                          {voices.kokoro?.british_english?.male?.map(v => <option key={v.id} value={v.id}>{v.name} ({v.id})</option>)}
+                        </optgroup>
+                      </>
+                    )
+                  }
+                  const langKey = language === 'vietnamese' ? 'vi' : 'en'
+                  return (
+                    <>
+                      <optgroup label="Male">
+                        {voices.elevenlabs?.[langKey]?.male?.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+                      </optgroup>
+                      <optgroup label="Female">
+                        {voices.elevenlabs?.[langKey]?.female?.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+                      </optgroup>
+                    </>
+                  )
+                })()}
+              </select>
+            </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs text-[#9090a8] font-medium">Background Music</label>
               <select
-                value={video.music_track_id || ''}
-                onChange={e => setScriptField('video', 'music_track_id', e.target.value ? parseInt(e.target.value) : null)}
+                value={
+                  video.music_disabled
+                    ? 'none'
+                    : video.music_track_id != null
+                      ? String(video.music_track_id)
+                      : 'auto'
+                }
+                onChange={e => {
+                  const val = e.target.value
+                  if (val === 'none') {
+                    setScriptField('video', 'music_disabled', true)
+                    setScriptField('video', 'music_track_id', null)
+                  } else if (val === 'auto') {
+                    setScriptField('video', 'music_disabled', false)
+                    setScriptField('video', 'music_track_id', null)
+                  } else {
+                    setScriptField('video', 'music_disabled', false)
+                    setScriptField('video', 'music_track_id', parseInt(val))
+                  }
+                }}
                 className="bg-[#16161a] border border-[#2a2a32] rounded-lg px-3 py-1.5 text-sm text-[#e8e8f0] focus:outline-none focus:border-[#7c6af7] transition-colors appearance-none cursor-pointer"
               >
-                <option value="">None</option>
+                <option value="auto">Auto (by mood)</option>
+                <option value="none">No music (TTS only)</option>
                 {musicTracks.map(t => (
-                  <option key={t.id} value={t.id}>
+                  <option key={t.id} value={String(t.id)}>
                     {t.title} · {t.duration_s ? `${t.duration_s.toFixed(0)}s` : '?'} · {(t.genres || []).join(', ')}
                   </option>
                 ))}
