@@ -129,6 +129,7 @@ fi
 echo "✅  ffmpeg ready"
 
 # ── 9. Kill stale processes ───────────────────────────────────────
+# Kill by pidfile first
 for pidfile in "$LOGS_DIR/celery.pid" "$LOGS_DIR/celery_beat.pid" "$LOGS_DIR/pipeline_celery.pid" "$LOGS_DIR/uvicorn.pid"; do
   if [ -f "$pidfile" ]; then
     OLD_PID=$(cat "$pidfile")
@@ -136,6 +137,11 @@ for pidfile in "$LOGS_DIR/celery.pid" "$LOGS_DIR/celery_beat.pid" "$LOGS_DIR/pip
     rm -f "$pidfile"
   fi
 done
+# Kill any remaining celery worker/beat processes for this project (orphans from prev runs)
+pgrep -f "celery.*console.backend.celery_app" 2>/dev/null | while read -r pid; do
+  kill "$pid" 2>/dev/null && echo "⚠️   Stopped orphan celery process (pid $pid)"
+done
+sleep 1
 lsof -ti :"${CONSOLE_PORT:-8080}" | xargs kill 2>/dev/null || true
 
 # ── 10. Start Celery worker (all queues) ──────────────────────────

@@ -1,4 +1,4 @@
-from celery import Celery
+from celery import Celery, signals
 from celery.schedules import crontab
 from console.backend.config import settings
 
@@ -38,3 +38,22 @@ celery_app.conf.update(
         },
     },
 )
+
+
+@signals.worker_process_init.connect
+def _worker_process_init(**kwargs):
+    """
+    Dispose all engine connection pools after Celery forks a worker process.
+    Without this, forked workers inherit the parent's pooled connections which
+    PostgreSQL considers stale, and they accumulate as idle orphans.
+    """
+    try:
+        from console.backend.database import engine as console_engine
+        console_engine.dispose()
+    except Exception:
+        pass
+    try:
+        from database.connection import engine as pipeline_engine
+        pipeline_engine.dispose()
+    except Exception:
+        pass
