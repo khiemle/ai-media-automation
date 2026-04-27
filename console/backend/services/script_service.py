@@ -104,6 +104,10 @@ class ScriptService:
             script_json["video"]["total_duration"] = total_duration
 
         row.script_json = script_json
+        # Sync music_track_id DB column from script_json.video so composer picks it up
+        video_section = script_json.get("video", {})
+        if "music_track_id" in video_section:
+            row.music_track_id = video_section.get("music_track_id")  # None = auto, int = explicit
         if editor_notes is not None:
             row.editor_notes = editor_notes
         row.edited_by = user_id

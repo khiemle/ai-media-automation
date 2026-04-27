@@ -132,8 +132,10 @@ function ScriptEditorModal({ scriptId, onClose, onSaved }) {
   )
 
   const setScriptField = (section, key, value) => {
-    const current = draft ?? data?.script_json ?? {}
-    setDraft({ ...current, [section]: { ...(current[section] || {}), [key]: value } })
+    setDraft(prev => {
+      const current = prev ?? data?.script_json ?? {}
+      return { ...current, [section]: { ...(current[section] || {}), [key]: value } }
+    })
   }
   const setScenes = (newScenes) => {
     const current = draft ?? data?.script_json ?? {}
@@ -284,10 +286,10 @@ function ScriptEditorModal({ scriptId, onClose, onSaved }) {
                   return (
                     <>
                       <optgroup label="Male">
-                        {voices.elevenlabs?.[langKey]?.male?.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+                        {voices.elevenlabs?.[langKey]?.male?.map(v => <option key={v.id} value={v.id}>{v.name !== 'Unknown' ? v.name : v.id}</option>)}
                       </optgroup>
                       <optgroup label="Female">
-                        {voices.elevenlabs?.[langKey]?.female?.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+                        {voices.elevenlabs?.[langKey]?.female?.map(v => <option key={v.id} value={v.id}>{v.name !== 'Unknown' ? v.name : v.id}</option>)}
                       </optgroup>
                     </>
                   )

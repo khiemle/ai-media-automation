@@ -83,7 +83,10 @@ export default function LLMPage() {
       const next = JSON.parse(JSON.stringify(prev))
       const keys = path.split('.')
       let obj = next
-      for (let i = 0; i < keys.length - 1; i++) obj = obj[keys[i]]
+      for (let i = 0; i < keys.length - 1; i++) {
+        if (obj[keys[i]] == null) obj[keys[i]] = {}
+        obj = obj[keys[i]]
+      }
       obj[keys[keys.length - 1]] = value
       return next
     })
@@ -236,12 +239,12 @@ export default function LLMPage() {
                 <>
                   <optgroup label="Male">
                     {voices.elevenlabs?.en?.male?.map(v => (
-                      <option key={v.id} value={v.id}>{v.name}</option>
+                      <option key={v.id} value={v.id}>{v.name !== 'Unknown' ? v.name : v.id}</option>
                     ))}
                   </optgroup>
                   <optgroup label="Female">
                     {voices.elevenlabs?.en?.female?.map(v => (
-                      <option key={v.id} value={v.id}>{v.name}</option>
+                      <option key={v.id} value={v.id}>{v.name !== 'Unknown' ? v.name : v.id}</option>
                     ))}
                   </optgroup>
                 </>
@@ -262,12 +265,12 @@ export default function LLMPage() {
                 <>
                   <optgroup label="Male">
                     {voices.elevenlabs?.vi?.male?.map(v => (
-                      <option key={v.id} value={v.id}>{v.name}</option>
+                      <option key={v.id} value={v.id}>{v.name !== 'Unknown' ? v.name : v.id}</option>
                     ))}
                   </optgroup>
                   <optgroup label="Female">
                     {voices.elevenlabs?.vi?.female?.map(v => (
-                      <option key={v.id} value={v.id}>{v.name}</option>
+                      <option key={v.id} value={v.id}>{v.name !== 'Unknown' ? v.name : v.id}</option>
                     ))}
                   </optgroup>
                 </>
