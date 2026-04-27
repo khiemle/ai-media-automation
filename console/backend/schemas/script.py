@@ -24,6 +24,7 @@ class ScriptDetail(ScriptListItem):
 class ScriptUpdate(BaseModel):
     script_json: dict
     editor_notes: str | None = None
+    language: str | None = None
 
 
 class ScriptGenerateRequest(BaseModel):

@@ -115,9 +115,21 @@ class PipelineService:
                 from console.backend.tasks.scraper_tasks import run_scrape_task
                 result = run_scrape_task.delay("all")
                 return result.id
-            elif job_type in ("generate",):
+            elif job_type == "generate":
                 from console.backend.tasks.script_tasks import generate_script_task
-                result = generate_script_task.delay(script_id)
+                from database.models import GeneratedScript
+                script_row = self.db.query(GeneratedScript).filter(GeneratedScript.id == script_id).first()
+                if script_row:
+                    result = generate_script_task.delay(
+                        topic=script_row.topic or "",
+                        niche=script_row.niche or "",
+                        template=script_row.template or "tiktok_viral",
+                        language=getattr(script_row, "language", "vietnamese") or "vietnamese",
+                    )
+                else:
+                    result = generate_script_task.delay(
+                        topic="", niche="", template="tiktok_viral", language="vietnamese",
+                    )
                 return result.id
             elif job_type in ("tts", "render"):
                 from console.backend.tasks.production_tasks import render_video_task
