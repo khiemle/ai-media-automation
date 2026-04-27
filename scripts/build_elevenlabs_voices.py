@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-One-time build script: fetches ElevenLabs voices from the account,
-rebuilds the elevenlabs section of config/tts_voices.json grouped by language+gender.
+One-time build script: fetches name/metadata for each specific ElevenLabs voice ID,
+writes the elevenlabs section of config/tts_voices.json.
 
 Usage:
     python scripts/build_elevenlabs_voices.py
@@ -10,28 +10,72 @@ Requires: ElevenLabs API key in config/api_keys.json
 """
 import json
 import sys
-from collections import defaultdict
 from pathlib import Path
 
 import httpx
 
-ROOT = Path(__file__).parent.parent
+ROOT        = Path(__file__).parent.parent
 VOICES_PATH = ROOT / "config" / "tts_voices.json"
 KEYS_PATH   = ROOT / "config" / "api_keys.json"
 
-# Languages to include. Voices with no language label are treated as English.
-INCLUDE_LANGUAGES = {"en", "vi"}
-GENDER_FALLBACK   = "other"
+# Hardcoded voice IDs grouped by language + gender
+VOICE_IDS = {
+    "en": {
+        "male": [
+            "UgBBYS2sOqTuMpoF3BR0",
+            "NOpBlnGInO9m6vDvFkFC",
+            "EkK5I93UQWFDigLMpZcX",
+            "uju3wxzG5OhpWcoi3SMy",
+            "NFG5qt843uXKj4pFvR7C",
+        ],
+        "female": [
+            "56AoDkrOh6qfVPDXZ7Pt",
+            "tnSpp4vdxKPjI9w0GnoV",
+            "Z3R5wn05IrDiVCyEkUrK",
+            "kPzsL2i3teMYv0FxEYQ6",
+            "aMSt68OGf4xUZAnLpTU8",
+            "RILOU7YmBhvwJGDGjNmP",
+            "flHkNRp1BlvT73UL6gyz",
+            "KoVIHoyLDrQyd4pGalbs",
+            "yj30vwTGJxSHezdAGsv9",
+        ],
+    },
+    "vi": {
+        "female": [
+            "A5w1fw5x0uXded1LDvZp",
+            "d5HVupAWCwe4e6GvMCAL",
+            "DvG3I1kDzdBY3u4EzYh6",
+            "foH7s9fX31wFFH2yqrFa",
+            "jdlxsPOZOHdGEfcItXVu",
+            "BlZK9tHPU6XXjwOSIiYA",
+            "a3AkyqGG4v8Pg7SWQ0Y3",
+            "HQZkBNMmZF5aISnrU842",
+            "qByVAGjXwGlkcRDJoiHg",
+        ],
+        "male": [
+            "3VnrjnYrskPMDsapTr8X",
+            "aN7cv9yXNrfIR87bDmyD",
+            "ueSxRO0nLF1bj93J2hVt",
+            "UsgbMVmY3U59ijwK5mdh",
+            "XBDAUT8ybuJTTCoOLSUj",
+            "9EE00wK5qV6tPtpQIxvy",
+        ],
+    },
+}
 
 
-def fetch_all_voices(api_key: str) -> list[dict]:
-    resp = httpx.get(
-        "https://api.elevenlabs.io/v1/voices",
-        headers={"xi-api-key": api_key},
-        timeout=15,
-    )
-    resp.raise_for_status()
-    return resp.json().get("voices", [])
+def fetch_voice_name(api_key: str, voice_id: str) -> str:
+    try:
+        resp = httpx.get(
+            f"https://api.elevenlabs.io/v1/voices/{voice_id}",
+            headers={"xi-api-key": api_key},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        return resp.json().get("name", "Unknown")
+    except Exception as e:
+        print(f"  WARN: {voice_id} — {e}", file=sys.stderr)
+        return "Unknown"
 
 
 def main():
@@ -40,29 +84,21 @@ def main():
         print("ERROR: ElevenLabs API key not set in config/api_keys.json", file=sys.stderr)
         sys.exit(1)
 
-    print("Fetching account voices from ElevenLabs...")
-    voices = fetch_all_voices(api_key)
-    print(f"  Found {len(voices)} voices")
-
-    # Group by language → gender
-    grouped: dict[str, dict[str, list]] = defaultdict(lambda: defaultdict(list))
-    for v in voices:
-        labels = v.get("labels", {})
-        lang   = labels.get("language", "en").lower()
-        gender = labels.get("gender", GENDER_FALLBACK).lower()
-        if lang not in INCLUDE_LANGUAGES:
-            continue
-        grouped[lang][gender].append({"id": v["voice_id"], "name": v["name"]})
-
-    # Print summary
-    for lang in sorted(grouped):
-        for gender in sorted(grouped[lang]):
-            print(f"  {lang}/{gender}: {len(grouped[lang][gender])} voices")
-
-    # Update the tts_voices.json elevenlabs section
     data = json.loads(VOICES_PATH.read_text())
-    data["elevenlabs"] = {lang: dict(genders) for lang, genders in grouped.items()}
+    result: dict = {}
 
+    for lang, genders in VOICE_IDS.items():
+        result[lang] = {}
+        for gender, ids in genders.items():
+            print(f"Fetching {lang}/{gender} ({len(ids)} voices)...")
+            voices = []
+            for voice_id in ids:
+                name = fetch_voice_name(api_key, voice_id)
+                voices.append({"id": voice_id, "name": name})
+                print(f"  {voice_id} → {name}")
+            result[lang][gender] = voices
+
+    data["elevenlabs"] = result
     VOICES_PATH.write_text(json.dumps(data, indent=2, ensure_ascii=False))
     print(f"\nDone. Written to {VOICES_PATH}")
 
