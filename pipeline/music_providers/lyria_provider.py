@@ -1,5 +1,5 @@
 """Lyria music generation via the Gemini API (google-genai SDK)."""
-import os
+from config.api_config import get_config
 
 try:
     from google import genai
@@ -14,9 +14,9 @@ LYRIA_MODELS = {
 
 class LyriaProvider:
     def __init__(self):
-        self._key = os.environ.get("GEMINI_MEDIA_API_KEY", "")
+        self._key = get_config()["gemini"]["music"]["api_key"]
         if not self._key:
-            raise RuntimeError("GEMINI_MEDIA_API_KEY is not set")
+            raise RuntimeError("Gemini music API key is not configured in config/api_keys.json")
         if genai is None:
             raise RuntimeError("google-genai not installed. Run: pip install google-genai")
 
