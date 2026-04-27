@@ -1,14 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
 from console.backend.auth import require_admin, require_editor_or_admin
+from console.backend.database import get_db
 from console.backend.services.llm_service import LLMService
 
 router = APIRouter(prefix="/llm", tags=["llm"])
-
-
-class SetModelBody(BaseModel):
-    provider: str
-    model: str
 
 
 @router.get("/status")
@@ -16,15 +13,26 @@ def get_status(_user=Depends(require_editor_or_admin)):
     return LLMService().get_status()
 
 
-@router.put("/model")
-def set_model(body: SetModelBody, _user=Depends(require_admin)):
-    try:
-        return LLMService().set_model(body.provider, body.model)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
 @router.get("/quota")
-def get_quota(_user=Depends(require_editor_or_admin)):
-    return LLMService().get_quota()
+def get_quota(db: Session = Depends(get_db), _user=Depends(require_editor_or_admin)):
+    return LLMService().get_quota(db=db)
+
+
+@router.get("/config")
+def get_config_masked(_user=Depends(require_admin)):
+    return LLMService().get_config_masked()
+
+
+@router.get("/config/raw")
+def get_config_raw(_user=Depends(require_admin)):
+    return LLMService().get_config_raw()
+
+
+@router.put("/config")
+def save_config(body: dict, _user=Depends(require_admin)):
+    try:
+        LLMService().save_config(body)
+        return {"ok": True}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
