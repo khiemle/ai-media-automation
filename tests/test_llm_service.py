@@ -65,3 +65,60 @@ def test_get_status_includes_kokoro():
         status = LLMService().get_status()
     assert "kokoro" in status
     assert status["kokoro"]["available"] is True
+
+
+def test_get_quota_suno_real_credits():
+    _cfg = {
+        "gemini": {"script": {"api_key": "", "model": ""}, "media": {"api_key": "", "model": ""}, "music": {"api_key": "", "model": ""}},
+        "elevenlabs": {"api_key": "", "voice_id_en": "", "voice_id_vi": "", "model": ""},
+        "suno": {"api_key": "test-suno-key", "model": "V4_5"},
+        "pexels": {"api_key": ""},
+        "kokoro": {"default_voice_en": "af_heart"},
+    }
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {"credits": 42}
+
+    with patch("console.backend.services.llm_service.api_config.get_config", return_value=_cfg), \
+         patch("console.backend.services.llm_service.httpx.get", return_value=mock_resp), \
+         patch("rag.rate_limiter.get_gemini_limiter") as mock_limiter:
+        mock_limiter.return_value.usage.return_value = {}
+        from console.backend.services.llm_service import LLMService
+        result = LLMService().get_quota()
+
+    assert result["suno"] == {"credits": 42}
+
+
+def test_get_quota_suno_api_error_returns_error():
+    _cfg = {
+        "gemini": {"script": {"api_key": "", "model": ""}, "media": {"api_key": "", "model": ""}, "music": {"api_key": "", "model": ""}},
+        "elevenlabs": {"api_key": "", "voice_id_en": "", "voice_id_vi": "", "model": ""},
+        "suno": {"api_key": "test-suno-key", "model": "V4_5"},
+        "pexels": {"api_key": ""},
+        "kokoro": {"default_voice_en": "af_heart"},
+    }
+    with patch("console.backend.services.llm_service.api_config.get_config", return_value=_cfg), \
+         patch("console.backend.services.llm_service.httpx.get", side_effect=Exception("timeout")), \
+         patch("rag.rate_limiter.get_gemini_limiter") as mock_limiter:
+        mock_limiter.return_value.usage.return_value = {}
+        from console.backend.services.llm_service import LLMService
+        result = LLMService().get_quota()
+
+    assert "error" in result["suno"]
+
+
+def test_get_quota_suno_no_key_returns_error():
+    _cfg = {
+        "gemini": {"script": {"api_key": "", "model": ""}, "media": {"api_key": "", "model": ""}, "music": {"api_key": "", "model": ""}},
+        "elevenlabs": {"api_key": "", "voice_id_en": "", "voice_id_vi": "", "model": ""},
+        "suno": {"api_key": "", "model": "V4_5"},
+        "pexels": {"api_key": ""},
+        "kokoro": {"default_voice_en": "af_heart"},
+    }
+    with patch("console.backend.services.llm_service.api_config.get_config", return_value=_cfg), \
+         patch("rag.rate_limiter.get_gemini_limiter") as mock_limiter:
+        mock_limiter.return_value.usage.return_value = {}
+        from console.backend.services.llm_service import LLMService
+        result = LLMService().get_quota()
+
+    assert "error" in result["suno"]

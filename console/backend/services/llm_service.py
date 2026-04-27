@@ -108,16 +108,22 @@ class LLMService:
         else:
             result["elevenlabs"] = {"error": "API key not configured"}
 
-        # Suno — count from DB
-        if db is not None:
+        # Suno — real API credits
+        suno_key = cfg.get("suno", {}).get("api_key", "")
+        if suno_key:
             try:
-                from database.models import MusicTrack
-                count = db.query(MusicTrack).filter(MusicTrack.provider == "suno").count()
-                result["suno"] = {"tracks_generated": count}
+                resp = httpx.get(
+                    "https://api.sunoapi.org/api/v1/credits",
+                    headers={"Authorization": f"Bearer {suno_key}"},
+                    timeout=10,
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                result["suno"] = {"credits": data.get("credits", 0)}
             except Exception as e:
                 result["suno"] = {"error": str(e)}
         else:
-            result["suno"] = {"tracks_generated": None}
+            result["suno"] = {"error": "API key not configured"}
 
         # Pexels — lightweight ping
         pexels_key = cfg.get("pexels", {}).get("api_key", "")
