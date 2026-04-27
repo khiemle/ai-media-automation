@@ -12,13 +12,13 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from config.api_config import get_config
+
 _root = Path(__file__).parent.parent
 load_dotenv(_root / ".env", override=False)
 
 logger = logging.getLogger(__name__)
 
-GEMINI_MEDIA_KEY = os.environ.get("GEMINI_MEDIA_API_KEY", "")
-VEO_MODEL        = os.environ.get("VEO_MODEL", "veo-3.1-lite-generate-preview")
 ASSET_DB_PATH    = os.environ.get("ASSET_DB_PATH", "./assets/video_db")
 VEO_TIMEOUT      = 300  # seconds per segment
 VEO_POLL_INTERVAL = 5   # seconds between status checks
@@ -28,31 +28,27 @@ TARGET_W, TARGET_H = 1080, 1920
 
 class VeoClient:
     def __init__(self):
-        self._configured = False
-
-    def _configure(self):
-        if self._configured:
-            return
-        if not GEMINI_MEDIA_KEY:
-            raise RuntimeError("GEMINI_MEDIA_API_KEY not set in .env")
+        cfg = get_config()
+        key = cfg["gemini"]["media"]["api_key"]
+        self._model = cfg["gemini"]["media"]["model"]
+        if not key:
+            raise RuntimeError("Gemini media API key is not configured in config/api_keys.json")
         try:
             from google import genai
             from google.genai import types as genai_types
-            self._client = genai.Client(api_key=GEMINI_MEDIA_KEY)
+            self._client = genai.Client(api_key=key)
             self._genai_types = genai_types
         except ImportError:
             raise RuntimeError("google-genai not installed. Run: pip install google-genai")
-        self._configured = True
 
     def generate_segment(self, prompt: str, scene_id: str, seg_idx: int) -> Path | None:
         """Generate one 8s video segment using Veo API. Returns local file path."""
-        self._configure()
         client      = self._client
         genai_types = self._genai_types
 
         try:
             op = client.models.generate_videos(
-                model=VEO_MODEL,
+                model=self._model,
                 prompt=prompt,
                 config=genai_types.GenerateVideosConfig(
                     aspect_ratio="9:16",
