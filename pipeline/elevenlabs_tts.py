@@ -165,7 +165,7 @@ def generate_tts_elevenlabs_with_timing(
     except Exception as e:
         raise RuntimeError(f"ElevenLabs SDK error: {e}") from e
 
-    mp3_bytes = base64.b64decode(response.audio_base64)
+    mp3_bytes = base64.b64decode(response.audio_base_64)
     output_path = Path(output_path)
     _mp3_to_wav(mp3_bytes, output_path)
 

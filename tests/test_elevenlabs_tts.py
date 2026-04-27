@@ -87,7 +87,7 @@ def test_generate_tts_elevenlabs_with_timing_returns_word_list(tmp_path):
     from pipeline.elevenlabs_tts import generate_tts_elevenlabs_with_timing
     out = tmp_path / "speech.wav"
     mock_response = MagicMock()
-    mock_response.audio_base64 = base64.b64encode(b"fake mp3 content").decode()
+    mock_response.audio_base_64 = base64.b64encode(b"fake mp3 content").decode()
     mock_response.alignment.characters = list("hi")
     mock_response.alignment.character_start_times_seconds = [0.0, 0.1]
     mock_response.alignment.character_end_times_seconds   = [0.1, 0.2]
