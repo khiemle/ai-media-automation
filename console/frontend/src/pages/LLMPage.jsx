@@ -1,120 +1,286 @@
 import { useState, useEffect, useRef } from 'react'
-import { Card, Button, Select, Spinner, Toast } from '../components/index.jsx'
+import { Card, Button, Select, Spinner, Toast, ProgressBar } from '../components/index.jsx'
 import { fetchApi } from '../api/client.js'
 
-export default function LLMPage() {
-  const [status,  setStatus]  = useState(null)
-  const [quota,   setQuota]   = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [saving,  setSaving]  = useState(false)
-  const [toast,   setToast]   = useState(null)
+const GEMINI_MEDIA_MODELS = ['veo-3.1-lite-generate-preview', 'veo-2.0-flash', 'veo-2.0-flash-lite']
+const GEMINI_MUSIC_MODELS = ['lyria-3-clip-preview', 'lyria-3-pro-preview']
+const ELEVENLABS_MODELS   = ['eleven_multilingual_v2', 'eleven_turbo_v2', 'eleven_monolingual_v1']
+const SUNO_MODELS         = ['V4_5', 'V4', 'V3_5']
 
-  const toastTimer = useRef(null)
+function KeyInput({ value, onChange, placeholder = '••••••••' }) {
+  const [shown, setShown] = useState(false)
+  return (
+    <div className="flex gap-2 items-center">
+      <input
+        type={shown ? 'text' : 'password'}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="flex-1 bg-[#16161a] border border-[#2a2a32] rounded px-3 py-1.5 text-sm font-mono text-[#e8e8f0] placeholder-[#5a5a70] focus:outline-none focus:border-[#7c6af7]"
+      />
+      <button
+        type="button"
+        onClick={() => setShown(s => !s)}
+        className="text-xs text-[#9090a8] hover:text-[#e8e8f0] px-2"
+      >
+        {shown ? 'hide' : 'show'}
+      </button>
+    </div>
+  )
+}
+
+function StatusDot({ available }) {
+  return (
+    <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 inline-block ${available ? 'bg-[#34d399]' : 'bg-[#f87171]'}`} />
+  )
+}
+
+export default function LLMPage() {
+  const [formData, setFormData] = useState(null)
+  const [status,   setStatus]   = useState(null)
+  const [quota,    setQuota]    = useState(null)
+  const [loading,  setLoading]  = useState(true)
+  const [saving,   setSaving]   = useState(null)  // 'script'|'media'|'music'|'elevenlabs'|'suno'|'pexels'
+  const [toast,    setToast]    = useState(null)
+  const timerRef = useRef(null)
+
   const showToast = (msg, type = 'success') => {
-    if (toastTimer.current) clearTimeout(toastTimer.current)
+    if (timerRef.current) clearTimeout(timerRef.current)
     setToast({ msg, type })
-    toastTimer.current = setTimeout(() => setToast(null), 3000)
+    timerRef.current = setTimeout(() => setToast(null), 3000)
   }
 
-  const load = () => {
+  const load = async () => {
     setLoading(true)
-    Promise.all([
-      fetchApi('/api/llm/status'),
-      fetchApi('/api/llm/quota'),
-    ])
-      .then(([s, q]) => { setStatus(s); setQuota(q) })
-      .catch((e) => showToast(e.message || 'Failed to load LLM status', 'error'))
-      .finally(() => setLoading(false))
+    try {
+      const [cfg, st, q] = await Promise.all([
+        fetchApi('/api/llm/config/raw'),
+        fetchApi('/api/llm/status'),
+        fetchApi('/api/llm/quota'),
+      ])
+      setFormData(cfg)
+      setStatus(st)
+      setQuota(q)
+    } catch (e) {
+      showToast(e.message || 'Failed to load config', 'error')
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => { load() }, [])
-  useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current) }, [])
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current) }, [])
 
-  const handleModelChange = async (model) => {
-    setSaving(true)
-    try {
-      await fetchApi('/api/llm/model', {
-        method: 'PUT',
-        body: JSON.stringify({ provider: status?.provider ?? 'gemini', model }),
-      })
-      setStatus(s => ({ ...s, model }))
-      showToast(`Model set to ${model}`)
-    } catch (e) { showToast(e.message || 'Failed to set model', 'error') }
-    finally { setSaving(false) }
+  const patch = (path, value) => {
+    setFormData(prev => {
+      const next = JSON.parse(JSON.stringify(prev))
+      const keys = path.split('.')
+      let obj = next
+      for (let i = 0; i < keys.length - 1; i++) obj = obj[keys[i]]
+      obj[keys[keys.length - 1]] = value
+      return next
+    })
   }
 
-  if (loading) return <div className="flex items-center justify-center h-64"><Spinner /></div>
+  const saveCard = async (cardKey) => {
+    setSaving(cardKey)
+    try {
+      await fetchApi('/api/llm/config', { method: 'PUT', body: JSON.stringify(formData) })
+      showToast(`${cardKey} settings saved`)
+      const st = await fetchApi('/api/llm/status')
+      setStatus(st)
+    } catch (e) {
+      showToast(e.message || 'Save failed', 'error')
+    } finally {
+      setSaving(null)
+    }
+  }
 
-  const gemini = status?.gemini || {}
-  const models = gemini.models || []
-  const currentModel = status?.model || ''
-  const geminiQuota = quota?.gemini || {}
+  if (loading || !formData) return (
+    <div className="flex items-center justify-center h-64"><Spinner /></div>
+  )
+
+  const g  = formData.gemini || {}
+  const el = formData.elevenlabs || {}
+  const su = formData.suno || {}
+  const px = formData.pexels || {}
+  const st = status || {}
+  const q  = quota  || {}
 
   return (
     <div className="space-y-5 max-w-2xl">
-      {/* Card 1 — Active Model */}
-      <Card title="Active Model" actions={saving && <Spinner size={16} />}>
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center gap-3">
-            <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${gemini.available ? 'bg-[#34d399]' : 'bg-[#f87171]'}`} />
-            <span className="font-semibold text-[#e8e8f0]">Google Gemini</span>
-            <span className={`text-xs font-mono ml-auto ${gemini.available ? 'text-[#34d399]' : 'text-[#f87171]'}`}>
-              {gemini.available ? 'Online' : 'Offline'}
-            </span>
-          </div>
 
-          <div className="flex items-center gap-3 text-sm">
-            <span className="text-[#9090a8]">API Key</span>
-            {gemini.api_key_set
-              ? <span className="text-[#34d399] font-mono">Set ✓</span>
-              : <span className="text-[#f87171] font-mono">Not set ✗</span>}
-          </div>
-
-          {gemini.error && (
-            <div className="text-xs text-[#f87171] font-mono bg-[#1e0a0a] px-3 py-2 rounded border border-[#3a1010]">
-              {gemini.error}
-            </div>
-          )}
-
+      {/* Gemini — Script */}
+      <Card title={
+        <span className="flex items-center gap-2">
+          <StatusDot available={st.gemini?.script?.available} />
+          Gemini — Script
+        </span>
+      } actions={saving === 'script' && <Spinner size={16} />}>
+        <div className="space-y-3">
+          <label className="text-xs text-[#9090a8]">API Key</label>
+          <KeyInput value={g.script?.api_key || ''} onChange={v => patch('gemini.script.api_key', v)} />
           <Select
             label="Model"
-            value={currentModel}
-            onChange={e => handleModelChange(e.target.value)}
-            options={models.length > 0
-              ? models.map(m => ({ value: m, label: m }))
-              : [{ value: currentModel, label: currentModel || 'Loading…' }]}
+            value={g.script?.model || ''}
+            onChange={e => patch('gemini.script.model', e.target.value)}
+            options={(st.gemini?.script?.models?.length
+              ? st.gemini.script.models
+              : ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro']
+            ).map(m => ({ value: m, label: m }))}
           />
-          <p className="text-[10px] font-mono text-[#5a5a70]">Current: {currentModel || '—'}</p>
+          {q.gemini_script && !q.gemini_script.error && (
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="bg-[#16161a] rounded-lg p-3 border border-[#2a2a32]">
+                <div className="text-[#9090a8] text-xs mb-1">Requests / Min</div>
+                <div className="font-mono text-[#e8e8f0]">{q.gemini_script.rpm ?? '—'} <span className="text-[#5a5a70] text-xs">/ {q.gemini_script.rpm_limit ?? '—'}</span></div>
+              </div>
+              <div className="bg-[#16161a] rounded-lg p-3 border border-[#2a2a32]">
+                <div className="text-[#9090a8] text-xs mb-1">Requests / Day</div>
+                <div className="font-mono text-[#e8e8f0]">{q.gemini_script.rpd ?? '—'} <span className="text-[#5a5a70] text-xs">/ {q.gemini_script.rpd_limit ?? '—'}</span></div>
+              </div>
+            </div>
+          )}
+          <Button size="sm" onClick={() => saveCard('script')}>Save</Button>
         </div>
       </Card>
 
-      {/* Card 2 — Usage / Quota */}
-      <Card title="Usage / Quota" actions={
-        <Button variant="ghost" size="sm" onClick={load}>Refresh</Button>
-      }>
-        {geminiQuota.error ? (
-          <p className="text-xs text-[#f87171] font-mono">{geminiQuota.error}</p>
-        ) : (
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div className="bg-[#16161a] rounded-lg p-3 border border-[#2a2a32]">
-              <div className="text-[#9090a8] text-xs mb-1">Requests / Minute</div>
-              <div className="font-mono text-[#e8e8f0] text-lg">{geminiQuota.rpm ?? '—'}</div>
-              <div className="text-[#5a5a70] text-xs">of {geminiQuota.rpm_limit ?? '—'} limit</div>
-            </div>
-            <div className="bg-[#16161a] rounded-lg p-3 border border-[#2a2a32]">
-              <div className="text-[#9090a8] text-xs mb-1">Requests / Day</div>
-              <div className="font-mono text-[#e8e8f0] text-lg">{geminiQuota.rpd ?? '—'}</div>
-              <div className="text-[#5a5a70] text-xs">of {geminiQuota.rpd_limit ?? '—'} limit</div>
-            </div>
-          </div>
-        )}
+      {/* Gemini — Media (Veo) */}
+      <Card title={
+        <span className="flex items-center gap-2">
+          <StatusDot available={st.gemini?.media?.available} />
+          Gemini — Media (Veo)
+        </span>
+      } actions={saving === 'media' && <Spinner size={16} />}>
+        <div className="space-y-3">
+          <label className="text-xs text-[#9090a8]">API Key</label>
+          <KeyInput value={g.media?.api_key || ''} onChange={v => patch('gemini.media.api_key', v)} />
+          <Select
+            label="Model"
+            value={g.media?.model || ''}
+            onChange={e => patch('gemini.media.model', e.target.value)}
+            options={GEMINI_MEDIA_MODELS.map(m => ({ value: m, label: m }))}
+          />
+          <p className="text-[10px] text-[#5a5a70] font-mono">Quota managed by Google AI Studio</p>
+          <Button size="sm" onClick={() => saveCard('media')}>Save</Button>
+        </div>
       </Card>
 
-      {/* Card 3 — Future Providers */}
-      <Card title="Additional Providers">
-        <p className="text-xs text-[#5a5a70]">
-          Additional providers (Ollama, OpenAI, etc.) can be configured in <span className="font-mono">pipeline.env</span> and registered in <span className="font-mono">llm_service.py</span>.
-        </p>
+      {/* Gemini — Music (Lyria) */}
+      <Card title={
+        <span className="flex items-center gap-2">
+          <StatusDot available={st.gemini?.music?.available} />
+          Gemini — Music (Lyria)
+        </span>
+      } actions={saving === 'music' && <Spinner size={16} />}>
+        <div className="space-y-3">
+          <label className="text-xs text-[#9090a8]">API Key</label>
+          <KeyInput value={g.music?.api_key || ''} onChange={v => patch('gemini.music.api_key', v)} />
+          <Select
+            label="Model"
+            value={g.music?.model || ''}
+            onChange={e => patch('gemini.music.model', e.target.value)}
+            options={GEMINI_MUSIC_MODELS.map(m => ({ value: m, label: m }))}
+          />
+          <p className="text-[10px] text-[#5a5a70] font-mono">Quota managed by Google AI Studio</p>
+          <Button size="sm" onClick={() => saveCard('music')}>Save</Button>
+        </div>
+      </Card>
+
+      {/* ElevenLabs */}
+      <Card title={
+        <span className="flex items-center gap-2">
+          <StatusDot available={st.elevenlabs?.available} />
+          ElevenLabs
+        </span>
+      } actions={saving === 'elevenlabs' && <Spinner size={16} />}>
+        <div className="space-y-3">
+          <label className="text-xs text-[#9090a8]">API Key</label>
+          <KeyInput value={el.api_key || ''} onChange={v => patch('elevenlabs.api_key', v)} />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-[#9090a8] block mb-1">Voice ID (EN)</label>
+              <input
+                type="text"
+                value={el.voice_id_en || ''}
+                onChange={e => patch('elevenlabs.voice_id_en', e.target.value)}
+                placeholder="voice ID"
+                className="w-full bg-[#16161a] border border-[#2a2a32] rounded px-3 py-1.5 text-sm font-mono text-[#e8e8f0] placeholder-[#5a5a70] focus:outline-none focus:border-[#7c6af7]"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-[#9090a8] block mb-1">Voice ID (VI)</label>
+              <input
+                type="text"
+                value={el.voice_id_vi || ''}
+                onChange={e => patch('elevenlabs.voice_id_vi', e.target.value)}
+                placeholder="voice ID"
+                className="w-full bg-[#16161a] border border-[#2a2a32] rounded px-3 py-1.5 text-sm font-mono text-[#e8e8f0] placeholder-[#5a5a70] focus:outline-none focus:border-[#7c6af7]"
+              />
+            </div>
+          </div>
+          <Select
+            label="Model"
+            value={el.model || ''}
+            onChange={e => patch('elevenlabs.model', e.target.value)}
+            options={ELEVENLABS_MODELS.map(m => ({ value: m, label: m }))}
+          />
+          {q.elevenlabs && !q.elevenlabs.error && (
+            <div>
+              <div className="flex justify-between text-xs text-[#9090a8] mb-1">
+                <span>Characters this month</span>
+                <span className="font-mono">{q.elevenlabs.characters_used?.toLocaleString()} / {q.elevenlabs.characters_limit?.toLocaleString()}</span>
+              </div>
+              <ProgressBar value={q.elevenlabs.characters_used} max={q.elevenlabs.characters_limit} />
+            </div>
+          )}
+          {q.elevenlabs?.error && <p className="text-xs text-[#f87171] font-mono">{q.elevenlabs.error}</p>}
+          <Button size="sm" onClick={() => saveCard('elevenlabs')}>Save</Button>
+        </div>
+      </Card>
+
+      {/* Suno */}
+      <Card title={
+        <span className="flex items-center gap-2">
+          <StatusDot available={st.suno?.available} />
+          Suno
+        </span>
+      } actions={saving === 'suno' && <Spinner size={16} />}>
+        <div className="space-y-3">
+          <label className="text-xs text-[#9090a8]">API Key</label>
+          <KeyInput value={su.api_key || ''} onChange={v => patch('suno.api_key', v)} />
+          <Select
+            label="Model"
+            value={su.model || ''}
+            onChange={e => patch('suno.model', e.target.value)}
+            options={SUNO_MODELS.map(m => ({ value: m, label: m }))}
+          />
+          {q.suno?.tracks_generated != null && (
+            <p className="text-xs text-[#9090a8] font-mono">{q.suno.tracks_generated} tracks generated</p>
+          )}
+          {q.suno?.error && <p className="text-xs text-[#f87171] font-mono">{q.suno.error}</p>}
+          <Button size="sm" onClick={() => saveCard('suno')}>Save</Button>
+        </div>
+      </Card>
+
+      {/* Pexels */}
+      <Card title={
+        <span className="flex items-center gap-2">
+          <StatusDot available={st.pexels?.available} />
+          Pexels
+        </span>
+      } actions={saving === 'pexels' && <Spinner size={16} />}>
+        <div className="space-y-3">
+          <label className="text-xs text-[#9090a8]">API Key</label>
+          <KeyInput value={px.api_key || ''} onChange={v => patch('pexels.api_key', v)} />
+          {q.pexels?.status === 'ok'
+            ? <p className="text-xs text-[#34d399] font-mono">Connected ✓</p>
+            : q.pexels?.status
+              ? <p className="text-xs text-[#f87171] font-mono">{q.pexels.status}</p>
+              : null
+          }
+          <Button size="sm" onClick={() => saveCard('pexels')}>Save</Button>
+        </div>
       </Card>
 
       {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
