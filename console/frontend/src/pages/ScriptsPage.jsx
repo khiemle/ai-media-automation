@@ -16,6 +16,14 @@ const STATUS_TABS = [
 const MOODS     = ['uplifting', 'calm_focus', 'energetic', 'dramatic', 'neutral']
 const SCENE_TYPES = ['hook', 'body', 'transition', 'cta']
 const OVERLAY_STYLES = ['bold_center', 'subtitle_bottom', 'corner_tag', 'full_overlay', 'minimal']
+const SUBTITLE_STYLE_OPTIONS = [
+  { value: '',              label: 'None' },
+  { value: 'tiktok_yellow', label: 'TikTok Yellow' },
+  { value: 'tiktok_white',  label: 'TikTok White' },
+  { value: 'bold_orange',   label: 'Bold Orange' },
+  { value: 'caption_dark',  label: 'Caption Dark' },
+  { value: 'minimal',       label: 'Minimal' },
+]
 
 // ── Scene Editor Row ──────────────────────────────────────────────────────────
 function SceneRow({ scene, index, total, onChange, onMove, onDelete, onRegen, regenLoading }) {
@@ -332,6 +340,12 @@ function ScriptEditorModal({ scriptId, onClose, onSaved }) {
             </div>
             <Select label="Mood"    value={video.music_mood || ''} onChange={e => setScriptField('video', 'music_mood', e.target.value)} placeholder="Default" options={MOODS.map(m => ({ value: m, label: m }))} />
             <Input label="Voice Speed" type="number" value={video.voice_speed ?? 1} onChange={e => setScriptField('video', 'voice_speed', parseFloat(e.target.value))} />
+            <Select
+              label="Subtitle Style"
+              value={video.subtitle_style || ''}
+              onChange={e => setScriptField('video', 'subtitle_style', e.target.value || null)}
+              options={SUBTITLE_STYLE_OPTIONS}
+            />
           </div>
         </div>
 
