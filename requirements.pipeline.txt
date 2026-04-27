@@ -19,6 +19,7 @@ onnxruntime>=1.18.0                 # ONNX runtime (CPU)
 soundfile>=0.12.1                   # WAV file read/write
 scipy>=1.13.0                       # Audio resampling (44.1kHz)
 numpy>=2.0.2                        # Required by kokoro-onnx 0.4.0
+elevenlabs>=2.44.0                  # ElevenLabs TTS SDK
 
 # ── Captions ───────────────────────────────────────────────
 faster-whisper>=1.2.0               # Whisper base → SRT subtitles
