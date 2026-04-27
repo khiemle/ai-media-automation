@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useLocation, Routes, Route, Navigate, NavLink } from 'react-router-dom'
 import { setToken, clearToken, loadPersistedToken, authApi } from './api/client.js'
 import LoginPage from './pages/LoginPage.jsx'
 import ScraperPage from './pages/ScraperPage.jsx'
@@ -72,21 +73,21 @@ const Icons = {
   ),
 }
 
+// system is first — it's the default landing tab
 const ALL_TABS = [
-  { id: 'niches',     label: 'Niches',     Icon: Icons.Niches,     roles: ['admin', 'editor'] },
-  { id: 'music',      label: 'Music',      Icon: Icons.Music,      roles: ['admin', 'editor'] },
-  { id: 'composer',   label: 'Composer',   Icon: Icons.Composer,   roles: ['admin', 'editor'] },
-  { id: 'scraper',    label: 'Scraper',    Icon: Icons.Scraper,    roles: ['admin', 'editor'] },
-  { id: 'scripts',    label: 'Scripts',    Icon: Icons.Scripts,    roles: ['admin', 'editor'] },
-  { id: 'production', label: 'Production', Icon: Icons.Production, roles: ['admin', 'editor'] },
-  { id: 'uploads',    label: 'Uploads',    Icon: Icons.Uploads,    roles: ['admin', 'editor'] },
-  { id: 'pipeline',   label: 'Pipeline',   Icon: Icons.Pipeline,   roles: ['admin', 'editor'] },
-  { id: 'llm',        label: 'LLM',        Icon: Icons.LLM,        roles: ['admin'] },
-  { id: 'performance',label: 'Performance',Icon: Icons.Performance,roles: ['admin', 'editor'] },
-  { id: 'system',     label: 'System',     Icon: Icons.System,     roles: ['admin'] },
+  { id: 'system',      label: 'System',      Icon: Icons.System,      roles: ['admin'] },
+  { id: 'niches',      label: 'Niches',      Icon: Icons.Niches,      roles: ['admin', 'editor'] },
+  { id: 'music',       label: 'Music',       Icon: Icons.Music,       roles: ['admin', 'editor'] },
+  { id: 'composer',    label: 'Composer',    Icon: Icons.Composer,    roles: ['admin', 'editor'] },
+  { id: 'scraper',     label: 'Scraper',     Icon: Icons.Scraper,     roles: ['admin', 'editor'] },
+  { id: 'scripts',     label: 'Scripts',     Icon: Icons.Scripts,     roles: ['admin', 'editor'] },
+  { id: 'production',  label: 'Production',  Icon: Icons.Production,  roles: ['admin', 'editor'] },
+  { id: 'uploads',     label: 'Uploads',     Icon: Icons.Uploads,     roles: ['admin', 'editor'] },
+  { id: 'pipeline',    label: 'Pipeline',    Icon: Icons.Pipeline,    roles: ['admin', 'editor'] },
+  { id: 'llm',         label: 'LLM',         Icon: Icons.LLM,         roles: ['admin'] },
+  { id: 'performance', label: 'Performance', Icon: Icons.Performance, roles: ['admin', 'editor'] },
 ]
 
-// ── Placeholder page ──────────────────────────────────────────────────────────
 function ComingSoon({ name }) {
   return (
     <div className="flex flex-col items-center justify-center h-full gap-4 text-center py-20">
@@ -100,21 +101,22 @@ function ComingSoon({ name }) {
   )
 }
 
-// ── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
-  const [user, setUser]         = useState(null)
-  const [activeTab, setTab]     = useState('niches')
+  const [user, setUser] = useState(null)
+  const location = useLocation()
 
-  // ── Restore session on mount ───────────────────────────────────────────────
   useEffect(() => {
     const token = loadPersistedToken()
     if (!token) return
     authApi.me()
-      .then(userData => setUser(userData))
+      .then(userData => {
+        const allowed = ALL_TABS.filter(t => t.roles.includes(userData.role))
+        if (allowed.length === 0) { clearToken(); return }
+        setUser(userData)
+      })
       .catch(() => clearToken())
   }, [])
 
-  // ── Auth handlers ──────────────────────────────────────────────────────────
   const handleLogin = (token, userData) => {
     setToken(token)
     setUser(userData)
@@ -125,27 +127,28 @@ export default function App() {
     setUser(null)
   }
 
-
   if (!user) return <LoginPage onLogin={handleLogin} />
 
-  // ── Visible tabs based on role ─────────────────────────────────────────────
   const tabs = ALL_TABS.filter(t => t.roles.includes(user.role))
+  const currentTab = location.pathname.replace(/^\//, '').split('/')[0]
+  const activeTabId = tabs.some(t => t.id === currentTab) ? currentTab : null
 
-  // ── Render current page ────────────────────────────────────────────────────
-  const renderPage = () => {
-    switch (activeTab) {
-      case 'niches':   return <NichesPage />
-      case 'music':    return <MusicPage />
-      case 'composer': return <ComposerPage />
-      case 'scraper':    return <ScraperPage />
-      case 'scripts':    return <ScriptsPage />
-      case 'production': return <ProductionPage />
-      case 'pipeline':   return <PipelinePage />
-      case 'uploads':     return <UploadsPage />
-      case 'performance': return <PerformancePage />
+  const renderPage = (tabId) => {
+    switch (tabId) {
       case 'system':      return <SystemPage />
+      case 'niches':      return <NichesPage />
+      case 'music':       return <MusicPage />
+      case 'composer':    return <ComposerPage />
+      case 'scraper':     return <ScraperPage />
+      case 'scripts':     return <ScriptsPage />
+      case 'production':  return <ProductionPage />
+      case 'uploads':     return <UploadsPage />
+      case 'pipeline':    return <PipelinePage />
       case 'llm':         return <LLMPage />
-      default:            return <ComingSoon name={ALL_TABS.find(t => t.id === activeTab)?.label ?? activeTab} />
+      case 'performance': return <PerformancePage />
+      default:
+        console.error(`[App] No render case for tab: ${tabId}`)
+        return <ComingSoon name={ALL_TABS.find(t => t.id === tabId)?.label ?? tabId} />
     }
   }
 
@@ -171,18 +174,20 @@ export default function App() {
         {/* Nav items */}
         <nav className="flex-1 py-2 overflow-y-auto">
           {tabs.map(({ id, label, Icon }) => (
-            <button
+            <NavLink
               key={id}
-              onClick={() => setTab(id)}
-              className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium transition-colors text-left ${
-                activeTab === id
-                  ? 'bg-[#222228] text-[#7c6af7] border-r-2 border-[#7c6af7]'
-                  : 'text-[#9090a8] hover:bg-[#1c1c22] hover:text-[#e8e8f0]'
-              }`}
+              to={'/' + id}
+              className={({ isActive }) =>
+                `w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium transition-colors text-left ${
+                  isActive
+                    ? 'bg-[#222228] text-[#7c6af7] border-r-2 border-[#7c6af7]'
+                    : 'text-[#9090a8] hover:bg-[#1c1c22] hover:text-[#e8e8f0]'
+                }`
+              }
             >
               <Icon />
               {label}
-            </button>
+            </NavLink>
           ))}
         </nav>
 
@@ -206,7 +211,17 @@ export default function App() {
       {/* ── Main content ── */}
       <main className="flex-1 overflow-y-auto bg-[#0d0d0f]">
         <div className="max-w-7xl mx-auto p-6">
-          {renderPage()}
+          <Routes>
+            <Route path="/" element={<Navigate to="/system" replace />} />
+            <Route
+              path="/:tab"
+              element={
+                activeTabId
+                  ? renderPage(activeTabId)
+                  : <Navigate to={'/' + tabs[0].id} replace />
+              }
+            />
+          </Routes>
         </div>
       </main>
     </div>
