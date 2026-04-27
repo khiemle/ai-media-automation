@@ -18,6 +18,7 @@ const SCENE_TYPES = ['hook', 'body', 'transition', 'cta']
 const OVERLAY_STYLES = ['bold_center', 'subtitle_bottom', 'corner_tag', 'full_overlay', 'minimal']
 const SUBTITLE_STYLE_OPTIONS = [
   { value: '',              label: 'None' },
+  { value: 'bold_center',   label: 'Bold Center' },
   { value: 'tiktok_yellow', label: 'TikTok Yellow' },
   { value: 'tiktok_white',  label: 'TikTok White' },
   { value: 'bold_orange',   label: 'Bold Orange' },
@@ -342,7 +343,7 @@ function ScriptEditorModal({ scriptId, onClose, onSaved }) {
             <Input label="Voice Speed" type="number" value={video.voice_speed ?? 1} onChange={e => setScriptField('video', 'voice_speed', parseFloat(e.target.value))} />
             <Select
               label="Subtitle Style"
-              value={video.subtitle_style || ''}
+              value={video.subtitle_style ?? 'bold_center'}
               onChange={e => setScriptField('video', 'subtitle_style', e.target.value || null)}
               options={SUBTITLE_STYLE_OPTIONS}
             />

@@ -7,6 +7,15 @@ _VIDEO_W = 1080  # portrait 9:16 (TikTok / Reels)
 _VIDEO_H = 1920
 
 SUBTITLE_STYLES: dict[str, dict] = {
+    "bold_center": {
+        "font": "Arial Black", "font_size": 90,
+        "primary_color": "&H00FFFFFF",
+        "outline_color": "&H00000000",
+        "outline_width": 5, "shadow": 0,
+        "bold": True, "uppercase": True,
+        "alignment": 2, "margin_v": 300,
+        "words_per_entry": 1,
+    },
     "tiktok_yellow": {
         "font": "Arial Black", "font_size": 90,
         "primary_color": "&H0000FFFF",
@@ -84,7 +93,7 @@ def build_ass(
         output_path.write_text("")
         return output_path
 
-    style = SUBTITLE_STYLES.get(style_name, SUBTITLE_STYLES["tiktok_yellow"])
+    style = SUBTITLE_STYLES.get(style_name, SUBTITLE_STYLES["bold_center"])
     bold_int = 1 if style["bold"] else 0
 
     lines = [

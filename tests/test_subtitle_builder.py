@@ -59,12 +59,12 @@ def test_build_ass_groups_words_per_entry(tmp_path):
     assert len(dialogues) == 2  # 6 words / 4 per entry = 2 dialogue lines
 
 
-def test_build_ass_falls_back_to_tiktok_yellow_for_unknown_style(tmp_path):
+def test_build_ass_falls_back_to_bold_center_for_unknown_style(tmp_path):
     from pipeline.subtitle_builder import build_ass
     out = tmp_path / "subs.ass"
     build_ass([(0.0, [{"word": "hi", "start": 0.0, "end": 1.0}])], out, "nonexistent_style")
     content = out.read_text()
-    assert "HI" in content  # tiktok_yellow is uppercase
+    assert "HI" in content  # bold_center is uppercase
 
 
 def test_build_ass_empty_timings_writes_empty_file(tmp_path):
