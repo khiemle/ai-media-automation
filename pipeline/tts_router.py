@@ -17,6 +17,30 @@ logger = logging.getLogger(__name__)
 TTS_ENGINE = os.environ.get("TTS_ENGINE", "auto")
 
 
+def _use_elevenlabs(tts_service: str, language: str) -> bool:
+    """Return True if the ElevenLabs engine should handle this request."""
+    if tts_service == "elevenlabs":
+        return True
+    if tts_service == "kokoro":
+        return False
+    return TTS_ENGINE == "elevenlabs" or (TTS_ENGINE == "auto" and language == "vietnamese")
+
+
+def _resolve_elevenlabs_voice(cfg: dict, voice_id: str, tts_service: str, language: str) -> str:
+    """Pick the correct ElevenLabs voice ID from script config or api_keys config."""
+    if tts_service == "elevenlabs":
+        voice = voice_id or cfg["elevenlabs"].get("voice_id_vi") or cfg["elevenlabs"].get("voice_id_en")
+    elif language == "vietnamese":
+        voice = cfg["elevenlabs"].get("voice_id_vi") or cfg["elevenlabs"].get("voice_id_en")
+    else:
+        voice = cfg["elevenlabs"].get("voice_id_en") or cfg["elevenlabs"].get("voice_id_vi")
+    if not voice:
+        raise RuntimeError(
+            "No ElevenLabs voice ID configured. Set voice_id_en / voice_id_vi in config/api_keys.json"
+        )
+    return voice
+
+
 def generate_tts(
     text:        str,
     voice_id:    str,
@@ -77,3 +101,31 @@ def generate_tts(
 def _kokoro_generate(text: str, voice_id: str, speed: float, output_path: str) -> Path:
     from pipeline.tts_engine import generate_tts as kokoro_tts
     return kokoro_tts(text=text, voice=voice_id, speed=speed, output_path=output_path)
+
+
+def generate_tts_with_timing(
+    text:        str,
+    voice_id:    str,
+    speed:       float,
+    language:    str,
+    output_path: str,
+    tts_service: str = "",
+) -> tuple[Path, list[dict]]:
+    """
+    Generate TTS audio and return (audio_path, word_timing).
+    word_timing is [{"word": str, "start": float, "end": float}, ...].
+    Kokoro path uses faster-whisper post-hoc; ElevenLabs uses convert_with_timestamps().
+    """
+    if tts_service == "kokoro" or not _use_elevenlabs(tts_service, language):
+        audio = _kokoro_generate(text, voice_id, speed, output_path)
+        lang_code = "vi" if language == "vietnamese" else "en"
+        from pipeline.caption_gen import extract_word_timing
+        return audio, extract_word_timing(audio, lang_code)
+
+    cfg = get_config()
+    if not cfg["elevenlabs"]["api_key"]:
+        raise RuntimeError("ElevenLabs API key is not configured in config/api_keys.json")
+    voice = _resolve_elevenlabs_voice(cfg, voice_id, tts_service, language)
+    from pipeline.elevenlabs_tts import generate_tts_elevenlabs_with_timing
+    return generate_tts_elevenlabs_with_timing(text, voice, speed, output_path)
+
