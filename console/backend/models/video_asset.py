@@ -14,6 +14,7 @@ class VideoAsset(Base):
     file_path: Mapped[str] = mapped_column(Text, nullable=False)
     thumbnail_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     source: Mapped[str | None] = mapped_column(String, nullable=True)  # 'pexels'|'veo'|'manual'|'stock'
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
     keywords: Mapped[list[str] | None] = mapped_column(ARRAY(String), nullable=True)
     niche: Mapped[list[str] | None] = mapped_column(ARRAY(String), nullable=True)
     duration_s: Mapped[float | None] = mapped_column(Float, nullable=True)
