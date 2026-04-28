@@ -1,5 +1,8 @@
 """Production router — asset browsing, scene editing, TTS/Veo/render."""
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -14,6 +17,13 @@ router = APIRouter(prefix="/production", tags=["production"])
 
 class ReplaceAssetBody(BaseModel):
     asset_id: int
+
+
+class UpdateAssetBody(BaseModel):
+    description: str | None = None
+    keywords: list[str] | None = None
+    niche: list[str] | None = None
+    quality_score: float | None = None
 
 
 # ── Assets ────────────────────────────────────────────────────────────────────
@@ -50,6 +60,54 @@ def get_asset(
 ):
     try:
         return ProductionService(db).get_asset(asset_id)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get("/assets/{asset_id}/stream")
+def stream_asset(
+    asset_id: int,
+    db: Session = Depends(get_db),
+    _user=Depends(require_editor_or_admin),
+):
+    try:
+        path = ProductionService(db).stream_asset_path(asset_id)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    if not Path(path).is_file():
+        raise HTTPException(status_code=404, detail="File not found on disk")
+    return FileResponse(str(path), media_type="video/mp4")
+
+
+@router.put("/assets/{asset_id}")
+def update_asset(
+    asset_id: int,
+    body: UpdateAssetBody,
+    db: Session = Depends(get_db),
+    _user=Depends(require_editor_or_admin),
+):
+    try:
+        return ProductionService(db).update_asset(
+            asset_id,
+            description=body.description,
+            keywords=body.keywords,
+            niche=body.niche,
+            quality_score=body.quality_score,
+        )
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.delete("/assets/{asset_id}", status_code=204)
+def delete_asset(
+    asset_id: int,
+    db: Session = Depends(get_db),
+    _user=Depends(require_editor_or_admin),
+):
+    try:
+        ProductionService(db).delete_asset(asset_id)
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
