@@ -72,6 +72,7 @@ class ProductionService:
             "file_path": asset.file_path,
             "thumbnail_url": asset.thumbnail_path,
             "source": asset.source,
+            "description": asset.description,
             "keywords": asset.keywords or [],
             "niche": asset.niche or [],
             "duration_s": asset.duration_s,
@@ -80,6 +81,44 @@ class ProductionService:
             "usage_count": asset.usage_count,
             "created_at": asset.created_at.isoformat() if asset.created_at else None,
         }
+
+    def update_asset(
+        self,
+        asset_id: int,
+        description: str | None = None,
+        keywords: list[str] | None = None,
+        niche: list[str] | None = None,
+        quality_score: float | None = None,
+    ) -> dict:
+        asset = self.db.query(VideoAsset).filter(VideoAsset.id == asset_id).first()
+        if not asset:
+            raise KeyError(f"Asset {asset_id} not found")
+        if description is not None:
+            asset.description = description
+        if keywords is not None:
+            asset.keywords = keywords
+        if niche is not None:
+            asset.niche = niche
+        if quality_score is not None:
+            asset.quality_score = quality_score
+        self.db.commit()
+        self.db.refresh(asset)
+        return self._asset_to_dict(asset)
+
+    def delete_asset(self, asset_id: int) -> None:
+        asset = self.db.query(VideoAsset).filter(VideoAsset.id == asset_id).first()
+        if not asset:
+            raise KeyError(f"Asset {asset_id} not found")
+        self.db.delete(asset)
+        self.db.commit()
+
+    def stream_asset_path(self, asset_id: int) -> str:
+        asset = self.db.query(VideoAsset).filter(VideoAsset.id == asset_id).first()
+        if not asset:
+            raise KeyError(f"Asset {asset_id} not found")
+        if not asset.file_path:
+            raise ValueError(f"Asset {asset_id} has no file path")
+        return asset.file_path
 
     # ── Scene editing ─────────────────────────────────────────────────────────
 
