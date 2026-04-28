@@ -132,3 +132,18 @@ export const musicApi = {
   pollTask: (taskId) => fetchApi(`/api/music/tasks/${taskId}`),
   streamUrl: (id) => `/api/music/${id}/stream`,
 }
+
+// ── Video Assets ───────────────────────────────────────────────────────────────
+export const assetsApi = {
+  list: (params = {}) => {
+    const q = new URLSearchParams(
+      Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== ''))
+    )
+    return fetchApi(`/api/production/assets?${q}`)
+  },
+  update: (id, body) =>
+    fetchApi(`/api/production/assets/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  delete: (id) =>
+    fetchApi(`/api/production/assets/${id}`, { method: 'DELETE' }),
+  streamUrl: (id) => `/api/production/assets/${id}/stream`,
+}
