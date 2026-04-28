@@ -1,5 +1,7 @@
 """Uploads router — production video list, target management, upload dispatch."""
+from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -67,3 +69,18 @@ def upload_all_ready(
 ):
     count = UploadService(db).upload_all_ready()
     return {"queued": count}
+
+
+@router.get("/videos/{video_id}/stream")
+def stream_video(
+    video_id: str,
+    db: Session = Depends(get_db),
+    _user=Depends(require_editor_or_admin),
+):
+    try:
+        path = UploadService(db).stream_video_path(video_id)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return FileResponse(str(path), media_type="video/mp4")

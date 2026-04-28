@@ -1,6 +1,7 @@
 """UploadService — list production videos, manage targets, dispatch upload tasks."""
 import math
 import logging
+import os
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -48,7 +49,7 @@ class UploadService:
         """
         data_sql = f"""
             SELECT
-                gs.id, gs.status, gs.script_json,
+                gs.id, gs.status, gs.script_json, gs.output_path,
                 COALESCE(
                     json_agg(
                         json_build_object(
@@ -85,13 +86,15 @@ class UploadService:
             sj = row.script_json if isinstance(row.script_json, dict) else {}
             video = sj.get("video", {})
             meta  = sj.get("meta", {})
+            has_video = bool(row.output_path and os.path.isfile(row.output_path))
             items.append({
-                "id":       row.id,
-                "title":    video.get("title") or meta.get("topic") or f"Script #{row.id}",
-                "template": meta.get("template"),
-                "niche":    meta.get("niche"),
-                "status":   row.status,
-                "targets":  row.targets if isinstance(row.targets, list) else [],
+                "id":        row.id,
+                "title":     video.get("title") or meta.get("topic") or f"Script #{row.id}",
+                "template":  meta.get("template"),
+                "niche":     meta.get("niche"),
+                "status":    row.status,
+                "targets":   row.targets if isinstance(row.targets, list) else [],
+                "has_video": has_video,
             })
 
         return PaginatedResponse(
@@ -224,3 +227,14 @@ class UploadService:
             task_ids = self.trigger_upload(video_id)
             count += len(task_ids)
         return count
+
+    def stream_video_path(self, video_id: str) -> str:
+        row = self.db.execute(
+            text("SELECT output_path FROM generated_scripts WHERE id = :id"),
+            {"id": video_id},
+        ).fetchone()
+        if not row:
+            raise KeyError(f"Video {video_id} not found")
+        if not row.output_path or not os.path.isfile(row.output_path):
+            raise ValueError(f"Video {video_id} has no rendered file on disk")
+        return row.output_path
