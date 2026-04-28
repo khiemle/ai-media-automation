@@ -112,7 +112,7 @@ def render_video_task(self, script_id: int):
         # Step 1: Compose
         from pipeline.composer import compose_video
         self.update_state(state="PROGRESS", meta={"step": "composing"})
-        raw_path = compose_video(script_id)
+        raw_path, subtitles_burned = compose_video(script_id)
         emit_log(job.id, "INFO", f"Compose done → {raw_path}")
         mark_job_progress(
             db,
@@ -123,10 +123,13 @@ def render_video_task(self, script_id: int):
             details={"step": "composing", "raw_path": str(raw_path)},
         )
 
-        # Step 2: Captions — skip when subtitle_style is set (composer burned them in via MoviePy)
+        # Step 2: Captions
+        # Skip if composer already burned subtitles into raw_video.
+        # Run Whisper SRT if: (a) no subtitle_style set, or (b) subtitle_style set but
+        # word timing was unavailable (e.g. ElevenLabs returned no alignment).
         subtitle_style = (script.script_json or {}).get("video", {}).get("subtitle_style")
         srt_path = None
-        if not subtitle_style:
+        if not subtitles_burned:
             from pipeline.caption_gen import generate_captions
             self.update_state(state="PROGRESS", meta={"step": "captions"})
             srt_path = generate_captions(raw_path)
@@ -140,7 +143,7 @@ def render_video_task(self, script_id: int):
                 details={"step": "captions", "raw_path": str(raw_path), "srt_path": str(srt_path)},
             )
         else:
-            emit_log(job.id, "INFO", f"Subtitle style '{subtitle_style}' set — subtitles burned in by composer")
+            emit_log(job.id, "INFO", f"Subtitle style '{subtitle_style}' burned in by composer — skipping Whisper")
             mark_job_progress(
                 db,
                 task_id=task_id,

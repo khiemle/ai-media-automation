@@ -18,7 +18,7 @@ TARGET_W, TARGET_H = 1080, 1920
 TARGET_FPS     = 30
 
 
-def compose_video(script_id: int) -> Path:
+def compose_video(script_id: int) -> tuple[Path, bool]:
     """
     Full composition pipeline for a script:
     1. Load script from DB
@@ -26,7 +26,8 @@ def compose_video(script_id: int) -> Path:
     3. MoviePy: composite scenes → concatenate → mix music
     4. Write raw_video.mp4
 
-    Returns path to raw_video.mp4
+    Returns (path_to_raw_video, subtitles_burned) where subtitles_burned is True
+    when word-timing subtitles were successfully composited into the raw video.
     """
     from database.connection import get_session
     from database.models import GeneratedScript
@@ -67,7 +68,7 @@ def compose_video(script_id: int) -> Path:
 
     # ── Phase 2: MoviePy assembly ─────────────────────────────────────────────
     raw_video_path = out_dir / "raw_video.mp4"
-    _assemble(scenes, scene_assets, meta, video, raw_video_path, music_track_id=music_track_id)
+    subtitles_burned = _assemble(scenes, scene_assets, meta, video, raw_video_path, music_track_id=music_track_id)
 
     # Update output_path in DB
     db = get_session()
@@ -80,7 +81,7 @@ def compose_video(script_id: int) -> Path:
         db.close()
 
     logger.info(f"[Composer] raw_video.mp4 → {raw_video_path}")
-    return raw_video_path
+    return raw_video_path, subtitles_burned
 
 
 def _process_scene(scene: dict, meta: dict, video_cfg: dict, out_dir: Path, idx: int) -> dict:
@@ -224,8 +225,8 @@ def _assemble(
     video_cfg:      dict,
     output_path:    Path,
     music_track_id: int | None = None,
-):
-    """Assemble all scene clips into raw_video.mp4 using MoviePy."""
+) -> bool:
+    """Assemble all scene clips into raw_video.mp4 using MoviePy. Returns True if subtitles burned in."""
     try:
         from moviepy import (
             VideoFileClip, AudioFileClip, ImageClip,
@@ -359,6 +360,7 @@ def _assemble(
             logger.warning(f"[Composer] Music mix failed: {e}")
 
     # Burn-in subtitles via MoviePy TextClip (no libass required)
+    subtitles_burned = False
     subtitle_style = (video_cfg.get("subtitle_style") or "") if video_cfg else ""
     if subtitle_style:
         scene_offsets = []
@@ -377,8 +379,9 @@ def _assemble(
             final = CompositeVideoClip([final] + subtitle_clips)
             if audio:
                 final = final.with_audio(audio)
+            subtitles_burned = True
         else:
-            logger.info("[Composer] No word timing data available; subtitles skipped")
+            logger.info("[Composer] No word timing data; will fall back to Whisper SRT subtitles")
 
     # Write raw video (libx264 fast, will be re-encoded by renderer)
     final.write_videofile(
@@ -390,6 +393,7 @@ def _assemble(
         preset="ultrafast",
         logger=None,
     )
+    return subtitles_burned
 
 
 def _select_music(mood: str, niche: str, duration: float) -> str | None:

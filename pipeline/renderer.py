@@ -66,6 +66,12 @@ def _burn_subtitles_moviepy(raw_path: Path, subtitle_file: Path, final_path: Pat
             logger.warning("[Renderer] SRT parsed but no entries found")
             return False
 
+        # Use Roboto for full Unicode / Vietnamese support
+        from pipeline.subtitle_builder import FONT_ROBOTO_BOLD, _ensure_roboto_fonts
+        _ensure_roboto_fonts()
+        font = FONT_ROBOTO_BOLD
+        max_text_w = int(TARGET_W * 0.90)  # 90% width so text never overflows frame
+
         video = VideoFileClip(str(raw_path))
         clips = [video]
 
@@ -76,11 +82,14 @@ def _burn_subtitles_moviepy(raw_path: Path, subtitle_file: Path, final_path: Pat
             try:
                 txt = TextClip(
                     text=entry["text"],
-                    font="Arial",
+                    font=font,
                     font_size=55,
                     color=(255, 255, 255),
                     stroke_color=(0, 0, 0),
                     stroke_width=2,
+                    size=(max_text_w, None),
+                    method="caption",
+                    text_align="center",
                 ).with_start(entry["start"]).with_end(end).with_position(
                     ("center", 0.85), relative=True
                 )
