@@ -59,9 +59,10 @@ class SunoProvider:
         data = resp.json().get("data", {})
         status = data.get("status", "")
         if status == "SUCCESS":
-            suno_data = data.get("sunoData", [])
+            suno_data = data.get("response", {}).get("sunoData", [])
             if suno_data:
                 return suno_data[0].get("audioUrl")
-        if status == "FAILED":
-            raise RuntimeError(f"Suno generation failed for task {task_id}")
+        if status in ("CREATE_TASK_FAILED", "GENERATE_AUDIO_FAILED", "SENSITIVE_WORD_ERROR"):
+            error_msg = data.get("errorMessage") or status
+            raise RuntimeError(f"Suno generation failed for task {task_id}: {error_msg}")
         return None  # still pending

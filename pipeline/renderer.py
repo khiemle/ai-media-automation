@@ -49,14 +49,82 @@ def _parse_srt(path: Path) -> list[dict]:
     return entries
 
 
+def _pil_subtitle_clip_renderer(
+    text: str,
+    font_path: str,
+    font_size: int,
+    max_text_w: int,
+    duration: float,
+    y_pos: float,
+) -> object | None:
+    """
+    Render a subtitle entry via PIL → ImageClip.
+    Uses textbbox for exact glyph bounds + explicit padding so descenders
+    are never clipped (unlike MoviePy TextClip which uses tight bounding box).
+    """
+    try:
+        import numpy as np
+        from PIL import Image, ImageDraw, ImageFont
+        from moviepy import ImageClip
+    except ImportError:
+        return None
+
+    PAD = 12
+    OUTLINE = 2
+
+    pil_font = ImageFont.truetype(font_path, font_size)
+
+    # Wrap text if wider than max_text_w
+    words = text.split()
+    lines: list[str] = []
+    current = ""
+    probe = Image.new("RGBA", (1, 1))
+    pd = ImageDraw.Draw(probe)
+    for w in words:
+        test = (current + " " + w).strip()
+        bb = pd.textbbox((0, 0), test, font=pil_font, stroke_width=OUTLINE)
+        if (bb[2] - bb[0]) > max_text_w and current:
+            lines.append(current)
+            current = w
+        else:
+            current = test
+    if current:
+        lines.append(current)
+    wrapped = "\n".join(lines)
+
+    bb = pd.textbbox((0, 0), wrapped, font=pil_font, stroke_width=OUTLINE)
+    text_w = bb[2] - bb[0]
+    text_h = bb[3] - bb[1]
+    canvas_w = min(max_text_w, text_w) + PAD * 2
+    canvas_h = text_h + PAD * 2
+
+    img = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    x = (canvas_w - text_w) // 2 - bb[0]
+    y = PAD - bb[1]
+    draw.text(
+        (x, y), wrapped, font=pil_font,
+        fill=(255, 255, 255, 255),
+        stroke_width=OUTLINE,
+        stroke_fill=(0, 0, 0, 255),
+    )
+
+    frame = np.array(img.convert("RGBA"))
+    return (
+        ImageClip(frame, is_mask=False)
+        .with_duration(duration)
+        .with_position(("center", y_pos), relative=True)
+    )
+
+
 def _burn_subtitles_moviepy(raw_path: Path, subtitle_file: Path, final_path: Path) -> bool:
     """
-    Burn SRT subtitles into video via MoviePy TextClip.
+    Burn SRT subtitles into video via PIL ImageClip (not TextClip).
     Used as fallback when ffmpeg lacks the libass subtitles filter.
     Returns True on success, False on any failure.
     """
     try:
-        from moviepy import VideoFileClip, TextClip, ColorClip, CompositeVideoClip
+        from moviepy import VideoFileClip, CompositeVideoClip
     except ImportError:
         return False
 
@@ -66,11 +134,10 @@ def _burn_subtitles_moviepy(raw_path: Path, subtitle_file: Path, final_path: Pat
             logger.warning("[Renderer] SRT parsed but no entries found")
             return False
 
-        # Use Roboto for full Unicode / Vietnamese support
         from pipeline.subtitle_builder import FONT_ROBOTO_BOLD, _ensure_roboto_fonts
         _ensure_roboto_fonts()
         font = FONT_ROBOTO_BOLD
-        max_text_w = int(TARGET_W * 0.90)  # 90% width so text never overflows frame
+        max_text_w = int(TARGET_W * 0.90)
 
         video = VideoFileClip(str(raw_path))
         clips = [video]
@@ -80,29 +147,18 @@ def _burn_subtitles_moviepy(raw_path: Path, subtitle_file: Path, final_path: Pat
             if end <= entry["start"]:
                 continue
             try:
-                txt = TextClip(
+                sub = _pil_subtitle_clip_renderer(
                     text=entry["text"],
-                    font=font,
+                    font_path=font,
                     font_size=55,
-                    color=(255, 255, 255),
-                    stroke_color=(0, 0, 0),
-                    stroke_width=2,
-                    size=(max_text_w, None),
-                    method="caption",
-                    text_align="center",
+                    max_text_w=max_text_w,
+                    duration=end - entry["start"],
+                    y_pos=0.85,
                 )
-                clip_w, clip_h = txt.size
-                padded_bg = ColorClip(
-                    size=(clip_w, clip_h + 10), color=(0, 0, 0)
-                ).with_opacity(0).with_duration(end - entry["start"])
-                padded_txt = CompositeVideoClip(
-                    [padded_bg, txt.with_position((0, 0))]
-                ).with_start(entry["start"]).with_end(end).with_position(
-                    ("center", 0.85), relative=True
-                )
-                clips.append(padded_txt)
+                if sub is not None:
+                    clips.append(sub.with_start(entry["start"]).with_end(end))
             except Exception as exc:
-                logger.debug(f"[Renderer] TextClip skipped for entry: {exc}")
+                logger.debug(f"[Renderer] subtitle clip skipped: {exc}")
 
         composed = CompositeVideoClip(clips)
         audio = video.audio
@@ -117,7 +173,7 @@ def _burn_subtitles_moviepy(raw_path: Path, subtitle_file: Path, final_path: Pat
             logger=None,
         )
         video.close()
-        logger.info(f"[Renderer] Subtitles burned via MoviePy fallback → {final_path}")
+        logger.info(f"[Renderer] Subtitles burned via MoviePy PIL fallback → {final_path}")
         return True
     except Exception as exc:
         logger.error(f"[Renderer] MoviePy subtitle burn failed: {exc}")

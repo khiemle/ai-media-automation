@@ -145,17 +145,89 @@ def _process_scene(scene: dict, meta: dict, video_cfg: dict, out_dir: Path, idx:
     }
 
 
+def _pil_subtitle_clip(
+    text: str,
+    font_path: str,
+    font_size: int,
+    primary_rgb: tuple,
+    outline_rgb: tuple,
+    outline_width: int,
+    max_text_w: int,
+    duration: float,
+    y_pos: float,
+) -> object | None:
+    """
+    Render a subtitle word/phrase via PIL → numpy array → MoviePy ImageClip.
+    PIL gives exact glyph bounds (textbbox), so we add explicit top/bottom
+    padding and never clip descenders the way MoviePy TextClip does.
+    """
+    try:
+        import numpy as np
+        from PIL import Image, ImageDraw, ImageFont
+        from moviepy import ImageClip
+    except ImportError:
+        return None
+
+    PAD = max(10, outline_width * 2 + 4)
+
+    pil_font = ImageFont.truetype(font_path, font_size)
+
+    # Wrap long text manually if wider than max_text_w
+    words = text.split()
+    lines: list[str] = []
+    current = ""
+    probe = Image.new("RGBA", (1, 1))
+    pd = ImageDraw.Draw(probe)
+    for w in words:
+        test = (current + " " + w).strip()
+        bb = pd.textbbox((0, 0), test, font=pil_font, stroke_width=outline_width)
+        if (bb[2] - bb[0]) > max_text_w and current:
+            lines.append(current)
+            current = w
+        else:
+            current = test
+    if current:
+        lines.append(current)
+    wrapped = "\n".join(lines)
+
+    # Measure exact pixel bounds
+    bb = pd.textbbox((0, 0), wrapped, font=pil_font, stroke_width=outline_width)
+    text_w = bb[2] - bb[0]
+    text_h = bb[3] - bb[1]
+    canvas_w = min(max_text_w, text_w) + PAD * 2
+    canvas_h = text_h + PAD * 2
+
+    img = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    x = (canvas_w - text_w) // 2 - bb[0]
+    y = PAD - bb[1]
+    draw.text(
+        (x, y), wrapped, font=pil_font,
+        fill=(*primary_rgb, 255),
+        stroke_width=outline_width,
+        stroke_fill=(*outline_rgb, 255),
+    )
+
+    frame = np.array(img.convert("RGBA"))
+    clip = (
+        ImageClip(frame, is_mask=False)
+        .with_duration(duration)
+        .with_start(0)
+        .with_position(("center", y_pos), relative=True)
+    )
+    return clip
+
+
 def _build_subtitle_clips(
     scene_word_timings: list[tuple[float, list[dict]]],
     subtitle_style: str,
 ) -> list:
     """
-    Build MoviePy TextClip overlays from per-scene word timing data.
-    Returns a list of positioned, timed TextClip objects ready for compositing.
+    Build PIL ImageClip subtitle overlays from per-scene word timing data.
+    Returns a list of positioned, timed ImageClip objects ready for compositing.
     No libass or ffmpeg subtitle filter needed.
     """
     try:
-        from moviepy import TextClip, ColorClip, CompositeVideoClip
         from pipeline.subtitle_builder import SUBTITLE_STYLES, _ass_color_to_rgb, _ensure_roboto_fonts
     except ImportError as exc:
         logger.warning(f"[Composer] Subtitle clips unavailable: {exc}")
@@ -198,34 +270,23 @@ def _build_subtitle_clips(
             if abs_end <= abs_start:
                 continue
             try:
-                txt = TextClip(
+                clip = _pil_subtitle_clip(
                     text=text,
-                    font=font,
+                    font_path=font,
                     font_size=font_size,
-                    color=primary_rgb,
-                    stroke_color=outline_rgb if outline_width > 0 else None,
-                    stroke_width=outline_width if outline_width > 0 else 0,
-                    size=(max_text_w, None),  # constrain width to prevent cropping
-                    method="caption",         # wrap text within max_text_w
-                    text_align="center",
+                    primary_rgb=primary_rgb,
+                    outline_rgb=outline_rgb,
+                    outline_width=outline_width,
+                    max_text_w=max_text_w,
+                    duration=abs_end - abs_start,
+                    y_pos=y_pos,
                 )
-                # MoviePy always computes zero bottom padding — the stroke reaches
-                # the very last pixel row of the clip, causing visible bottom crop.
-                # Wrap in a taller transparent clip to add explicit bottom padding.
-                BOTTOM_PAD = max(12, outline_width * 2 + 4)
-                clip_w, clip_h = txt.size
-                padded_h = clip_h + BOTTOM_PAD
-                padded_bg = ColorClip(
-                    size=(clip_w, padded_h), color=(0, 0, 0)
-                ).with_opacity(0).with_duration(abs_end - abs_start)
-                padded_txt = CompositeVideoClip(
-                    [padded_bg, txt.with_position((0, 0))]
-                ).with_start(abs_start).with_end(abs_end).with_position(
-                    ("center", y_pos), relative=True
-                )
-                clips.append(padded_txt)
+                if clip is None:
+                    continue
+                clip = clip.with_start(abs_start).with_end(abs_end)
+                clips.append(clip)
             except Exception as exc:
-                logger.warning(f"[Composer] TextClip error for '{text}': {exc}")
+                logger.warning(f"[Composer] subtitle clip error for '{text}': {exc}")
 
     return clips
 
