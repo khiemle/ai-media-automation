@@ -155,7 +155,7 @@ def _build_subtitle_clips(
     No libass or ffmpeg subtitle filter needed.
     """
     try:
-        from moviepy import TextClip
+        from moviepy import TextClip, ColorClip, CompositeVideoClip
         from pipeline.subtitle_builder import SUBTITLE_STYLES, _ass_color_to_rgb, _ensure_roboto_fonts
     except ImportError as exc:
         logger.warning(f"[Composer] Subtitle clips unavailable: {exc}")
@@ -208,10 +208,22 @@ def _build_subtitle_clips(
                     size=(max_text_w, None),  # constrain width to prevent cropping
                     method="caption",         # wrap text within max_text_w
                     text_align="center",
+                )
+                # MoviePy always computes zero bottom padding — the stroke reaches
+                # the very last pixel row of the clip, causing visible bottom crop.
+                # Wrap in a taller transparent clip to add explicit bottom padding.
+                BOTTOM_PAD = max(12, outline_width * 2 + 4)
+                clip_w, clip_h = txt.size
+                padded_h = clip_h + BOTTOM_PAD
+                padded_bg = ColorClip(
+                    size=(clip_w, padded_h), color=(0, 0, 0)
+                ).with_opacity(0).with_duration(abs_end - abs_start)
+                padded_txt = CompositeVideoClip(
+                    [padded_bg, txt.with_position((0, 0))]
                 ).with_start(abs_start).with_end(abs_end).with_position(
                     ("center", y_pos), relative=True
                 )
-                clips.append(txt)
+                clips.append(padded_txt)
             except Exception as exc:
                 logger.warning(f"[Composer] TextClip error for '{text}': {exc}")
 

@@ -56,7 +56,7 @@ def _burn_subtitles_moviepy(raw_path: Path, subtitle_file: Path, final_path: Pat
     Returns True on success, False on any failure.
     """
     try:
-        from moviepy import VideoFileClip, TextClip, CompositeVideoClip
+        from moviepy import VideoFileClip, TextClip, ColorClip, CompositeVideoClip
     except ImportError:
         return False
 
@@ -90,10 +90,17 @@ def _burn_subtitles_moviepy(raw_path: Path, subtitle_file: Path, final_path: Pat
                     size=(max_text_w, None),
                     method="caption",
                     text_align="center",
+                )
+                clip_w, clip_h = txt.size
+                padded_bg = ColorClip(
+                    size=(clip_w, clip_h + 10), color=(0, 0, 0)
+                ).with_opacity(0).with_duration(end - entry["start"])
+                padded_txt = CompositeVideoClip(
+                    [padded_bg, txt.with_position((0, 0))]
                 ).with_start(entry["start"]).with_end(end).with_position(
                     ("center", 0.85), relative=True
                 )
-                clips.append(txt)
+                clips.append(padded_txt)
             except Exception as exc:
                 logger.debug(f"[Renderer] TextClip skipped for entry: {exc}")
 
