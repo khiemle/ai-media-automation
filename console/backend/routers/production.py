@@ -3,7 +3,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from console.backend.auth import get_current_user, require_editor_or_admin
@@ -23,7 +23,7 @@ class UpdateAssetBody(BaseModel):
     description: str | None = None
     keywords: list[str] | None = None
     niche: list[str] | None = None
-    quality_score: float | None = None
+    quality_score: float | None = Field(None, ge=0.0, le=100.0)
 
 
 # ── Assets ────────────────────────────────────────────────────────────────────
@@ -86,11 +86,12 @@ def update_asset(
     asset_id: int,
     body: UpdateAssetBody,
     db: Session = Depends(get_db),
-    _user=Depends(require_editor_or_admin),
+    user=Depends(get_current_user),
 ):
     try:
         return ProductionService(db).update_asset(
             asset_id,
+            user_id=user.id,
             description=body.description,
             keywords=body.keywords,
             niche=body.niche,
@@ -104,10 +105,10 @@ def update_asset(
 def delete_asset(
     asset_id: int,
     db: Session = Depends(get_db),
-    _user=Depends(require_editor_or_admin),
+    user=Depends(get_current_user),
 ):
     try:
-        ProductionService(db).delete_asset(asset_id)
+        ProductionService(db).delete_asset(asset_id, user_id=user.id)
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e))
 

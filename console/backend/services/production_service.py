@@ -17,6 +17,17 @@ class ProductionService:
     def __init__(self, db: Session):
         self.db = db
 
+    def _audit(self, user_id: int, action: str, target_type: str, target_id: str, details: dict = None) -> None:
+        from console.backend.models.audit_log import AuditLog
+        self.db.add(AuditLog(
+            user_id=user_id,
+            action=action,
+            target_type=target_type,
+            target_id=target_id,
+            details=details or {},
+        ))
+        # Commit happens in the calling method
+
     # ── Assets ────────────────────────────────────────────────────────────────
 
     def search_assets(
@@ -85,6 +96,7 @@ class ProductionService:
     def update_asset(
         self,
         asset_id: int,
+        user_id: int,
         description: str | None = None,
         keywords: list[str] | None = None,
         niche: list[str] | None = None,
@@ -101,15 +113,17 @@ class ProductionService:
             asset.niche = niche
         if quality_score is not None:
             asset.quality_score = quality_score
+        self._audit(user_id, "update", "video_asset", str(asset_id))
         self.db.commit()
         self.db.refresh(asset)
         return self._asset_to_dict(asset)
 
-    def delete_asset(self, asset_id: int) -> None:
+    def delete_asset(self, asset_id: int, user_id: int) -> None:
         asset = self.db.query(VideoAsset).filter(VideoAsset.id == asset_id).first()
         if not asset:
             raise KeyError(f"Asset {asset_id} not found")
         self.db.delete(asset)
+        self._audit(user_id, "delete", "video_asset", str(asset_id))
         self.db.commit()
 
     def stream_asset_path(self, asset_id: int) -> str:
