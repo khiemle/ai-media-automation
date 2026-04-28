@@ -520,6 +520,13 @@ export default function UploadsPage() {
   const [tab,      setTab]      = useState('videos')
   const [channels, setChannels] = useState([])
 
+  // Fetch channels on mount so VideosTab has them without requiring ChannelsTab to load first
+  useEffect(() => {
+    fetchApi('/api/channels')
+      .then(data => setChannels(Array.isArray(data) ? data : []))
+      .catch(() => {})
+  }, [])
+
   const TABS = [
     { id: 'videos',      label: 'Videos' },
     { id: 'credentials', label: 'Auth & Credentials' },
