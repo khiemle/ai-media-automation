@@ -80,7 +80,7 @@ function EditModal({ asset, niches, onClose, onSaved }) {
   const [description,   setDescription]   = useState(asset.description || '')
   const [keywordsRaw,   setKeywordsRaw]   = useState((asset.keywords || []).join(', '))
   const [selectedNiches,setSelectedNiches]= useState(asset.niche || [])
-  const [qualityScore,  setQualityScore]  = useState(asset.quality_score ?? 80)
+  const [qualityScore,  setQualityScore]  = useState(asset.quality_score ?? 0)
   const [saving,        setSaving]        = useState(false)
   const [toast,         setToast]         = useState(null)
 
@@ -94,7 +94,7 @@ function EditModal({ asset, niches, onClose, onSaved }) {
     try {
       const keywords = keywordsRaw.split(',').map(k => k.trim()).filter(Boolean)
       await assetsApi.update(asset.id, {
-        description,
+        description: description || null,
         keywords,
         niche: selectedNiches,
         quality_score: qualityScore,
@@ -178,14 +178,15 @@ export default function VideoAssetsPage() {
   }
 
   const { data: niches = [] } = useApi(() => nichesApi.list(), [])
+  const nichesKey = filterNiches.join(',')
   const { data: result, loading, refetch } = useApi(
     () => assetsApi.list({
       keywords:    filterKeywords || undefined,
       source:      filterSource   || undefined,
-      niche:       filterNiches.length ? filterNiches.join(',') : undefined,
+      niche:       nichesKey || undefined,
       min_duration: filterMinDur  || undefined,
     }),
-    [filterKeywords, filterSource, filterNiches, filterMinDur]
+    [filterKeywords, filterSource, nichesKey, filterMinDur]
   )
 
   const nicheList  = niches  || []
