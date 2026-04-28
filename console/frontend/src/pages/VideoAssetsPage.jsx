@@ -1,0 +1,445 @@
+import { useState } from 'react'
+import { assetsApi, nichesApi } from '../api/client.js'
+import { useApi } from '../hooks/useApi.js'
+import { Card, Button, StatBox, Modal, Input, Spinner, EmptyState, Toast } from '../components/index.jsx'
+
+// ── Source badge ──────────────────────────────────────────────────────────────
+const SOURCE_COLORS = {
+  pexels: 'bg-[#001624] text-[#4a9eff] border-[#002840]',
+  veo:    'bg-[#001e12] text-[#34d399] border-[#003020]',
+}
+
+function SourceBadge({ source }) {
+  const cls = SOURCE_COLORS[source] || 'bg-[#1e1e2e] text-[#9090a8] border-[#2a2a42]'
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-mono font-medium border ${cls}`}>
+      {(source || 'manual').toUpperCase()}
+    </span>
+  )
+}
+
+// ── Niche multi-select pills ──────────────────────────────────────────────────
+function NicheSelect({ options, value = [], onChange }) {
+  const toggle = (opt) =>
+    onChange(value.includes(opt) ? value.filter(v => v !== opt) : [...value, opt])
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="text-xs text-[#9090a8] font-medium">Niches</label>
+      <div className="flex flex-wrap gap-1.5">
+        {options.map(opt => (
+          <button
+            key={opt}
+            type="button"
+            onClick={() => toggle(opt)}
+            className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
+              value.includes(opt)
+                ? 'bg-[#7c6af7] border-[#7c6af7] text-white'
+                : 'bg-[#16161a] border-[#2a2a32] text-[#9090a8] hover:border-[#7c6af7] hover:text-[#e8e8f0]'
+            }`}
+          >
+            {opt}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── Preview Modal ─────────────────────────────────────────────────────────────
+function PreviewModal({ asset, onClose }) {
+  return (
+    <Modal open onClose={onClose} title="Preview" width="max-w-xs">
+      <div className="flex flex-col gap-3">
+        <div className="aspect-[9/16] bg-[#0d0d0f] rounded-lg overflow-hidden">
+          <video
+            controls
+            autoPlay
+            src={assetsApi.streamUrl(asset.id)}
+            className="w-full h-full object-contain"
+          />
+        </div>
+        {asset.keywords?.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {asset.keywords.map(kw => (
+              <span
+                key={kw}
+                className="text-[10px] bg-[#2a2a32] text-[#9090a8] rounded px-2 py-0.5"
+              >
+                {kw}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    </Modal>
+  )
+}
+
+// ── Edit Modal ────────────────────────────────────────────────────────────────
+function EditModal({ asset, niches, onClose, onSaved }) {
+  const [description,   setDescription]   = useState(asset.description || '')
+  const [keywordsRaw,   setKeywordsRaw]   = useState((asset.keywords || []).join(', '))
+  const [selectedNiches,setSelectedNiches]= useState(asset.niche || [])
+  const [qualityScore,  setQualityScore]  = useState(asset.quality_score ?? 80)
+  const [saving,        setSaving]        = useState(false)
+  const [toast,         setToast]         = useState(null)
+
+  const showToast = (msg, type = 'error') => {
+    setToast({ msg, type })
+    setTimeout(() => setToast(null), 3000)
+  }
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      const keywords = keywordsRaw.split(',').map(k => k.trim()).filter(Boolean)
+      await assetsApi.update(asset.id, {
+        description,
+        keywords,
+        niche: selectedNiches,
+        quality_score: qualityScore,
+      })
+      onSaved()
+      onClose()
+    } catch (e) {
+      showToast(e.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={`Edit Asset — ${asset.id}`}
+      width="max-w-xl"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" loading={saving} onClick={handleSave}>Save</Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-[#9090a8] font-medium">Description</label>
+          <textarea
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            rows={3}
+            placeholder="Describe the video clip…"
+            className="bg-[#16161a] border border-[#2a2a32] rounded-lg px-3 py-1.5 text-sm text-[#e8e8f0] placeholder:text-[#5a5a70] focus:outline-none focus:border-[#7c6af7] resize-y transition-colors"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-[#9090a8] font-medium">Keywords <span className="text-[#5a5a70]">(comma-separated)</span></label>
+          <input
+            value={keywordsRaw}
+            onChange={e => setKeywordsRaw(e.target.value)}
+            placeholder="fitness, outdoor, running"
+            className="bg-[#16161a] border border-[#2a2a32] rounded-lg px-3 py-1.5 text-sm text-[#e8e8f0] placeholder:text-[#5a5a70] focus:outline-none focus:border-[#7c6af7] transition-colors"
+          />
+        </div>
+
+        <NicheSelect
+          options={niches.map(n => n.name)}
+          value={selectedNiches}
+          onChange={setSelectedNiches}
+        />
+
+        <Input
+          label="Quality Score (0–100)"
+          type="number"
+          value={qualityScore}
+          onChange={e => setQualityScore(parseInt(e.target.value) || 0)}
+        />
+      </div>
+      {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+    </Modal>
+  )
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
+export default function VideoAssetsPage() {
+  const [filterKeywords,  setFilterKeywords]  = useState('')
+  const [filterSource,    setFilterSource]    = useState('')
+  const [filterNiches,    setFilterNiches]    = useState([])
+  const [filterMinDur,    setFilterMinDur]    = useState('')
+  const [previewAsset,    setPreviewAsset]    = useState(null)
+  const [editingAsset,    setEditingAsset]    = useState(null)
+  const [deletingId,      setDeletingId]      = useState(null)
+  const [toast,           setToast]           = useState(null)
+
+  const showToast = (msg, type = 'success') => {
+    setToast({ msg, type })
+    setTimeout(() => setToast(null), 3000)
+  }
+
+  const { data: niches = [] } = useApi(() => nichesApi.list(), [])
+  const { data: result, loading, refetch } = useApi(
+    () => assetsApi.list({
+      keywords:    filterKeywords || undefined,
+      source:      filterSource   || undefined,
+      niche:       filterNiches.length ? filterNiches.join(',') : undefined,
+      min_duration: filterMinDur  || undefined,
+    }),
+    [filterKeywords, filterSource, filterNiches, filterMinDur]
+  )
+
+  const nicheList  = niches  || []
+  const assetList  = result?.items || result || []
+  const totalCount = result?.total ?? assetList.length
+
+  // Derived counts from visible results
+  const pexelsCount = assetList.filter(a => a.source === 'pexels').length
+  const veoCount    = assetList.filter(a => a.source === 'veo').length
+  const otherCount  = assetList.filter(a => a.source !== 'pexels' && a.source !== 'veo').length
+
+  const handleDelete = async (asset) => {
+    if (!window.confirm(`Delete this asset? This cannot be undone.`)) return
+    setDeletingId(asset.id)
+    try {
+      await assetsApi.delete(asset.id)
+      refetch()
+      showToast('Asset deleted')
+    } catch (e) {
+      showToast(e.message, 'error')
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  const toggleNicheFilter = (niche) => {
+    setFilterNiches(prev =>
+      prev.includes(niche) ? prev.filter(n => n !== niche) : [...prev, niche]
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-5">
+      {/* Header */}
+      <div>
+        <h1 className="text-xl font-bold text-[#e8e8f0]">Video Assets</h1>
+        <p className="text-sm text-[#9090a8] mt-0.5">
+          Manage video clips downloaded from Pexels or generated by Veo
+        </p>
+      </div>
+
+      {/* Stats */}
+      <div className="flex gap-3 flex-wrap">
+        <StatBox label="Total"  value={totalCount} />
+        <StatBox label="Pexels" value={pexelsCount} />
+        <StatBox label="Veo"    value={veoCount} />
+        <StatBox label="Other"  value={otherCount} />
+      </div>
+
+      {/* Filters */}
+      <div className="flex gap-2 flex-wrap items-end">
+        {/* Keyword search */}
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-[#9090a8] font-medium">Keywords</label>
+          <input
+            value={filterKeywords}
+            onChange={e => setFilterKeywords(e.target.value)}
+            placeholder="Search keywords…"
+            className="bg-[#16161a] border border-[#2a2a32] rounded-lg px-3 py-1.5 text-sm text-[#e8e8f0] placeholder:text-[#5a5a70] focus:outline-none focus:border-[#7c6af7] w-44 transition-colors"
+          />
+        </div>
+
+        {/* Source filter */}
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-[#9090a8] font-medium">Source</label>
+          <select
+            value={filterSource}
+            onChange={e => setFilterSource(e.target.value)}
+            className="bg-[#16161a] border border-[#2a2a32] rounded-lg px-3 py-1.5 text-sm text-[#e8e8f0] focus:outline-none focus:border-[#7c6af7] transition-colors"
+          >
+            <option value="">All sources</option>
+            <option value="pexels">Pexels</option>
+            <option value="veo">Veo</option>
+            <option value="manual">Manual</option>
+          </select>
+        </div>
+
+        {/* Min duration */}
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-[#9090a8] font-medium">Min Duration (s)</label>
+          <input
+            type="number"
+            value={filterMinDur}
+            onChange={e => setFilterMinDur(e.target.value)}
+            placeholder="e.g. 5"
+            className="bg-[#16161a] border border-[#2a2a32] rounded-lg px-3 py-1.5 text-sm text-[#e8e8f0] placeholder:text-[#5a5a70] focus:outline-none focus:border-[#7c6af7] w-32 transition-colors"
+          />
+        </div>
+
+        {/* Niche filter pills */}
+        {nicheList.length > 0 && (
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-[#9090a8] font-medium">Niches</label>
+            <div className="flex flex-wrap gap-1.5">
+              {nicheList.map(n => (
+                <button
+                  key={n.id}
+                  type="button"
+                  onClick={() => toggleNicheFilter(n.name)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
+                    filterNiches.includes(n.name)
+                      ? 'bg-[#7c6af7] border-[#7c6af7] text-white'
+                      : 'bg-[#16161a] border-[#2a2a32] text-[#9090a8] hover:border-[#7c6af7] hover:text-[#e8e8f0]'
+                  }`}
+                >
+                  {n.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Asset table */}
+      <Card>
+        {loading ? (
+          <div className="flex justify-center py-10"><Spinner /></div>
+        ) : assetList.length === 0 ? (
+          <EmptyState
+            icon="🎬"
+            title="No video assets found"
+            description="Video clips are downloaded from Pexels or generated by Veo during the production pipeline."
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[#2a2a32] text-left">
+                  {['Thumbnail', 'Description / Keywords', 'Source', 'Duration', 'Resolution', 'Niches', 'Score', 'Uses', ''].map(h => (
+                    <th key={h} className="pb-2 pr-4 text-xs font-semibold text-[#9090a8] uppercase tracking-wider whitespace-nowrap">
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {assetList.map(asset => (
+                  <tr key={asset.id} className="border-b border-[#2a2a32] hover:bg-[#16161a] transition-colors">
+                    {/* Thumbnail */}
+                    <td className="py-2.5 pr-4">
+                      {asset.thumbnail_url ? (
+                        <img
+                          src={asset.thumbnail_url}
+                          alt="thumbnail"
+                          className="w-16 h-9 object-cover rounded bg-[#0d0d0f]"
+                        />
+                      ) : (
+                        <div className="w-16 h-9 flex items-center justify-center bg-[#0d0d0f] rounded text-xl">
+                          🎬
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Description + keywords */}
+                    <td className="py-2.5 pr-4 max-w-[220px]">
+                      <div className="text-[#e8e8f0] text-sm truncate">
+                        {asset.description || <span className="text-[#5a5a70] italic">No description</span>}
+                      </div>
+                      {asset.keywords?.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {asset.keywords.slice(0, 4).map(kw => (
+                            <span key={kw} className="text-[10px] bg-[#2a2a32] text-[#9090a8] rounded px-1.5 py-0.5">
+                              {kw}
+                            </span>
+                          ))}
+                          {asset.keywords.length > 4 && (
+                            <span className="text-[10px] text-[#5a5a70]">+{asset.keywords.length - 4}</span>
+                          )}
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Source badge */}
+                    <td className="py-2.5 pr-4 whitespace-nowrap">
+                      <SourceBadge source={asset.source} />
+                    </td>
+
+                    {/* Duration */}
+                    <td className="py-2.5 pr-4 font-mono text-[#9090a8] text-xs whitespace-nowrap">
+                      {asset.duration_s != null ? `${Number(asset.duration_s).toFixed(1)}s` : '—'}
+                    </td>
+
+                    {/* Resolution */}
+                    <td className="py-2.5 pr-4 font-mono text-[#9090a8] text-xs whitespace-nowrap">
+                      {asset.resolution || '—'}
+                    </td>
+
+                    {/* Niches */}
+                    <td className="py-2.5 pr-4">
+                      <div className="flex flex-wrap gap-1 max-w-[160px]">
+                        {(asset.niche || []).slice(0, 3).map(n => (
+                          <span key={n} className="text-[10px] bg-[#1a0e2e] text-[#7c6af7] border border-[#2a1a50] rounded px-1.5 py-0.5">
+                            {n}
+                          </span>
+                        ))}
+                        {(asset.niche || []).length > 3 && (
+                          <span className="text-[10px] text-[#5a5a70]">+{asset.niche.length - 3}</span>
+                        )}
+                      </div>
+                    </td>
+
+                    {/* Quality score */}
+                    <td className="py-2.5 pr-4 font-mono text-[#9090a8] text-xs">
+                      {asset.quality_score ?? '—'}
+                    </td>
+
+                    {/* Usage count */}
+                    <td className="py-2.5 pr-4 font-mono text-[#9090a8] text-xs">
+                      {asset.usage_count ?? 0}
+                    </td>
+
+                    {/* Actions */}
+                    <td className="py-2.5 whitespace-nowrap">
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => setPreviewAsset(asset)} title="Preview">
+                          ▶
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => setEditingAsset(asset)} title="Edit">
+                          ✎
+                        </Button>
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          loading={deletingId === asset.id}
+                          onClick={() => handleDelete(asset)}
+                          title="Delete"
+                        >
+                          ✕
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
+      {/* Modals */}
+      {previewAsset && (
+        <PreviewModal asset={previewAsset} onClose={() => setPreviewAsset(null)} />
+      )}
+
+      {editingAsset && (
+        <EditModal
+          asset={editingAsset}
+          niches={nicheList}
+          onClose={() => setEditingAsset(null)}
+          onSaved={refetch}
+        />
+      )}
+
+      {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+    </div>
+  )
+}
