@@ -28,12 +28,42 @@ function StatusBadge({ status }) {
   return <Badge status={map[status] || 'planned'} label={status} />
 }
 
+// ── Video Preview Modal ───────────────────────────────────────────────────────
+function VideoPreviewModal({ video, onClose }) {
+  if (!video) return null
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70" onClick={onClose}>
+      <div
+        className="bg-[#1c1c22] border border-[#2a2a32] rounded-xl p-4 w-full max-w-sm flex flex-col gap-3"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div className="text-sm font-medium text-[#e8e8f0] leading-snug">{video.title}</div>
+          <button onClick={onClose} className="text-[#9090a8] hover:text-[#f87171] flex-shrink-0 transition-colors">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+        <video
+          controls
+          autoPlay
+          src={`/api/uploads/videos/${video.id}/stream`}
+          className="w-full rounded-lg bg-black"
+          style={{ aspectRatio: '9/16', maxHeight: '60vh', objectFit: 'contain' }}
+        />
+      </div>
+    </div>
+  )
+}
+
 // ── Videos Sub-tab ────────────────────────────────────────────────────────────
 function VideosTab({ channels }) {
-  const [videos,  setVideos]  = useState([])
-  const [loading, setLoading] = useState(true)
-  const [targets, setTargets] = useState({})   // { video_id: [channel_id, ...] }
-  const [toast,   setToast]   = useState(null)
+  const [videos,       setVideos]       = useState([])
+  const [loading,      setLoading]      = useState(true)
+  const [targets,      setTargets]      = useState({})   // { video_id: [channel_id, ...] }
+  const [toast,        setToast]        = useState(null)
+  const [previewVideo, setPreviewVideo] = useState(null)
 
   const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000) }
 
@@ -151,6 +181,17 @@ function VideosTab({ channels }) {
                     </td>
                     <td className="py-2.5 text-right">
                       <div className="flex items-center gap-1 justify-end">
+                        {v.has_video && (
+                          <button
+                            title="Preview video"
+                            onClick={() => setPreviewVideo(v)}
+                            className="w-7 h-7 flex items-center justify-center rounded bg-[#222228] text-[#9090a8] hover:text-[#7c6af7] hover:bg-[#2a2a38] transition-colors"
+                          >
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                              <polygon points="5 3 19 12 5 21 5 3"/>
+                            </svg>
+                          </button>
+                        )}
                         {uploadable && vTargets.length > 0 && (
                           <Button variant="primary" className="text-xs px-2 py-1" onClick={() => handleUpload(v.id)}>
                             Upload
@@ -169,6 +210,7 @@ function VideosTab({ channels }) {
         </div>
       )}
       {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+      <VideoPreviewModal video={previewVideo} onClose={() => setPreviewVideo(null)} />
     </Card>
   )
 }
