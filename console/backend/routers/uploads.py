@@ -74,7 +74,6 @@ def upload_all_ready(
 def stream_video(
     video_id: str,
     db: Session = Depends(get_db),
-    _user=Depends(require_editor_or_admin),
 ):
     try:
         path = UploadService(db).stream_video_path(video_id)

@@ -68,7 +68,6 @@ def get_asset(
 def stream_asset(
     asset_id: int,
     db: Session = Depends(get_db),
-    _user=Depends(require_editor_or_admin),
 ):
     try:
         path = ProductionService(db).stream_asset_path(asset_id)
