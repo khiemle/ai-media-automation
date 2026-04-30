@@ -150,6 +150,7 @@ class ProductionService:
         keywords: list[str] | None,
         asset_type: str | None = None,
         assets_dir: Path | None = None,
+        user_id: int | None = None,
     ) -> dict:
         ext = Path(filename).suffix.lower()
         if ext not in _ALLOWED_ASSET_EXTENSIONS:
@@ -173,6 +174,8 @@ class ProductionService:
         dest = save_dir / f'asset_{row.id}{ext}'
         dest.write_bytes(file_bytes)
         row.file_path = str(dest)
+        if user_id is not None:
+            self._audit(user_id, "import", "video_asset", str(row.id))
         self.db.commit()
         self.db.refresh(row)
         return self._asset_to_dict(row)

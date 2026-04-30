@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from console.backend.auth import get_current_user, require_editor_or_admin
 from console.backend.database import get_db
-from console.backend.services.production_service import ProductionService
+from console.backend.services.production_service import ProductionService, _ALLOWED_ASSET_EXTENSIONS
 
 router = APIRouter(prefix="/production", tags=["production"])
 
@@ -114,7 +114,6 @@ def delete_asset(
         raise HTTPException(status_code=404, detail=str(e))
 
 
-_ASSET_UPLOAD_ALLOWED = {'.jpg', '.jpeg', '.png', '.webp', '.mp4', '.mov', '.webm'}
 _MAX_ASSET_BYTES = 500 * 1024 * 1024  # 500 MB
 _ASSET_SOURCES = {'manual', 'midjourney', 'runway', 'pexels', 'veo', 'stock'}
 
@@ -130,7 +129,7 @@ async def upload_asset(
     user=Depends(require_editor_or_admin),
 ):
     ext = Path(file.filename or '').suffix.lower()
-    if ext not in _ASSET_UPLOAD_ALLOWED:
+    if ext not in _ALLOWED_ASSET_EXTENSIONS:
         raise HTTPException(status_code=400, detail=f"Unsupported file type: {ext}")
     if source not in _ASSET_SOURCES:
         raise HTTPException(status_code=400, detail=f"Invalid source: {source}")
@@ -148,6 +147,7 @@ async def upload_asset(
             description=description or None,
             keywords=kw_list or None,
             asset_type=asset_type or None,
+            user_id=user.id,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
