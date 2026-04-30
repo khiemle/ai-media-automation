@@ -149,3 +149,31 @@ def delete_video(
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
+
+@router.post("/{video_id}/render")
+def start_render(
+    video_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(require_editor_or_admin),
+):
+    """Queue a YouTube video for rendering via Celery."""
+    svc = YoutubeVideoService(db)
+    try:
+        video = svc.get_video(video_id)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    if video["status"] not in ("draft", "queued"):
+        raise HTTPException(status_code=400, detail=f"Cannot render video in status '{video['status']}'")
+
+    svc.update_status(video_id, "queued", user_id=user.id)
+
+    from console.backend.tasks.youtube_render_task import render_youtube_video_task
+    from console.backend.models.youtube_video import YoutubeVideo
+
+    task = render_youtube_video_task.delay(video_id)
+    db.query(YoutubeVideo).filter(YoutubeVideo.id == video_id).update({"celery_task_id": task.id})
+    db.commit()
+
+    return {"task_id": task.id, "status": "queued"}
+

@@ -1,25 +1,16 @@
-// ── Token storage ────────────────────────────────────────────────────────────
-const TOKEN_KEY = 'auth_token'
+// ── Token storage (memory only — never persisted) ─────────────────────────────
 let _token = null
 
 export function setToken(token) {
   if (!token) return
   _token = token
-  localStorage.setItem(TOKEN_KEY, token)
 }
 
 export function clearToken() {
   _token = null
-  localStorage.removeItem(TOKEN_KEY)
 }
 
 export function getToken() { return _token }
-
-export function loadPersistedToken() {
-  const stored = localStorage.getItem(TOKEN_KEY)
-  if (stored) _token = stored
-  return stored
-}
 
 // ── Base fetch wrapper ─────────────────────────────────────────────────────────
 export async function fetchApi(url, options = {}) {
@@ -189,17 +180,14 @@ export const youtubeVideosApi = {
   get: (id) => fetchApi(`/api/youtube-videos/${id}`),
   create: (data) => fetchApi('/api/youtube-videos', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   }),
   update: (id, data) => fetchApi(`/api/youtube-videos/${id}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   }),
   updateStatus: (id, status) => fetchApi(`/api/youtube-videos/${id}/status`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status }),
   }),
   delete: (id) => fetchApi(`/api/youtube-videos/${id}`, { method: 'DELETE' }),

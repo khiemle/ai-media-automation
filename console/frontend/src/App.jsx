@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useLocation, Routes, Route, Navigate, NavLink } from 'react-router-dom'
-import { setToken, clearToken, loadPersistedToken, authApi } from './api/client.js'
+import { setToken, clearToken, authApi } from './api/client.js'
 import LoginPage from './pages/LoginPage.jsx'
 import ScraperPage from './pages/ScraperPage.jsx'
 import ScriptsPage from './pages/ScriptsPage.jsx'
@@ -113,15 +113,7 @@ export default function App() {
   const location = useLocation()
 
   useEffect(() => {
-    const token = loadPersistedToken()
-    if (!token) return
-    authApi.me()
-      .then(userData => {
-        const allowed = ALL_TABS.filter(t => t.roles.includes(userData.role))
-        if (allowed.length === 0) { clearToken(); return }
-        setUser(userData)
-      })
-      .catch(() => clearToken())
+    // No persisted token — user must log in each session
   }, [])
 
   const handleLogin = (token, userData) => {
