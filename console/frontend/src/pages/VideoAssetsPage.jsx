@@ -264,9 +264,9 @@ function ImportAssetModal({ onClose, onImported }) {
     try {
       await assetsApi.upload(file, {
         source,
-        description: description || undefined,
-        keywords: keywords || undefined,
-        asset_type: detectedType || undefined,
+        description,
+        keywords,
+        asset_type: detectedType,
       })
       onImported()
       onClose()
@@ -306,18 +306,11 @@ function ImportAssetModal({ onClose, onImported }) {
             </span>
           )}
         </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs text-[#9090a8] font-medium">Source</label>
-          <select
-            value={source}
-            onChange={e => setSource(e.target.value)}
-            className="bg-[#16161a] border border-[#2a2a32] rounded-lg px-3 py-1.5 text-sm text-[#e8e8f0] focus:outline-none focus:border-[#7c6af7] transition-colors"
-          >
-            {IMPORT_SOURCES.map(s => (
-              <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
-            ))}
-          </select>
-        </div>
+        <Select label="Source" value={source} onChange={e => setSource(e.target.value)}>
+          {IMPORT_SOURCES.map(s => (
+            <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+          ))}
+        </Select>
         <div className="flex flex-col gap-1">
           <label className="text-xs text-[#9090a8] font-medium">Description <span className="text-[#5a5a70]">(optional)</span></label>
           <input

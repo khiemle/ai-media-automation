@@ -156,6 +156,7 @@ export const assetsApi = {
     if (description) form.append('description', description)
     if (keywords) form.append('keywords', keywords)
     if (asset_type) form.append('asset_type', asset_type)
+    // fetchApi adds Content-Type: application/json which breaks multipart — use raw fetch
     const headers = {}
     const token = getToken()
     if (token) headers['Authorization'] = `Bearer ${token}`
