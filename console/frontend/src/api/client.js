@@ -200,4 +200,5 @@ export const youtubeVideosApi = {
 // ── Templates ───────────────────────────────────────────────────────────────────
 export const templatesApi = {
   list: () => fetchApi('/api/youtube-videos/templates'),
+  musicTypes: () => fetchApi('/api/music/templates'),
 }

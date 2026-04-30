@@ -59,6 +59,9 @@ def list_video_templates(
                 "slug": t.slug,
                 "label": t.label,
                 "output_format": t.output_format,
+                "suno_prompt_template": t.suno_prompt_template,
+                "sound_rules": t.sound_rules or [],
+                "suno_extends_recommended": t.suno_extends_recommended,
             }
             for t in rows
         ]

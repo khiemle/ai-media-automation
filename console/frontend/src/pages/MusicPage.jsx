@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { musicApi, nichesApi } from '../api/client.js'
+import { musicApi, nichesApi, templatesApi } from '../api/client.js'
 import { useApi } from '../hooks/useApi.js'
 import { Card, Badge, Button, StatBox, Modal, Input, Select, Spinner, EmptyState, Toast } from '../components/index.jsx'
 
@@ -133,10 +133,11 @@ function EditModal({ track, niches, onClose, onSaved, onPollTrack }) {
 
 // ── Provider / Status badge colors ───────────────────────────────────────────
 const PROVIDER_COLORS = {
-  sunoapi:     'bg-[#1a0e2e] text-[#7c6af7] border-[#2a1a50]',
-  'lyria-clip':'bg-[#001624] text-[#4a9eff] border-[#002840]',
-  'lyria-pro': 'bg-[#001e12] text-[#34d399] border-[#003020]',
-  import:      'bg-[#1e1e2e] text-[#9090a8] border-[#2a2a42]',
+  sunoapi:      'bg-[#1a0e2e] text-[#7c6af7] border-[#2a1a50]',
+  suno:         'bg-[#1e0a3e] text-[#a78bfa] border-[#3d1a70]',
+  'lyria-clip': 'bg-[#001624] text-[#4a9eff] border-[#002840]',
+  'lyria-pro':  'bg-[#001e12] text-[#34d399] border-[#003020]',
+  import:       'bg-[#1e1e2e] text-[#9090a8] border-[#2a2a42]',
 }
 const STATUS_COLORS = {
   ready:   'bg-[#001e12] text-[#34d399] border-[#003020]',
@@ -196,46 +197,191 @@ function AudioPlayer({ track, onClose }) {
   )
 }
 
+// ── Suno Manual Form ──────────────────────────────────────────────────────────
+const SUNO_EXTEND_STEPS = [
+  'Generate initial clip on suno.com (~2 min)',
+  'Click ··· → Extend on the generated clip',
+  'Click ··· → Extend again from the NEW clip (not the original)',
+  'Repeat steps 2–3 until you have enough extends',
+  'On the LAST clip: ··· → Get Whole Song → Download MP3',
+]
+
+function SunoManualForm({ musicTemplates, form, setForm }) {
+  const [showExtendGuide, setShowExtendGuide] = useState(false)
+  const selectedTemplate = musicTemplates.find(t => t.slug === form.sunoMusicType) || (form.sunoMusicType ? null : musicTemplates[0])
+  const prompt = selectedTemplate?.suno_prompt_template || ''
+  const soundRules = selectedTemplate?.sound_rules || []
+  const extendsRecommended = selectedTemplate?.suno_extends_recommended
+
+  const handleCopy = () => navigator.clipboard.writeText(prompt)
+
+  return (
+    <div className="flex flex-col gap-4">
+      <Select
+        label="Music Type"
+        value={form.sunoMusicType || ''}
+        onChange={e => setForm(f => ({ ...f, sunoMusicType: e.target.value }))}
+      >
+        <option value="">Select type...</option>
+        {musicTemplates.map(t => (
+          <option key={t.slug} value={t.slug}>{t.label}</option>
+        ))}
+      </Select>
+
+      {selectedTemplate && (
+        <>
+          {prompt && (
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-[#9090a8] font-medium">SUNO PROMPT</label>
+              <div className="relative bg-[#0d0d0f] border border-[#2a2a32] rounded-lg p-3">
+                <p className="text-sm text-[#e8e8f0] pr-12 leading-relaxed">{prompt}</p>
+                <button
+                  onClick={handleCopy}
+                  className="absolute top-2 right-2 text-xs text-[#7c6af7] hover:text-[#9d8df8] transition-colors px-2 py-1 bg-[#16161a] rounded"
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
+          )}
+
+          {soundRules.length > 0 && (
+            <div className="bg-[#1c1c22] border border-[#fbbf24] border-opacity-40 rounded-lg p-3">
+              <div className="text-xs font-semibold text-[#fbbf24] mb-2">⚠ {selectedTemplate.label.toUpperCase()} SOUND RULES</div>
+              <ul className="flex flex-col gap-1">
+                {soundRules.map((rule, i) => (
+                  <li key={i} className="text-xs text-[#9090a8]">• {rule}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className="border border-[#2a2a32] rounded-lg overflow-hidden">
+            <button
+              onClick={() => setShowExtendGuide(g => !g)}
+              className="w-full flex items-center justify-between px-4 py-3 text-sm text-[#e8e8f0] bg-[#16161a] hover:bg-[#1c1c22] transition-colors"
+            >
+              <span>▸ HOW TO EXTEND ON SUNO</span>
+              <span className="text-[#9090a8]">{showExtendGuide ? '▲' : '▼'}</span>
+            </button>
+            {showExtendGuide && (
+              <div className="px-4 py-3 bg-[#0d0d0f] flex flex-col gap-2">
+                {SUNO_EXTEND_STEPS.map((step, i) => (
+                  <div key={i} className="flex items-start gap-3">
+                    <span className="text-xs font-mono text-[#7c6af7] flex-shrink-0 mt-0.5">Step {i + 1}</span>
+                    <span className="text-xs text-[#9090a8]">{step}</span>
+                  </div>
+                ))}
+                {extendsRecommended && (
+                  <div className="mt-2 text-xs text-[#5a5a70] border-t border-[#2a2a32] pt-2">
+                    {selectedTemplate.label}: <strong className="text-[#e8e8f0]">{extendsRecommended} extends</strong> recommended
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* File upload for manual import */}
+      <div className="flex flex-col gap-1">
+        <label className="text-xs text-[#9090a8] font-medium">Upload finished file</label>
+        <div
+          className="border-2 border-dashed border-[#2a2a32] rounded-lg p-6 text-center cursor-pointer hover:border-[#7c6af7] transition-colors"
+          onDragOver={e => e.preventDefault()}
+          onDrop={e => { e.preventDefault(); setForm(f => ({ ...f, uploadFile: e.dataTransfer.files[0] })) }}
+          onClick={() => document.getElementById('suno-upload-input').click()}
+        >
+          <input
+            id="suno-upload-input" type="file" accept=".mp3,.wav" className="hidden"
+            onChange={e => setForm(f => ({ ...f, uploadFile: e.target.files?.[0] || null }))}
+          />
+          {form.uploadFile ? (
+            <span className="text-sm text-[#34d399]">✓ {form.uploadFile.name}</span>
+          ) : (
+            <span className="text-sm text-[#5a5a70]">Drop MP3/WAV here or click to browse</span>
+          )}
+        </div>
+      </div>
+
+      <Input label="Title" value={form.title || ''} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Track title" />
+    </div>
+  )
+}
+
 // ── Generate Music Modal ──────────────────────────────────────────────────────
 function GenerateModal({ niches, onClose, onGenerated, onPollTrack }) {
-  const [idea,      setIdea]      = useState('')
-  const [selNiches, setSelNiches] = useState([])
-  const [selMoods,  setSelMoods]  = useState([])
-  const [selGenres, setSelGenres] = useState([])
-  const [provider,  setProvider]  = useState('sunoapi')
-  const [isVocal,   setIsVocal]   = useState(false)
-  const [expanded,  setExpanded]  = useState('')
-  const [expanding, setExpanding] = useState(false)
-  const [generating,setGenerating]= useState(false)
-  const [toast,     setToast]     = useState(null)
+  const [form, setForm] = useState({
+    provider:      'sunoapi',
+    idea:          '',
+    niches:        [],
+    moods:         [],
+    genres:        [],
+    is_vocal:      false,
+    sunoMusicType: '',
+    uploadFile:    null,
+    title:         '',
+  })
+  const [expanded,       setExpanded]       = useState('')
+  const [expanding,      setExpanding]      = useState(false)
+  const [loading,        setLoading]        = useState(false)
+  const [musicTemplates, setMusicTemplates] = useState([])
+  const [toast,          setToast]          = useState(null)
   const showToast = (msg, type='error') => { setToast({msg,type}); setTimeout(()=>setToast(null),3000) }
 
+  useEffect(() => {
+    if (form.provider === 'suno') {
+      templatesApi.musicTypes().then(setMusicTemplates).catch(() => {})
+    }
+  }, [form.provider])
+
   const handleExpand = async () => {
-    if (!idea.trim()) { showToast('Enter an idea first'); return }
+    if (!form.idea.trim()) { showToast('Enter an idea first'); return }
     setExpanding(true)
     try {
       const res = await musicApi.generate({
-        idea, niches: selNiches, moods: selMoods, genres: selGenres,
-        provider, is_vocal: isVocal, expand_only: true,
+        idea: form.idea, niches: form.niches, moods: form.moods, genres: form.genres,
+        provider: form.provider, is_vocal: form.is_vocal, expand_only: true,
       })
-      setExpanded(res.expanded_prompt || idea)
+      setExpanded(res.expanded_prompt || form.idea)
     } catch (e) { showToast(e.message) }
     finally { setExpanding(false) }
   }
 
   const handleGenerate = async () => {
-    if (!idea.trim() && !expanded.trim()) { showToast('Enter an idea or expand first'); return }
-    setGenerating(true)
+    const ideaText = expanded || form.idea
+    if (!ideaText.trim()) { showToast('Enter an idea or expand first'); return }
+    setLoading(true)
     try {
       const res = await musicApi.generate({
-        idea: expanded || idea, niches: selNiches, moods: selMoods, genres: selGenres,
-        provider, is_vocal: isVocal, expand_only: false,
+        idea: ideaText, niches: form.niches, moods: form.moods, genres: form.genres,
+        provider: form.provider, is_vocal: form.is_vocal, expand_only: false,
       })
       onPollTrack(res.track_id, res.task_id)
       onGenerated()
       onClose()
     } catch (e) { showToast(e.message) }
-    finally { setGenerating(false) }
+    finally { setLoading(false) }
+  }
+
+  const handleSunoUpload = async () => {
+    if (!form.uploadFile || !form.title) {
+      showToast('Title and file are required', 'error'); return
+    }
+    setLoading(true)
+    try {
+      await musicApi.upload(form.uploadFile, {
+        title: form.title,
+        niches: form.niches,
+        moods: form.moods,
+        genres: form.genres,
+        is_vocal: false,
+        provider: 'suno',
+      })
+      onGenerated()
+      onClose()
+    } catch (e) { showToast(e.message, 'error') }
+    finally { setLoading(false) }
   }
 
   return (
@@ -243,52 +389,66 @@ function GenerateModal({ niches, onClose, onGenerated, onPollTrack }) {
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button variant="default" loading={expanding} onClick={handleExpand}>✨ Expand with Gemini</Button>
-          <Button variant="primary" loading={generating} onClick={handleGenerate}>Generate</Button>
+          {form.provider !== 'suno' && (
+            <Button variant="default" loading={expanding} onClick={handleExpand}>✨ Expand with Gemini</Button>
+          )}
+          <Button variant="primary" loading={loading} onClick={form.provider === 'suno' ? handleSunoUpload : handleGenerate}>
+            {form.provider === 'suno' ? 'Upload' : 'Generate'}
+          </Button>
         </>
       }
     >
       <div className="flex flex-col gap-4">
+        {/* Provider select — always first */}
         <div className="flex flex-col gap-1">
-          <label className="text-xs text-[#9090a8] font-medium">General idea / description</label>
-          <textarea
-            value={expanded || idea}
-            onChange={e => { expanded ? setExpanded(e.target.value) : setIdea(e.target.value) }}
-            rows={4}
-            placeholder="e.g. upbeat energetic workout music with punchy beats"
-            className={`bg-[#16161a] rounded-lg px-3 py-1.5 text-sm text-[#e8e8f0] placeholder:text-[#5a5a70] focus:outline-none resize-y transition-colors ${
-              expanded
-                ? 'border border-[#34d399] focus:border-[#34d399]'
-                : 'border border-[#2a2a32] focus:border-[#7c6af7]'
-            }`}
-          />
-          {expanded
-            ? <p className="text-xs text-[#34d399]">✓ Expanded by Gemini — edit freely before generating</p>
-            : <p className="text-xs text-[#5a5a70]">Click "✨ Expand" to enrich this with Gemini before generating</p>
-          }
+          <label className="text-xs text-[#9090a8] font-medium">Provider</label>
+          <select
+            value={form.provider}
+            onChange={e => setForm(f => ({ ...f, provider: e.target.value }))}
+            className="bg-[#16161a] border border-[#2a2a32] rounded-lg px-3 py-1.5 text-sm text-[#e8e8f0] focus:outline-none focus:border-[#7c6af7]"
+          >
+            <option value="sunoapi">SunoAPI</option>
+            <option value="suno">Suno (Manual)</option>
+            <option value="lyria-clip">Lyria Clip (30s)</option>
+            <option value="lyria-pro">Lyria Pro</option>
+          </select>
         </div>
 
-        <MultiSelect label="Niches" options={niches.map(n => n.name)} value={selNiches} onChange={setSelNiches} />
-        <MultiSelect label="Moods"  options={MOODS}  value={selMoods}  onChange={setSelMoods} />
-        <MultiSelect label="Genres" options={GENRES} value={selGenres} onChange={setSelGenres} />
+        {form.provider === 'suno' ? (
+          <SunoManualForm musicTemplates={musicTemplates} form={form} setForm={setForm} />
+        ) : (
+          <>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-[#9090a8] font-medium">General idea / description</label>
+              <textarea
+                value={expanded || form.idea}
+                onChange={e => { expanded ? setExpanded(e.target.value) : setForm(f => ({ ...f, idea: e.target.value })) }}
+                rows={4}
+                placeholder="e.g. upbeat energetic workout music with punchy beats"
+                className={`bg-[#16161a] rounded-lg px-3 py-1.5 text-sm text-[#e8e8f0] placeholder:text-[#5a5a70] focus:outline-none resize-y transition-colors ${
+                  expanded
+                    ? 'border border-[#34d399] focus:border-[#34d399]'
+                    : 'border border-[#2a2a32] focus:border-[#7c6af7]'
+                }`}
+              />
+              {expanded
+                ? <p className="text-xs text-[#34d399]">✓ Expanded by Gemini — edit freely before generating</p>
+                : <p className="text-xs text-[#5a5a70]">Click "✨ Expand" to enrich this with Gemini before generating</p>
+              }
+            </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-[#9090a8] font-medium">Provider</label>
-            <select value={provider} onChange={e => setProvider(e.target.value)}
-              className="bg-[#16161a] border border-[#2a2a32] rounded-lg px-3 py-1.5 text-sm text-[#e8e8f0] focus:outline-none focus:border-[#7c6af7]">
-              <option value="sunoapi">Suno</option>
-              <option value="lyria-clip">Lyria Clip (30s)</option>
-              <option value="lyria-pro">Lyria Pro (full song)</option>
-            </select>
-          </div>
-          <div className="flex flex-col justify-end">
-            <label className="flex items-center gap-2 cursor-pointer text-sm text-[#9090a8] pb-1.5">
-              <input type="checkbox" checked={isVocal} onChange={e => setIsVocal(e.target.checked)} className="accent-[#7c6af7]" />
-              With vocals
-            </label>
-          </div>
-        </div>
+            <MultiSelect label="Niches" options={niches.map(n => n.name)} value={form.niches} onChange={v => setForm(f => ({ ...f, niches: v }))} />
+            <MultiSelect label="Moods"  options={MOODS}  value={form.moods}  onChange={v => setForm(f => ({ ...f, moods: v }))} />
+            <MultiSelect label="Genres" options={GENRES} value={form.genres} onChange={v => setForm(f => ({ ...f, genres: v }))} />
+
+            <div className="flex flex-col gap-1">
+              <label className="flex items-center gap-2 cursor-pointer text-sm text-[#9090a8] py-1">
+                <input type="checkbox" checked={form.is_vocal} onChange={e => setForm(f => ({ ...f, is_vocal: e.target.checked }))} className="accent-[#7c6af7]" />
+                With vocals
+              </label>
+            </div>
+          </>
+        )}
       </div>
       {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
     </Modal>
