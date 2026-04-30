@@ -15,78 +15,75 @@ OUTPUT_DIR = Path(os.environ.get("RENDER_OUTPUT_PATH", "./renders/youtube"))
 
 @celery_app.task(
     bind=True,
-    name="console.backend.tasks.youtube_render_task.render_youtube_video",
+    name="tasks.render_youtube_video",
     queue="render_q",
     max_retries=2,
     default_retry_delay=60,
 )
 def render_youtube_video_task(self, youtube_video_id: int):
-    """
-    Orchestrate rendering of a long-form YouTube video.
-
-    Steps:
-    1. Load YoutubeVideo + VideoTemplate from DB
-    2. Update status → "rendering"
-    3. Resolve/assemble audio (music track + SFX mix)  [placeholder]
-    4. Resolve/assemble visual segments (scene assets)  [placeholder]
-    5. Render final video with ffmpeg (concatenate segments with audio)
-    6. Update status → "done", output_path set
-    7. On failure → status → "failed", re-raise for retry
-
-    Steps 3-4 are stubs that will be wired to real pipeline modules in a
-    future task (pipeline integration sprint).
-    """
+    """Orchestrate rendering of a long-form YouTube video."""
     from console.backend.database import SessionLocal
     from console.backend.models.youtube_video import YoutubeVideo
 
     db = SessionLocal()
     video = None
+    render_completed = False
     try:
         video = db.get(YoutubeVideo, youtube_video_id)
         if not video:
             logger.error("YoutubeVideo %s not found", youtube_video_id)
             return {"status": "failed", "reason": "video not found"}
 
-        # Step 2: Mark rendering
+        # Guard: skip if already rendering or done (prevents concurrent corruption)
+        if video.status not in {"draft", "queued"}:
+            logger.warning(
+                "YoutubeVideo %s is already %s; skipping render",
+                youtube_video_id, video.status,
+            )
+            return {"status": "skipped", "reason": f"already {video.status}"}
+
         video.status = "rendering"
         db.commit()
-        logger.info("YoutubeVideo %s → rendering", youtube_video_id)
 
-        # Steps 3-5: Placeholder — real asset assembly wired in future task
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-        output_path = OUTPUT_DIR / f"youtube_{youtube_video_id}.mp4"
+        import time as _time
+        output_path = OUTPUT_DIR / f"youtube_{youtube_video_id}_v{int(_time.time())}.mp4"
 
         _render_placeholder(video, output_path)
+        render_completed = True
 
-        # Step 6: Mark done
         video.status = "done"
         video.output_path = str(output_path)
         db.commit()
 
-        logger.info("YoutubeVideo %s rendered → %s", youtube_video_id, output_path)
+        logger.info("YoutubeVideo %s rendered to %s", youtube_video_id, output_path)
         return {"status": "done", "output_path": str(output_path)}
 
     except Exception as exc:
         logger.exception("YoutubeVideo %s render failed: %s", youtube_video_id, exc)
-        if video is not None:
+        if video is not None and not render_completed:
+            # Only mark failed if render itself didn't complete
             try:
                 video.status = "failed"
                 db.commit()
-            except Exception:
+            except Exception as db_exc:
                 db.rollback()
+                logger.error(
+                    "Failed to persist 'failed' status for YoutubeVideo %s: %s",
+                    youtube_video_id, db_exc,
+                )
         raise self.retry(exc=exc)
     finally:
         db.close()
 
 
 def _render_placeholder(video, output_path: Path) -> None:
-    """
-    Placeholder render: creates a minimal valid .mp4 using ffmpeg lavfi sources.
-    Will be replaced by real asset assembly + ffmpeg compose in pipeline integration.
-    """
-    # target_duration_h is stored in hours; convert to seconds, default 3 h
+    """Placeholder render: creates a minimal valid .mp4 using ffmpeg lavfi."""
+    import shutil
+    if not shutil.which("ffmpeg"):
+        raise RuntimeError("ffmpeg not found in PATH — install ffmpeg to render videos")
+
     duration_s = int((video.target_duration_h or 3.0) * 3600)
-    # Cap at 60 s for placeholder renders to avoid huge files during development
     duration_s = min(duration_s, 60)
 
     cmd = [
@@ -97,8 +94,11 @@ def _render_placeholder(video, output_path: Path) -> None:
         "-c:a", "aac", "-shortest",
         str(output_path),
     ]
-    result = subprocess.run(cmd, capture_output=True, timeout=300)
+    try:
+        result = subprocess.run(cmd, capture_output=True, timeout=300, text=True)
+    except subprocess.TimeoutExpired:
+        raise RuntimeError(f"ffmpeg timeout after 300s rendering {output_path}")
+
     if result.returncode != 0:
-        raise RuntimeError(
-            f"ffmpeg placeholder render failed: {result.stderr.decode()[:500]}"
-        )
+        stderr_msg = (result.stderr or "<no stderr>")[:500]
+        raise RuntimeError(f"ffmpeg placeholder render failed: {stderr_msg}")
