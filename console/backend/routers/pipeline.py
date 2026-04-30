@@ -27,12 +27,13 @@ def get_stats(
 def list_jobs(
     status: str | None = Query(None),
     job_type: str | None = Query(None),
+    video_format: str | None = Query(None),
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
     _user=Depends(require_editor_or_admin),
 ):
-    return PipelineService(db).list_jobs(status=status, job_type=job_type, page=page, per_page=per_page)
+    return PipelineService(db).list_jobs(status=status, job_type=job_type, video_format=video_format, page=page, per_page=per_page)
 
 
 @router.get("/jobs/{job_id}")

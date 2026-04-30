@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { Card, Badge, Button, StatBox, ProgressBar, Spinner, EmptyState, Toast } from '../components/index.jsx'
+import { Card, Badge, Button, StatBox, ProgressBar, Spinner, EmptyState, Toast, Select } from '../components/index.jsx'
 import { useWebSocket } from '../hooks/useWebSocket.js'
 import { fetchApi } from '../api/client.js'
 
@@ -63,6 +63,9 @@ function JobRow({ job, onRetry, onCancel, onError }) {
         <span className="text-xs font-mono text-[#5a5a70] w-8">#{job.id}</span>
         <Badge status={STATUS_COLOR[job.status]} label={job.status} />
         <span className="text-xs font-mono text-[#9090a8] w-20">{JOB_TYPE_LABELS[job.job_type] || job.job_type}</span>
+        {job.video_format === 'youtube_long' && (
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#14b8a6] bg-opacity-20 text-[#14b8a6] font-mono">YOUTUBE</span>
+        )}
         <div className="flex-1"><ProgressBar value={job.progress || 0} max={100} /></div>
         <span className="text-xs font-mono text-[#9090a8] w-8 text-right">{job.progress || 0}%</span>
         {job.script_id && <span className="text-xs text-[#5a5a70] font-mono">script#{job.script_id}</span>}
@@ -112,6 +115,7 @@ export default function PipelinePage() {
   const [jobs,       setJobs]       = useState([])
   const [wsConnected,setWsConnected]= useState(false)
   const [statusFilter, setFilter]   = useState('all')
+  const [filterFormat, setFilterFormat] = useState('')
   const [loading,    setLoading]    = useState(false)
   const [toast,      setToast]      = useState(null)
 
@@ -144,7 +148,7 @@ export default function PipelinePage() {
     try {
       const [statsRes, jobsRes] = await Promise.all([
         fetchApi('/api/pipeline/stats'),
-        fetchApi(`/api/pipeline/jobs?${statusFilter !== 'all' ? `status=${statusFilter}&` : ''}per_page=50`),
+        fetchApi(`/api/pipeline/jobs?${statusFilter !== 'all' ? `status=${statusFilter}&` : ''}${filterFormat ? `video_format=${filterFormat}&` : ''}per_page=50`),
       ])
       setStats(statsRes)
       setJobs(jobsRes.items || [])
@@ -153,7 +157,7 @@ export default function PipelinePage() {
     } finally {
       setLoading(false)
     }
-  }, [statusFilter])
+  }, [statusFilter, filterFormat])
 
   useEffect(() => { loadJobs() }, [loadJobs])
 
@@ -219,20 +223,27 @@ export default function PipelinePage() {
       <Card
         title={`Jobs (${filtered.length})`}
         actions={
-          <div className="flex gap-1">
-            {['all', 'queued', 'running', 'completed', 'failed', 'cancelled'].map(s => (
-              <button
-                key={s}
-                onClick={() => setFilter(s)}
-                className={`px-2 py-0.5 rounded text-xs font-mono transition-colors ${
-                  statusFilter === s
-                    ? 'bg-[#7c6af7] text-white'
-                    : 'text-[#9090a8] hover:text-[#e8e8f0]'
-                }`}
-              >
-                {s}
-              </button>
-            ))}
+          <div className="flex gap-3 items-center">
+            <div className="flex gap-1">
+              {['all', 'queued', 'running', 'completed', 'failed', 'cancelled'].map(s => (
+                <button
+                  key={s}
+                  onClick={() => setFilter(s)}
+                  className={`px-2 py-0.5 rounded text-xs font-mono transition-colors ${
+                    statusFilter === s
+                      ? 'bg-[#7c6af7] text-white'
+                      : 'text-[#9090a8] hover:text-[#e8e8f0]'
+                  }`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+            <Select value={filterFormat} onChange={e => setFilterFormat(e.target.value)} className="max-w-[160px]">
+              <option value="">Format: All</option>
+              <option value="short">Short</option>
+              <option value="youtube_long">YouTube Long</option>
+            </Select>
           </div>
         }
       >

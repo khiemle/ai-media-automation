@@ -59,6 +59,7 @@ class PipelineService:
         self,
         status: str | None = None,
         job_type: str | None = None,
+        video_format: str | None = None,
         page: int = 1,
         per_page: int = 20,
     ) -> PaginatedResponse:
@@ -67,6 +68,8 @@ class PipelineService:
             q = q.filter(PipelineJob.status == status)
         if job_type:
             q = q.filter(PipelineJob.job_type == job_type)
+        if video_format:
+            q = q.filter(PipelineJob.video_format == video_format)
 
         total = q.count()
         rows = q.order_by(PipelineJob.created_at.desc()).offset((page - 1) * per_page).limit(per_page).all()
@@ -230,6 +233,7 @@ class PipelineService:
             "progress":       job.progress,
             "details":        job.details,
             "error":          job.error,
+            "video_format":   job.video_format,
             "started_at":     job.started_at.isoformat() if job.started_at else None,
             "completed_at":   job.completed_at.isoformat() if job.completed_at else None,
             "created_at":     job.created_at.isoformat() if job.created_at else None,
