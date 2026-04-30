@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { youtubeVideosApi, musicApi, assetsApi } from '../api/client.js'
-import { Card, Badge, Button, Input, Select, Toast, Spinner, EmptyState } from '../components/index.jsx'
+import { Card, Badge, Button, Input, Select, Toast, Spinner, EmptyState, Modal } from '../components/index.jsx'
 
 const STATUS_COLORS = {
   draft:     '#9090a8',
@@ -270,12 +270,99 @@ function CreationPanel({ template, onClose, onCreated }) {
   )
 }
 
+function MakeShortModal({ video, shortTemplates, onClose, onCreated }) {
+  const [form, setForm] = useState({
+    sameMusic: true,
+    sameVisual: true,
+    ctaText: `Full ${video.target_duration_h ? video.target_duration_h + 'h' : ''} version on channel ↑`,
+    ctaPosition: 'last_10s',
+  })
+  const [loading, setLoading] = useState(false)
+  const [toast, setToast] = useState(null)
+  const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000) }
+
+  const shortTemplate = shortTemplates[0]
+
+  const handleSubmit = async () => {
+    if (!shortTemplate) { showToast('No short template found', 'error'); return }
+    setLoading(true)
+    try {
+      await youtubeVideosApi.create({
+        title: `${video.title} — Short`,
+        template_id: shortTemplate.id,
+        theme: video.theme,
+        target_duration_h: 58 / 3600,
+        music_track_id: form.sameMusic ? video.music_track_id : null,
+        visual_asset_id: form.sameVisual ? video.visual_asset_id : null,
+        sfx_overrides: { parent_youtube_video_id: video.id, cta_text: form.ctaText, cta_position: form.ctaPosition },
+      })
+      onCreated()
+      onClose()
+    } catch (e) { showToast(e.message, 'error') }
+    finally { setLoading(false) }
+  }
+
+  return (
+    <Modal open onClose={onClose} title={`New ${shortTemplate?.label || 'Viral Short'}`} width="max-w-md"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" loading={loading} onClick={handleSubmit}>Queue Render →</Button>
+        </>
+      }
+    >
+      {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+      <div className="flex flex-col gap-4">
+        <div className="bg-[#0d0d0f] rounded-lg p-3">
+          <div className="text-xs text-[#5a5a70] mb-1">Parent Video</div>
+          <div className="text-sm text-[#e8e8f0]">{video.title}</div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-[#9090a8] font-medium">Music</label>
+            <div className="flex gap-2">
+              <button onClick={() => setForm(f => ({ ...f, sameMusic: true }))}
+                className={`flex-1 py-2 rounded-lg text-xs border transition-colors ${form.sameMusic ? 'bg-[#7c6af7] border-[#7c6af7] text-white' : 'bg-[#16161a] border-[#2a2a32] text-[#9090a8]'}`}>
+                Same as parent
+              </button>
+              <button onClick={() => setForm(f => ({ ...f, sameMusic: false }))}
+                className={`flex-1 py-2 rounded-lg text-xs border transition-colors ${!form.sameMusic ? 'bg-[#7c6af7] border-[#7c6af7] text-white' : 'bg-[#16161a] border-[#2a2a32] text-[#9090a8]'}`}>
+                Pick different
+              </button>
+            </div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-[#9090a8] font-medium">Visual</label>
+            <div className="flex gap-2">
+              <button onClick={() => setForm(f => ({ ...f, sameVisual: true }))}
+                className={`flex-1 py-2 rounded-lg text-xs border transition-colors ${form.sameVisual ? 'bg-[#7c6af7] border-[#7c6af7] text-white' : 'bg-[#16161a] border-[#2a2a32] text-[#9090a8]'}`}>
+                9:16 crop
+              </button>
+              <button onClick={() => setForm(f => ({ ...f, sameVisual: false }))}
+                className={`flex-1 py-2 rounded-lg text-xs border transition-colors ${!form.sameVisual ? 'bg-[#7c6af7] border-[#7c6af7] text-white' : 'bg-[#16161a] border-[#2a2a32] text-[#9090a8]'}`}>
+                Pick different
+              </button>
+            </div>
+          </div>
+        </div>
+        <div className="text-xs text-[#9090a8]">Duration: <strong className="text-[#e8e8f0]">58 seconds</strong> (fixed)</div>
+        <Input label="CTA Overlay Text" value={form.ctaText} onChange={e => setForm(f => ({ ...f, ctaText: e.target.value }))} />
+        <Select label="CTA Position" value={form.ctaPosition} onChange={e => setForm(f => ({ ...f, ctaPosition: e.target.value }))}>
+          <option value="last_10s">Last 10 seconds</option>
+          <option value="throughout">Throughout</option>
+        </Select>
+      </div>
+    </Modal>
+  )
+}
+
 export default function YouTubeVideosPage() {
   const [videos, setVideos]               = useState([])
   const [templates, setTemplates]         = useState([])
   const [loading, setLoading]             = useState(true)
   const [filterStatus, setFilterStatus]   = useState('')
   const [activeTemplate, setActiveTemplate] = useState(null)
+  const [makeShortVideo, setMakeShortVideo] = useState(null)
   const [toast, setToast]                 = useState(null)
 
   const showToast = (msg, type = 'success') => {
@@ -400,6 +487,11 @@ export default function YouTubeVideosPage() {
                         Render →
                       </Button>
                     )}
+                    {v.status === 'ready' && (
+                      <Button variant="ghost" size="sm" onClick={() => setMakeShortVideo(v)}>
+                        + Make Short
+                      </Button>
+                    )}
                     <button
                       onClick={() => handleDelete(v)}
                       className="text-[#5a5a70] hover:text-[#f87171] text-xs ml-1"
@@ -420,6 +512,16 @@ export default function YouTubeVideosPage() {
           template={activeTemplate}
           onClose={() => setActiveTemplate(null)}
           onCreated={() => { setActiveTemplate(null); load() }}
+        />
+      )}
+
+      {/* Make Short Modal */}
+      {makeShortVideo && (
+        <MakeShortModal
+          video={makeShortVideo}
+          shortTemplates={templates.filter(t => t.output_format === 'portrait_short')}
+          onClose={() => setMakeShortVideo(null)}
+          onCreated={() => { setMakeShortVideo(null); load() }}
         />
       )}
     </div>
