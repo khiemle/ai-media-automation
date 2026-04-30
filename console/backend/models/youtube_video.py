@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Float, Integer, String, Text, DateTime, func
+from sqlalchemy import Float, ForeignKey, Integer, String, Text, DateTime, func
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -12,7 +12,9 @@ class YoutubeVideo(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     title: Mapped[str] = mapped_column(Text, nullable=False)
-    template_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    template_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("video_templates.id", ondelete="RESTRICT"), nullable=False
+    )
     theme: Mapped[str | None] = mapped_column(Text, nullable=True)
     music_track_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     visual_asset_id: Mapped[int | None] = mapped_column(Integer, nullable=True)

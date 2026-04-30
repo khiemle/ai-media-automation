@@ -6,8 +6,39 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from console.backend.models.audit_log import AuditLog
 from console.backend.models.youtube_video import YoutubeVideo
 from console.backend.models.video_template import VideoTemplate
+
+# Valid status transitions for the YoutubeVideo state machine
+ALLOWED_TRANSITIONS: dict[str, set[str]] = {
+    "draft": {"queued"},
+    "queued": {"rendering", "failed", "draft"},
+    "rendering": {"done", "failed"},
+    "done": {"published", "draft"},
+    "failed": {"draft"},
+    "published": set(),
+}
+
+
+def _audit(
+    db: Session,
+    user_id: int | None,
+    action: str,
+    target_type: str,
+    target_id: str,
+    details: dict | None = None,
+) -> None:
+    if user_id is None:
+        return
+    log = AuditLog(
+        user_id=user_id,
+        action=action,
+        target_type=target_type,
+        target_id=str(target_id),
+        details=details or {},
+    )
+    db.add(log)
 
 
 def _video_to_dict(v: YoutubeVideo) -> dict[str, Any]:
@@ -82,13 +113,14 @@ class YoutubeVideoService:
             raise KeyError(f"YoutubeVideo {video_id} not found")
         return _video_to_dict(v)
 
-    def create_video(self, data: dict) -> dict:
+    def create_video(self, data: dict, user_id: int | None = None) -> dict:
         """Create a new YouTube video project."""
         template_id = data.get("template_id")
-        if template_id:
-            template = self.db.get(VideoTemplate, template_id)
-            if not template:
-                raise ValueError(f"Template {template_id} not found")
+        if not template_id:
+            raise ValueError("template_id is required")
+        template = self.db.get(VideoTemplate, template_id)
+        if not template:
+            raise ValueError(f"Template {template_id} not found")
 
         video = YoutubeVideo(
             title=data["title"],
@@ -105,11 +137,17 @@ class YoutubeVideoService:
             status="draft",
         )
         self.db.add(video)
-        self.db.commit()
-        self.db.refresh(video)
+        try:
+            self.db.flush()
+            _audit(self.db, user_id, "create_video", "youtube_video", str(video.id), {"title": video.title})
+            self.db.commit()
+            self.db.refresh(video)
+        except Exception:
+            self.db.rollback()
+            raise
         return _video_to_dict(video)
 
-    def update_video(self, video_id: int, data: dict) -> dict:
+    def update_video(self, video_id: int, data: dict, user_id: int | None = None) -> dict:
         """Update editable fields on a YouTube video project."""
         v = self.db.get(YoutubeVideo, video_id)
         if not v:
@@ -120,30 +158,56 @@ class YoutubeVideoService:
             "sfx_overrides", "target_duration_h", "output_quality",
             "seo_title", "seo_description", "seo_tags",
         ]
-        for field in editable_fields:
-            if field in data:
-                setattr(v, field, data[field])
+        changed = {f: data[f] for f in editable_fields if f in data}
+        for field, value in changed.items():
+            setattr(v, field, value)
 
-        self.db.commit()
-        self.db.refresh(v)
+        try:
+            _audit(self.db, user_id, "update_video", "youtube_video", str(video_id), changed)
+            self.db.commit()
+            self.db.refresh(v)
+        except Exception:
+            self.db.rollback()
+            raise
         return _video_to_dict(v)
 
-    def update_status(self, video_id: int, status: str) -> dict:
-        """Transition video status."""
-        valid_statuses = {"draft", "queued", "rendering", "done", "failed", "published"}
+    def update_status(self, video_id: int, status: str, user_id: int | None = None) -> dict:
+        """Transition video status following the allowed state machine."""
+        valid_statuses = set(ALLOWED_TRANSITIONS.keys())
         if status not in valid_statuses:
-            raise ValueError(f"Invalid status: {status}")
+            raise ValueError(f"Invalid status: {status!r}")
         v = self.db.get(YoutubeVideo, video_id)
         if not v:
             raise KeyError(f"YoutubeVideo {video_id} not found")
+        allowed = ALLOWED_TRANSITIONS.get(v.status, set())
+        if status not in allowed:
+            raise ValueError(f"Cannot transition from {v.status!r} to {status!r}")
+        prev = v.status
         v.status = status
-        self.db.commit()
-        self.db.refresh(v)
+        try:
+            _audit(self.db, user_id, "update_status", "youtube_video", str(video_id),
+                   {"from": prev, "to": status})
+            self.db.commit()
+            self.db.refresh(v)
+        except Exception:
+            self.db.rollback()
+            raise
         return _video_to_dict(v)
 
-    def delete_video(self, video_id: int) -> None:
+    def delete_video(self, video_id: int, user_id: int | None = None) -> None:
         v = self.db.get(YoutubeVideo, video_id)
         if not v:
             raise KeyError(f"YoutubeVideo {video_id} not found")
-        self.db.delete(v)
-        self.db.commit()
+        # Revoke active Celery task if video is queued or rendering
+        if v.celery_task_id and v.status in {"queued", "rendering"}:
+            from console.backend.celery_app import celery_app
+            celery_app.control.revoke(v.celery_task_id, terminate=True)
+        try:
+            _audit(self.db, user_id, "delete_video", "youtube_video", str(video_id),
+                   {"title": v.title})
+            self.db.delete(v)
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise
+

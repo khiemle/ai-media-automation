@@ -1,5 +1,6 @@
 # console/backend/routers/youtube_videos.py
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from console.backend.auth import require_editor_or_admin
@@ -7,6 +8,40 @@ from console.backend.database import get_db
 from console.backend.services.youtube_video_service import YoutubeVideoService
 
 router = APIRouter(prefix="/youtube-videos", tags=["youtube-videos"])
+
+
+# ── Request schemas ───────────────────────────────────────────────────────────
+
+
+class YoutubeVideoCreate(BaseModel):
+    title: str
+    template_id: int
+    theme: str | None = None
+    music_track_id: int | None = None
+    sfx_overrides: dict | None = None
+    visual_asset_id: int | None = None
+    target_duration_h: float | None = None
+    output_quality: str = "1080p"
+    seo_title: str | None = None
+    seo_description: str | None = None
+    seo_tags: list[str] | None = None
+
+
+class YoutubeVideoUpdate(BaseModel):
+    title: str | None = None
+    theme: str | None = None
+    music_track_id: int | None = None
+    sfx_overrides: dict | None = None
+    visual_asset_id: int | None = None
+    target_duration_h: float | None = None
+    output_quality: str | None = None
+    seo_title: str | None = None
+    seo_description: str | None = None
+    seo_tags: list[str] | None = None
+
+
+class StatusUpdate(BaseModel):
+    status: str
 
 
 # ── Templates ────────────────────────────────────────────────────────────────
@@ -47,12 +82,12 @@ def list_videos(
 
 @router.post("", status_code=201)
 def create_video(
-    data: dict,
+    body: YoutubeVideoCreate,
     db: Session = Depends(get_db),
-    _user=Depends(require_editor_or_admin),
+    user=Depends(require_editor_or_admin),
 ):
     try:
-        return YoutubeVideoService(db).create_video(data)
+        return YoutubeVideoService(db).create_video(body.model_dump(), user_id=user.id)
     except (ValueError, KeyError) as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -72,25 +107,31 @@ def get_video(
 @router.put("/{video_id}")
 def update_video(
     video_id: int,
-    data: dict,
+    body: YoutubeVideoUpdate,
     db: Session = Depends(get_db),
-    _user=Depends(require_editor_or_admin),
+    user=Depends(require_editor_or_admin),
 ):
     try:
-        return YoutubeVideoService(db).update_video(video_id, data)
+        return YoutubeVideoService(db).update_video(
+            video_id,
+            {k: v for k, v in body.model_dump().items() if v is not None},
+            user_id=user.id,
+        )
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.patch("/{video_id}/status")
 def update_status(
     video_id: int,
-    data: dict,
+    body: StatusUpdate,
     db: Session = Depends(get_db),
-    _user=Depends(require_editor_or_admin),
+    user=Depends(require_editor_or_admin),
 ):
     try:
-        return YoutubeVideoService(db).update_status(video_id, data.get("status", ""))
+        return YoutubeVideoService(db).update_status(video_id, body.status, user_id=user.id)
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
@@ -101,9 +142,10 @@ def update_status(
 def delete_video(
     video_id: int,
     db: Session = Depends(get_db),
-    _user=Depends(require_editor_or_admin),
+    user=Depends(require_editor_or_admin),
 ):
     try:
-        YoutubeVideoService(db).delete_video(video_id)
+        YoutubeVideoService(db).delete_video(video_id, user_id=user.id)
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
