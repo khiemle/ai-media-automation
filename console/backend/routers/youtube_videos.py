@@ -91,7 +91,9 @@ def update_status(
 ):
     try:
         return YoutubeVideoService(db).update_status(video_id, data.get("status", ""))
-    except (KeyError, ValueError) as e:
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
