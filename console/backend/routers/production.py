@@ -1,7 +1,7 @@
 """Production router — asset browsing, scene editing, TTS/Veo/render."""
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -112,6 +112,43 @@ def delete_asset(
         ProductionService(db).delete_asset(asset_id, user_id=user.id)
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+_ASSET_UPLOAD_ALLOWED = {'.jpg', '.jpeg', '.png', '.webp', '.mp4', '.mov', '.webm'}
+_MAX_ASSET_BYTES = 500 * 1024 * 1024  # 500 MB
+_ASSET_SOURCES = {'manual', 'midjourney', 'runway', 'pexels', 'veo', 'stock'}
+
+
+@router.post("/assets/upload", status_code=201)
+async def upload_asset(
+    file: UploadFile = File(...),
+    source: str = Form(default='manual'),
+    description: str = Form(default=''),
+    keywords: str = Form(default=''),
+    db: Session = Depends(get_db),
+    user=Depends(require_editor_or_admin),
+):
+    ext = Path(file.filename or '').suffix.lower()
+    if ext not in _ASSET_UPLOAD_ALLOWED:
+        raise HTTPException(status_code=400, detail=f"Unsupported file type: {ext}")
+    if source not in _ASSET_SOURCES:
+        raise HTTPException(status_code=400, detail=f"Invalid source: {source}")
+
+    content = await file.read(_MAX_ASSET_BYTES + 1)
+    if len(content) > _MAX_ASSET_BYTES:
+        raise HTTPException(status_code=413, detail='File too large (max 500 MB)')
+
+    kw_list = [k.strip() for k in keywords.split(',') if k.strip()] if keywords else []
+    try:
+        return ProductionService(db).import_asset(
+            file_bytes=content,
+            filename=file.filename or 'asset',
+            source=source,
+            description=description or None,
+            keywords=kw_list or None,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 # ── Script viewer ─────────────────────────────────────────────────────────────

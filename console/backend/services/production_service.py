@@ -1,7 +1,9 @@
 """ProductionService — asset search, scene editing, TTS/Veo regen, start production."""
 import math
 import logging
+import os
 from datetime import datetime, timezone
+from pathlib import Path
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -11,6 +13,13 @@ from console.backend.models.pipeline_job import PipelineJob
 from console.backend.schemas.common import PaginatedResponse
 
 logger = logging.getLogger(__name__)
+
+_ALLOWED_IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp'}
+_ALLOWED_VIDEO_EXTENSIONS = {'.mp4', '.mov', '.webm'}
+_ALLOWED_ASSET_EXTENSIONS = _ALLOWED_IMAGE_EXTENSIONS | _ALLOWED_VIDEO_EXTENSIONS
+_DEFAULT_ASSETS_DIR = Path(os.path.abspath(
+    os.environ.get('ASSETS_PATH', './assets/video_db/manual')
+))
 
 
 class ProductionService:
@@ -131,6 +140,40 @@ class ProductionService:
         self.db.delete(asset)
         self._audit(user_id, "delete", "video_asset", str(asset_id))
         self.db.commit()
+
+    def import_asset(
+        self,
+        file_bytes: bytes,
+        filename: str,
+        source: str,
+        description: str | None,
+        keywords: list[str] | None,
+        assets_dir: Path | None = None,
+    ) -> dict:
+        ext = Path(filename).suffix.lower()
+        if ext not in _ALLOWED_ASSET_EXTENSIONS:
+            raise ValueError(f"Unsupported file type: {ext}")
+
+        asset_type = 'still_image' if ext in _ALLOWED_IMAGE_EXTENSIONS else 'video_clip'
+        save_dir = Path(assets_dir) if assets_dir else _DEFAULT_ASSETS_DIR
+        save_dir.mkdir(parents=True, exist_ok=True)
+
+        row = VideoAsset(
+            file_path='',
+            source=source,
+            asset_type=asset_type,
+            description=description,
+            keywords=keywords or [],
+        )
+        self.db.add(row)
+        self.db.flush()
+
+        dest = save_dir / f'asset_{row.id}{ext}'
+        dest.write_bytes(file_bytes)
+        row.file_path = str(dest)
+        self.db.commit()
+        self.db.refresh(row)
+        return self._asset_to_dict(row)
 
     def stream_asset_path(self, asset_id: int) -> str:
         asset = self.db.query(VideoAsset).filter(VideoAsset.id == asset_id).first()
