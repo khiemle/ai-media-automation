@@ -231,6 +231,116 @@ function AnimateModal({ asset, onClose, onAnimated }) {
   )
 }
 
+// ── Import Modal ──────────────────────────────────────────────────────────────
+const IMPORT_SOURCES = ['manual', 'midjourney', 'runway', 'pexels', 'veo', 'stock']
+const IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.webp'])
+const VIDEO_EXTS = new Set(['.mp4', '.mov', '.webm'])
+
+function detectAssetType(filename) {
+  const ext = filename.slice(filename.lastIndexOf('.')).toLowerCase()
+  if (IMAGE_EXTS.has(ext)) return 'still_image'
+  if (VIDEO_EXTS.has(ext)) return 'video_clip'
+  return ''
+}
+
+function ImportAssetModal({ onClose, onImported }) {
+  const [file, setFile] = useState(null)
+  const [source, setSource] = useState('manual')
+  const [description, setDescription] = useState('')
+  const [keywords, setKeywords] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [toast, setToast] = useState(null)
+
+  const showToast = (msg, type = 'error') => {
+    setToast({ msg, type })
+    setTimeout(() => setToast(null), 3000)
+  }
+
+  const detectedType = file ? detectAssetType(file.name) : ''
+
+  const handleSubmit = async () => {
+    if (!file) { showToast('Please select a file'); return }
+    setLoading(true)
+    try {
+      await assetsApi.upload(file, {
+        source,
+        description: description || undefined,
+        keywords: keywords || undefined,
+        asset_type: detectedType || undefined,
+      })
+      onImported()
+      onClose()
+    } catch (e) {
+      showToast(e.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Import Asset"
+      width="max-w-lg"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" loading={loading} onClick={handleSubmit}>Import</Button>
+        </>
+      }
+    >
+      {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-[#9090a8] font-medium">File (Image or Video)</label>
+          <input
+            type="file"
+            accept=".jpg,.jpeg,.png,.webp,.mp4,.mov,.webm"
+            onChange={e => setFile(e.target.files?.[0] || null)}
+            className="text-sm text-[#9090a8] file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-[#2a2a32] file:text-[#e8e8f0] file:text-xs cursor-pointer"
+          />
+          {detectedType && (
+            <span className="text-xs text-[#5a5a70] mt-0.5">
+              Type: <span className="text-[#9090a8] font-mono">{detectedType}</span>
+            </span>
+          )}
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-[#9090a8] font-medium">Source</label>
+          <select
+            value={source}
+            onChange={e => setSource(e.target.value)}
+            className="bg-[#16161a] border border-[#2a2a32] rounded-lg px-3 py-1.5 text-sm text-[#e8e8f0] focus:outline-none focus:border-[#7c6af7] transition-colors"
+          >
+            {IMPORT_SOURCES.map(s => (
+              <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+            ))}
+          </select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-[#9090a8] font-medium">Description <span className="text-[#5a5a70]">(optional)</span></label>
+          <input
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            placeholder="e.g. Rainy window close-up"
+            className="bg-[#16161a] border border-[#2a2a32] rounded-lg px-3 py-1.5 text-sm text-[#e8e8f0] placeholder:text-[#5a5a70] focus:outline-none focus:border-[#7c6af7] transition-colors"
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-[#9090a8] font-medium">Keywords <span className="text-[#5a5a70]">(comma-separated, optional)</span></label>
+          <input
+            value={keywords}
+            onChange={e => setKeywords(e.target.value)}
+            placeholder="rain, dark, window"
+            className="bg-[#16161a] border border-[#2a2a32] rounded-lg px-3 py-1.5 text-sm text-[#e8e8f0] placeholder:text-[#5a5a70] focus:outline-none focus:border-[#7c6af7] transition-colors"
+          />
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function VideoAssetsPage() {
   const [filterKeywords,  setFilterKeywords]  = useState('')
@@ -243,6 +353,7 @@ export default function VideoAssetsPage() {
   const [animateTarget,   setAnimateTarget]   = useState(null)
   const [deletingId,      setDeletingId]      = useState(null)
   const [toast,           setToast]           = useState(null)
+  const [showImport,      setShowImport]      = useState(false)
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type })
@@ -294,11 +405,14 @@ export default function VideoAssetsPage() {
   return (
     <div className="flex flex-col gap-5">
       {/* Header */}
-      <div>
-        <h1 className="text-xl font-bold text-[#e8e8f0]">Video Assets</h1>
-        <p className="text-sm text-[#9090a8] mt-0.5">
-          Manage video clips downloaded from Pexels or generated by Veo
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-[#e8e8f0]">Video Assets</h1>
+          <p className="text-sm text-[#9090a8] mt-0.5">
+            Manage video clips downloaded from Pexels or generated by Veo
+          </p>
+        </div>
+        <Button variant="primary" onClick={() => setShowImport(true)}>+ Import Asset</Button>
       </div>
 
       {/* Stats */}
@@ -547,6 +661,13 @@ export default function VideoAssetsPage() {
       )}
 
       {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+
+      {showImport && (
+        <ImportAssetModal
+          onClose={() => setShowImport(false)}
+          onImported={refetch}
+        />
+      )}
     </div>
   )
 }

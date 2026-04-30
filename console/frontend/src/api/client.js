@@ -149,6 +149,25 @@ export const assetsApi = {
   thumbnailUrl: (id) => `/api/production/assets/${id}/thumbnail`,
   animateWithRunway: (id, body) =>
     fetchApi(`/api/production/assets/${id}/animate`, { method: 'POST', body: JSON.stringify(body) }),
+  upload: (file, { source = 'manual', description = '', keywords = '', asset_type = '' } = {}) => {
+    const form = new FormData()
+    form.append('file', file)
+    form.append('source', source)
+    if (description) form.append('description', description)
+    if (keywords) form.append('keywords', keywords)
+    if (asset_type) form.append('asset_type', asset_type)
+    const headers = {}
+    const token = getToken()
+    if (token) headers['Authorization'] = `Bearer ${token}`
+    return fetch('/api/production/assets/upload', { method: 'POST', body: form, headers })
+      .then(async res => {
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ detail: res.statusText }))
+          throw new Error(err.detail || `HTTP ${res.status}`)
+        }
+        return res.json()
+      })
+  },
 }
 
 // ── SFX ─────────────────────────────────────────────────────────────────────────
