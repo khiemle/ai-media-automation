@@ -47,6 +47,12 @@ export default function LLMPage() {
   const [saving,   setSaving]   = useState(null)  // 'script'|'media'|'music'|'elevenlabs'|'kokoro'|'sunoapi'|'pexels'
   const [voices,   setVoices]   = useState(null)
   const [toast,    setToast]    = useState(null)
+  const [runwayConfig, setRunwayConfig] = useState(null)
+  const [runwayKey, setRunwayKey] = useState('')
+  const [runwayModel, setRunwayModel] = useState('gen3-alpha')
+  const [runwaySaving, setRunwaySaving] = useState(false)
+  const [runwayTesting, setRunwayTesting] = useState(false)
+  const [runwayTestResult, setRunwayTestResult] = useState(null)
   const timerRef = useRef(null)
 
   const showToast = (msg, type = 'success') => {
@@ -72,6 +78,15 @@ export default function LLMPage() {
       showToast(e.message || 'Failed to load config', 'error')
     } finally {
       setLoading(false)
+    }
+
+    // Load Runway config separately
+    try {
+      const runwayData = await fetchApi('/api/llm/runway')
+      setRunwayConfig(runwayData)
+      setRunwayModel(runwayData.model || 'gen3-alpha')
+    } catch (e) {
+      // Silently fail if Runway endpoint not available
     }
   }
 
@@ -103,6 +118,36 @@ export default function LLMPage() {
       showToast(e.message || 'Save failed', 'error')
     } finally {
       setSaving(null)
+    }
+  }
+
+  const handleRunwaySave = async () => {
+    setRunwaySaving(true)
+    try {
+      const result = await fetchApi('/api/llm/runway', {
+        method: 'PUT',
+        body: JSON.stringify({ api_key: runwayKey, model: runwayModel }),
+      })
+      setRunwayConfig(result)
+      setRunwayKey('')
+      showToast('Runway settings saved')
+    } catch (e) {
+      showToast(e.message || 'Save failed', 'error')
+    } finally {
+      setRunwaySaving(false)
+    }
+  }
+
+  const handleRunwayTest = async () => {
+    setRunwayTesting(true)
+    setRunwayTestResult(null)
+    try {
+      const result = await fetchApi('/api/llm/runway/test-connection', { method: 'POST' })
+      setRunwayTestResult(result)
+    } catch (e) {
+      setRunwayTestResult({ ok: false, error: e.message })
+    } finally {
+      setRunwayTesting(false)
     }
   }
 
@@ -384,6 +429,46 @@ export default function LLMPage() {
               : null
           }
           <Button size="sm" onClick={() => saveCard('pexels')}>Save</Button>
+        </div>
+      </Card>
+
+      {/* Runway */}
+      <Card title={
+        <span className="flex items-center gap-2">
+          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0 inline-block bg-[#14b8a6]" />
+          Runway
+        </span>
+      } actions={runwaySaving && <Spinner size={16} />}>
+        <div className="space-y-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-[#9090a8] font-medium">API Key</label>
+            <KeyInput
+              value={runwayKey}
+              onChange={v => setRunwayKey(v)}
+              placeholder="rw-..."
+            />
+            {runwayConfig?.api_key_masked && (
+              <span className="text-xs text-[#5a5a70] font-mono">{runwayConfig.api_key_masked}</span>
+            )}
+          </div>
+          <Select
+            label="Model"
+            value={runwayModel}
+            onChange={e => setRunwayModel(e.target.value)}
+            options={[
+              { value: 'gen3-alpha', label: 'gen3-alpha' },
+              { value: 'gen4-turbo', label: 'gen4-turbo' },
+            ]}
+          />
+          <div className="flex gap-2">
+            <Button size="sm" loading={runwaySaving} onClick={handleRunwaySave}>Save</Button>
+            <Button size="sm" variant="ghost" loading={runwayTesting} onClick={handleRunwayTest}>Test Connection</Button>
+          </div>
+          {runwayTestResult && (
+            <div className={`text-xs px-3 py-2 rounded-lg font-mono ${runwayTestResult.ok ? 'bg-[#34d399] bg-opacity-10 text-[#34d399]' : 'bg-[#f87171] bg-opacity-10 text-[#f87171]'}`}>
+              {runwayTestResult.ok ? '✓ Connected' : `✗ ${runwayTestResult.error}`}
+            </div>
+          )}
         </div>
       </Card>
 

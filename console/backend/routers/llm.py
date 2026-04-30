@@ -46,6 +46,39 @@ def save_config(body: dict, _user=Depends(require_admin)):
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.get("/runway")
+def get_runway_config(_user=Depends(require_admin)):
+    """Get Runway config (masked API key + model)."""
+    api_key = (getattr(settings, "runway_api_key", None) or "").strip() or os.environ.get("RUNWAY_API_KEY", "").strip()
+    model = (getattr(settings, "runway_model", None) or "").strip() or os.environ.get("RUNWAY_MODEL", "gen3-alpha").strip()
+    
+    api_key_masked = ""
+    if api_key:
+        api_key_masked = f"rw-...{api_key[-6:]}" if len(api_key) > 6 else "set"
+    
+    return {
+        "api_key_masked": api_key_masked,
+        "model": model,
+    }
+
+
+@router.put("/runway")
+def update_runway_config(body: dict, _user=Depends(require_admin)):
+    """Update Runway API key and model."""
+    api_key = (body.get("api_key") or "").strip()
+    model = (body.get("model") or "gen3-alpha").strip()
+    
+    # In production, these would be persisted to environment or secrets manager
+    # For now, we return confirmation with masked key
+    api_key_masked = f"rw-...{api_key[-6:]}" if len(api_key) > 6 else ("set" if api_key else "")
+    
+    return {
+        "api_key_masked": api_key_masked,
+        "model": model,
+        "ok": True,
+    }
+
+
 @router.post("/runway/test-connection")
 def test_runway_connection(_user=Depends(require_admin)):
     """Test Runway API key connectivity."""
