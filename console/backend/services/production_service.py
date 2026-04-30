@@ -148,13 +148,15 @@ class ProductionService:
         source: str,
         description: str | None,
         keywords: list[str] | None,
+        asset_type: str | None = None,
         assets_dir: Path | None = None,
     ) -> dict:
         ext = Path(filename).suffix.lower()
         if ext not in _ALLOWED_ASSET_EXTENSIONS:
             raise ValueError(f"Unsupported file type: {ext}")
 
-        asset_type = 'still_image' if ext in _ALLOWED_IMAGE_EXTENSIONS else 'video_clip'
+        if not asset_type:
+            asset_type = 'still_image' if ext in _ALLOWED_IMAGE_EXTENSIONS else 'video_clip'
         save_dir = Path(assets_dir) if assets_dir else _DEFAULT_ASSETS_DIR
         save_dir.mkdir(parents=True, exist_ok=True)
 

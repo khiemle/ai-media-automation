@@ -125,6 +125,7 @@ async def upload_asset(
     source: str = Form(default='manual'),
     description: str = Form(default=''),
     keywords: str = Form(default=''),
+    asset_type: str = Form(default=''),
     db: Session = Depends(get_db),
     user=Depends(require_editor_or_admin),
 ):
@@ -146,6 +147,7 @@ async def upload_asset(
             source=source,
             description=description or None,
             keywords=kw_list or None,
+            asset_type=asset_type or None,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

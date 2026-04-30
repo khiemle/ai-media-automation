@@ -63,3 +63,17 @@ def test_import_unsupported_extension_raises(db, tmp_path):
             keywords=None,
             assets_dir=tmp_path,
         )
+
+
+def test_import_explicit_asset_type_override(db, tmp_path):
+    svc = ProductionService(db)
+    result = svc.import_asset(
+        file_bytes=b'\xff\xd8\xff' + b'\x00' * 20,
+        filename='photo.jpg',
+        source='manual',
+        description=None,
+        keywords=None,
+        asset_type='video_clip',  # override: jpg but caller says video_clip
+        assets_dir=tmp_path,
+    )
+    assert result['asset_type'] == 'video_clip'
