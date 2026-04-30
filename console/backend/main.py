@@ -130,6 +130,18 @@ def register_routers():
     except ImportError:
         pass
 
+    try:
+        from console.backend.routers import sfx
+        app.include_router(sfx.router, prefix="/api")
+    except ImportError:
+        pass
+
+    try:
+        from console.backend.routers import youtube_videos
+        app.include_router(youtube_videos.router, prefix="/api")
+    except ImportError:
+        pass
+
 
 register_routers()
 

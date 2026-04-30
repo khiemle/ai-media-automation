@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     CONSOLE_PORT: int = 8080
     FRONTEND_ORIGIN: str = "http://localhost:5173"
 
+    # Third-party API keys
+    runway_api_key: str = ""
+
     # Environment
     ENV: str = "development"
 

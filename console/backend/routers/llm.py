@@ -1,3 +1,5 @@
+import os
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -40,4 +42,18 @@ def save_config(body: dict, _user=Depends(require_admin)):
         return {"ok": True}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/runway/test-connection")
+def test_runway_connection(_user=Depends(require_admin)):
+    """Test Runway API key connectivity."""
+    from console.backend.services.runway_service import RunwayService
+    from console.backend.config import settings
+
+    api_key = getattr(settings, "runway_api_key", None) or os.environ.get("RUNWAY_API_KEY", "")
+    if not api_key:
+        return {"ok": False, "error": "RUNWAY_API_KEY not configured"}
+
+    svc = RunwayService(api_key=api_key)
+    return svc.test_connection()
 
