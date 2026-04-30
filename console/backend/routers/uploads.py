@@ -19,12 +19,13 @@ class SetTargetsBody(BaseModel):
 def list_videos(
     platform: str | None = Query(None),
     status: str | None = Query(None),
+    video_format: str | None = Query(None),
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
     _user=Depends(require_editor_or_admin),
 ):
-    return UploadService(db).list_videos(platform=platform, status=status, page=page, per_page=per_page)
+    return UploadService(db).list_videos(platform=platform, status=status, video_format=video_format, page=page, per_page=per_page)
 
 
 @router.delete("/videos/{video_id}", status_code=204)

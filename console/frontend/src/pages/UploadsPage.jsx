@@ -64,13 +64,15 @@ function VideosTab({ channels }) {
   const [targets,      setTargets]      = useState({})   // { video_id: [channel_id, ...] }
   const [toast,        setToast]        = useState(null)
   const [previewVideo, setPreviewVideo] = useState(null)
+  const [videoFormat,  setVideoFormat]  = useState('all')
 
   const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000) }
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetchApi('/api/uploads/videos?per_page=50')
+      const formatParam = videoFormat === 'all' ? '' : `&video_format=${videoFormat}`
+      const res = await fetchApi(`/api/uploads/videos?per_page=50${formatParam}`)
       setVideos(res.items || [])
       // Init targets from existing upload targets
       const t = {}
@@ -80,7 +82,7 @@ function VideosTab({ channels }) {
       setTargets(t)
     } catch { setVideos([]) }
     finally { setLoading(false) }
-  }, [])
+  }, [videoFormat])
 
   useEffect(() => { load() }, [load])
 
@@ -139,7 +141,26 @@ function VideosTab({ channels }) {
       ) : videos.length === 0 ? (
         <EmptyState title="No production videos yet" description="Videos appear here when scripts reach 'completed' status." />
       ) : (
-        <div className="overflow-x-auto">
+        <>
+          <div className="mb-4 flex items-center gap-3 pb-4 border-b border-[#2a2a32]">
+            <span className="text-xs font-medium text-[#5a5a70] uppercase tracking-wider">Format:</span>
+            <div className="flex items-center gap-1 bg-[#16161a] border border-[#2a2a32] rounded-lg p-1">
+              {['all', 'short', 'youtube_long'].map(f => (
+                <button
+                  key={f}
+                  onClick={() => setVideoFormat(f)}
+                  className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+                    videoFormat === f
+                      ? 'bg-[#7c6af7] text-white'
+                      : 'text-[#9090a8] hover:text-[#e8e8f0]'
+                  }`}
+                >
+                  {f === 'all' ? 'All' : f === 'short' ? 'Short' : 'YouTube Long'}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs text-[#5a5a70] uppercase tracking-wider border-b border-[#2a2a32]">
@@ -158,7 +179,18 @@ function VideosTab({ channels }) {
                   <tr key={v.id} className="hover:bg-[#1c1c22]/50 transition-colors">
                     <td className="py-2.5 pr-4">
                       <div className="font-medium text-[#e8e8f0] truncate max-w-[200px]">{v.title}</div>
-                      <div className="text-xs text-[#5a5a70] font-mono">{v.niche}</div>
+                      <div className="text-xs text-[#5a5a70] font-mono">
+                        {v.niche}
+                        {v.duration_s && (
+                          <>
+                            {' • '}
+                            {v.video_format === 'youtube_long'
+                              ? `${(v.duration_s / 3600).toFixed(1)}h`
+                              : `${Math.round(v.duration_s)}s`
+                            }
+                          </>
+                        )}
+                      </div>
                     </td>
                     <td className="py-2.5 pr-4 text-xs text-[#9090a8] font-mono">{v.template || '—'}</td>
                     <td className="py-2.5 pr-4"><Badge status={v.status} /></td>
@@ -207,7 +239,8 @@ function VideosTab({ channels }) {
               })}
             </tbody>
           </table>
-        </div>
+          </div>
+        </>
       )}
       {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
       <VideoPreviewModal video={previewVideo} onClose={() => setPreviewVideo(null)} />

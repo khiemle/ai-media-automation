@@ -102,6 +102,9 @@ class GeneratedScript(Base):
     language         = Column(String, default="vietnamese")
     # Music extension (added by migration 006)
     music_track_id   = Column(Integer, ForeignKey("music_tracks.id"), nullable=True)
+    # Uploads format extension (added by migration 008)
+    video_format     = Column(String, default="short")
+    duration_s       = Column(Float)
     created_at       = Column(DateTime(timezone=True), server_default=func.now())
     updated_at       = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

@@ -23,6 +23,7 @@ class UploadService:
         self,
         platform: str | None = None,
         status: str | None = None,
+        video_format: str | None = None,
         page: int = 1,
         per_page: int = 20,
     ) -> PaginatedResponse:
@@ -37,6 +38,9 @@ class UploadService:
         if platform:
             where_clauses.append("ch.platform = :platform")
             params["platform"] = platform
+        if video_format:
+            where_clauses.append("gs.video_format = :video_format")
+            params["video_format"] = video_format
 
         where_sql = " AND ".join(where_clauses)
 
@@ -49,7 +53,7 @@ class UploadService:
         """
         data_sql = f"""
             SELECT
-                gs.id, gs.status, gs.script_json, gs.output_path,
+                gs.id, gs.status, gs.script_json, gs.output_path, gs.video_format, gs.duration_s,
                 COALESCE(
                     json_agg(
                         json_build_object(
@@ -88,13 +92,15 @@ class UploadService:
             meta  = sj.get("meta", {})
             has_video = bool(row.output_path and os.path.isfile(row.output_path))
             items.append({
-                "id":        row.id,
-                "title":     video.get("title") or meta.get("topic") or f"Script #{row.id}",
-                "template":  meta.get("template"),
-                "niche":     meta.get("niche"),
-                "status":    row.status,
-                "targets":   row.targets if isinstance(row.targets, list) else [],
-                "has_video": has_video,
+                "id":            row.id,
+                "title":         video.get("title") or meta.get("topic") or f"Script #{row.id}",
+                "template":      meta.get("template"),
+                "niche":         meta.get("niche"),
+                "status":        row.status,
+                "video_format":  row.video_format or "short",
+                "duration_s":    row.duration_s,
+                "targets":       row.targets if isinstance(row.targets, list) else [],
+                "has_video":     has_video,
             })
 
         return PaginatedResponse(
