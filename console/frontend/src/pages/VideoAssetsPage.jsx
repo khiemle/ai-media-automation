@@ -248,6 +248,7 @@ function ImportAssetModal({ onClose, onImported }) {
   const [source, setSource] = useState('manual')
   const [description, setDescription] = useState('')
   const [keywords, setKeywords] = useState('')
+  const [generationPrompt, setGenerationPrompt] = useState('')
   const [loading, setLoading] = useState(false)
   const [toast, setToast] = useState(null)
 
@@ -257,6 +258,7 @@ function ImportAssetModal({ onClose, onImported }) {
   }
 
   const detectedType = file ? detectAssetType(file.name) : ''
+  const isGenerative = source === 'midjourney' || source === 'runway'
 
   const handleSubmit = async () => {
     if (!file) { showToast('Please select a file'); return }
@@ -267,6 +269,7 @@ function ImportAssetModal({ onClose, onImported }) {
         description,
         keywords,
         asset_type: detectedType,
+        generation_prompt: generationPrompt,
       })
       onImported()
       onClose()
@@ -329,6 +332,21 @@ function ImportAssetModal({ onClose, onImported }) {
             className="bg-[#16161a] border border-[#2a2a32] rounded-lg px-3 py-1.5 text-sm text-[#e8e8f0] placeholder:text-[#5a5a70] focus:outline-none focus:border-[#7c6af7] transition-colors"
           />
         </div>
+        {isGenerative && (
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-[#9090a8] font-medium">
+              {source === 'midjourney' ? 'MidJourney Prompt' : 'Runway Prompt'}
+              <span className="text-[#5a5a70]"> (optional)</span>
+            </label>
+            <textarea
+              value={generationPrompt}
+              onChange={e => setGenerationPrompt(e.target.value)}
+              placeholder={source === 'midjourney' ? '/imagine prompt: dark rainy window, cinematic...' : 'A dark atmospheric scene with...'}
+              rows={3}
+              className="bg-[#16161a] border border-[#2a2a32] rounded-lg px-3 py-1.5 text-sm text-[#e8e8f0] placeholder:text-[#5a5a70] focus:outline-none focus:border-[#7c6af7] transition-colors resize-none font-mono"
+            />
+          </div>
+        )}
       </div>
     </Modal>
   )

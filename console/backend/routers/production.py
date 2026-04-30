@@ -125,6 +125,7 @@ async def upload_asset(
     description: str = Form(default=''),
     keywords: str = Form(default=''),
     asset_type: str = Form(default=''),
+    generation_prompt: str = Form(default=''),
     db: Session = Depends(get_db),
     user=Depends(require_editor_or_admin),
 ):
@@ -147,6 +148,7 @@ async def upload_asset(
             description=description or None,
             keywords=kw_list or None,
             asset_type=asset_type or None,
+            generation_prompt=generation_prompt or None,
             user_id=user.id,
         )
     except ValueError as e:

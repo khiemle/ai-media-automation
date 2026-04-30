@@ -202,12 +202,12 @@ function VideosTab({ channels }) {
                           </span>
                         ))}
                         {uploadable && (
-                          <ChannelPicker
-                            channels={channels}
-                            selected={vTargets}
-                            onChange={(ids) => handleTargetChange(v.id, ids)}
-                            onDone={(ids) => handleTargetDone(v.id, ids)}
-                          />
+                           <ChannelPicker
+                             channels={v.video_format === 'youtube_long' ? channels.filter(c => c.platform === 'youtube') : channels}
+                             selected={vTargets}
+                             onChange={(ids) => handleTargetChange(v.id, ids)}
+                             onDone={(ids) => handleTargetDone(v.id, ids)}
+                           />
                         )}
                       </div>
                     </td>

@@ -105,6 +105,7 @@ class ProductionService:
             "resolution": asset.resolution,
             "quality_score": asset.quality_score,
             "usage_count": asset.usage_count,
+            "generation_prompt": asset.generation_prompt,
             "created_at": asset.created_at.isoformat() if asset.created_at else None,
         }
 
@@ -149,6 +150,7 @@ class ProductionService:
         description: str | None,
         keywords: list[str] | None,
         asset_type: str | None = None,
+        generation_prompt: str | None = None,
         assets_dir: Path | None = None,
         user_id: int | None = None,
     ) -> dict:
@@ -167,6 +169,7 @@ class ProductionService:
             asset_type=asset_type,
             description=description,
             keywords=keywords or [],
+            generation_prompt=generation_prompt or None,
         )
         self.db.add(row)
         self.db.flush()

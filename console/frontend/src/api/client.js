@@ -149,13 +149,14 @@ export const assetsApi = {
   thumbnailUrl: (id) => `/api/production/assets/${id}/thumbnail`,
   animateWithRunway: (id, body) =>
     fetchApi(`/api/production/assets/${id}/animate`, { method: 'POST', body: JSON.stringify(body) }),
-  upload: (file, { source = 'manual', description = '', keywords = '', asset_type = '' } = {}) => {
+  upload: (file, { source = 'manual', description = '', keywords = '', asset_type = '', generation_prompt = '' } = {}) => {
     const form = new FormData()
     form.append('file', file)
     form.append('source', source)
     if (description) form.append('description', description)
     if (keywords) form.append('keywords', keywords)
     if (asset_type) form.append('asset_type', asset_type)
+    if (generation_prompt) form.append('generation_prompt', generation_prompt)
     // fetchApi adds Content-Type: application/json which breaks multipart — use raw fetch
     const headers = {}
     const token = getToken()

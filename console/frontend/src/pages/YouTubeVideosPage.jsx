@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { youtubeVideosApi, musicApi, assetsApi } from '../api/client.js'
+import { youtubeVideosApi, musicApi, assetsApi, sfxApi } from '../api/client.js'
 import { Card, Badge, Button, Input, Select, Toast, Spinner, EmptyState, Modal } from '../components/index.jsx'
 
 const STATUS_COLORS = {
@@ -34,8 +34,15 @@ function CreationPanel({ template, onClose, onCreated }) {
   })
   const [musicList, setMusicList]   = useState([])
   const [assetList, setAssetList]   = useState([])
+  const [sfxList,   setSfxList]     = useState([])
   const [loading, setLoading]       = useState(false)
   const [toast, setToast]           = useState(null)
+
+  const [sfxLayers, setSfxLayers] = useState({
+    foreground: { asset_id: '', volume: 0.6 },
+    midground:  { asset_id: '', volume: 0.3 },
+    background: { asset_id: '', volume: 0.1 },
+  })
 
   const [showMusicUpload, setShowMusicUpload] = useState(false)
   const [musicUploadFile, setMusicUploadFile] = useState(null)
@@ -113,6 +120,9 @@ function CreationPanel({ template, onClose, onCreated }) {
     assetsApi.list({ asset_type: 'video_clip' })
       .then(d => { if (mounted) setAssetList(d.items || d || []) })
       .catch(() => {})
+    sfxApi.list()
+      .then(d => { if (mounted) setSfxList(d.items || d || []) })
+      .catch(() => {})
     return () => { mounted = false }
   }, [])
 
@@ -149,7 +159,13 @@ function CreationPanel({ template, onClose, onCreated }) {
         target_duration_h: duration,
         music_track_id: form.music_track_id || null,
         visual_asset_id: form.visual_asset_id || null,
-        sfx_overrides: form.sfx_overrides,
+        sfx_overrides: (sfxLayers.foreground.asset_id || sfxLayers.midground.asset_id || sfxLayers.background.asset_id)
+          ? {
+              foreground: sfxLayers.foreground.asset_id ? sfxLayers.foreground : null,
+              midground:  sfxLayers.midground.asset_id  ? sfxLayers.midground  : null,
+              background: sfxLayers.background.asset_id ? sfxLayers.background : null,
+            }
+          : null,
         seo_title: form.seo_title,
         seo_description: form.seo_description,
         seo_tags: form.seo_tags
@@ -408,9 +424,63 @@ function CreationPanel({ template, onClose, onCreated }) {
             </div>
           </section>
 
-          {/* ④ RENDER */}
+          {/* ④ SFX LAYERS */}
           <section>
-            <div className="text-xs font-bold text-[#5a5a70] tracking-widest mb-3">④ RENDER</div>
+            <div className="text-xs font-bold text-[#5a5a70] tracking-widest mb-3">④ SFX LAYERS</div>
+            <div className="flex flex-col gap-3">
+              {[
+                { key: 'foreground', label: 'Foreground', defaultVol: 0.6 },
+                { key: 'midground',  label: 'Midground',  defaultVol: 0.3 },
+                { key: 'background', label: 'Background', defaultVol: 0.1 },
+              ].map(({ key, label, defaultVol }) => {
+                const sfxPack = template?.sfx_pack?.[key]
+                const layerDefault = sfxList.find(s => s.id === sfxPack?.asset_id)
+                return (
+                  <div key={key} className="bg-[#0d0d0f] border border-[#2a2a32] rounded-lg p-3 flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-[#9090a8]">{label}</span>
+                      {layerDefault && !sfxLayers[key].asset_id && (
+                        <span className="text-[10px] text-[#5a5a70] font-mono">template default: {layerDefault.title}</span>
+                      )}
+                    </div>
+                    <select
+                      value={sfxLayers[key].asset_id}
+                      onChange={e => setSfxLayers(prev => ({
+                        ...prev,
+                        [key]: { ...prev[key], asset_id: e.target.value },
+                      }))}
+                      className="bg-[#16161a] border border-[#2a2a32] rounded-lg px-3 py-1.5 text-sm text-[#e8e8f0] focus:outline-none focus:border-[#7c6af7] transition-colors w-full"
+                    >
+                      <option value="">— {layerDefault ? `${layerDefault.title} (template default)` : 'No SFX'} —</option>
+                      {sfxList.map(s => (
+                        <option key={s.id} value={String(s.id)}>{s.title} ({s.category || 'sfx'})</option>
+                      ))}
+                    </select>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-[#5a5a70] w-16 shrink-0">Volume</span>
+                      <input
+                        type="range"
+                        min={0} max={1} step={0.05}
+                        value={sfxLayers[key].volume}
+                        onChange={e => setSfxLayers(prev => ({
+                          ...prev,
+                          [key]: { ...prev[key], volume: parseFloat(e.target.value) },
+                        }))}
+                        className="flex-1 accent-[#7c6af7]"
+                      />
+                      <span className="text-xs text-[#9090a8] font-mono w-8 text-right">
+                        {Math.round(sfxLayers[key].volume * 100)}%
+                      </span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+
+          {/* ⑤ RENDER */}
+          <section>
+            <div className="text-xs font-bold text-[#5a5a70] tracking-widest mb-3">⑤ RENDER</div>
             <Select
               label="Output Quality"
               value={form.output_quality}
