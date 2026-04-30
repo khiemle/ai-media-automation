@@ -146,7 +146,10 @@ export const assetsApi = {
 // ── SFX ─────────────────────────────────────────────────────────────────────────
 export const sfxApi = {
   list: (params = {}) => {
-    const qs = new URLSearchParams(params).toString()
+    const filtered = Object.fromEntries(
+      Object.entries(params).filter(([, v]) => v != null && v !== '')
+    )
+    const qs = new URLSearchParams(filtered).toString()
     return fetchApi(`/api/sfx${qs ? `?${qs}` : ''}`)
   },
   listSoundTypes: () => fetchApi('/api/sfx/sound-types'),
@@ -177,7 +180,10 @@ export const youtubeVideosApi = {
   listTemplates: () => fetchApi('/api/youtube-videos/templates'),
   getTemplate: (id) => fetchApi(`/api/youtube-videos/templates/${id}`),
   list: (params = {}) => {
-    const qs = new URLSearchParams(params).toString()
+    const filtered = Object.fromEntries(
+      Object.entries(params).filter(([, v]) => v != null && v !== '')
+    )
+    const qs = new URLSearchParams(filtered).toString()
     return fetchApi(`/api/youtube-videos${qs ? `?${qs}` : ''}`)
   },
   get: (id) => fetchApi(`/api/youtube-videos/${id}`),
