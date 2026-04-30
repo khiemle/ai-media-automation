@@ -4,8 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from console.backend.auth import require_admin, require_editor_or_admin
+from console.backend.config import settings
 from console.backend.database import get_db
 from console.backend.services.llm_service import LLMService
+from console.backend.services.runway_service import RunwayService
 
 router = APIRouter(prefix="/llm", tags=["llm"])
 
@@ -47,13 +49,13 @@ def save_config(body: dict, _user=Depends(require_admin)):
 @router.post("/runway/test-connection")
 def test_runway_connection(_user=Depends(require_admin)):
     """Test Runway API key connectivity."""
-    from console.backend.services.runway_service import RunwayService
-    from console.backend.config import settings
-
-    api_key = getattr(settings, "runway_api_key", None) or os.environ.get("RUNWAY_API_KEY", "")
+    api_key = (getattr(settings, "runway_api_key", None) or "").strip() or os.environ.get("RUNWAY_API_KEY", "").strip()
     if not api_key:
         return {"ok": False, "error": "RUNWAY_API_KEY not configured"}
 
-    svc = RunwayService(api_key=api_key)
-    return svc.test_connection()
+    try:
+        svc = RunwayService(api_key=api_key)
+        return svc.test_connection()
+    except Exception as exc:
+        return {"ok": False, "error": f"Connection test failed: {exc}"}
 
