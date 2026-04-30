@@ -43,8 +43,14 @@ function CreationPanel({ template, onClose, onCreated }) {
   }
 
   useEffect(() => {
-    musicApi.list({ status: 'ready' }).then(d => setMusicList(d.items || d)).catch(() => {})
-    assetsApi.list({ asset_type: 'video_clip' }).then(d => setAssetList(d.items || d)).catch(() => {})
+    let mounted = true
+    musicApi.list({ status: 'ready' })
+      .then(d => { if (mounted) setMusicList(d.items || d || []) })
+      .catch(() => {})
+    assetsApi.list({ asset_type: 'video_clip' })
+      .then(d => { if (mounted) setAssetList(d.items || d || []) })
+      .catch(() => {})
+    return () => { mounted = false }
   }, [])
 
   useEffect(() => {
@@ -62,7 +68,7 @@ function CreationPanel({ template, onClose, onCreated }) {
           .replace('{duration}', h),
       }))
     }
-  }, [form.theme, form.target_duration_h, form.customDuration])
+  }, [form.theme, form.target_duration_h, form.customDuration, form.isCustomDuration])
 
   const handleSubmit = async () => {
     if (!form.theme) { showToast('Theme is required', 'error'); return }
@@ -277,23 +283,28 @@ export default function YouTubeVideosPage() {
     setTimeout(() => setToast(null), 3000)
   }
 
-  const load = async () => {
+  const load = async (signal = { cancelled: false }) => {
     setLoading(true)
     try {
-      const [vids, tmpl] = await Promise.all([
-        youtubeVideosApi.list({ status: filterStatus || undefined }),
-        youtubeVideosApi.listTemplates(),
-      ])
-      setVideos(vids.items || vids)
-      setTemplates(tmpl.filter(t => t.output_format === 'landscape_long'))
+      const vids = await youtubeVideosApi.list({ status: filterStatus || undefined })
+      if (!signal.cancelled) setVideos(vids.items || vids)
     } catch (e) {
-      showToast(e.message, 'error')
-    } finally {
-      setLoading(false)
+      if (!signal.cancelled) showToast(e.message, 'error')
     }
+    try {
+      const tmpl = await youtubeVideosApi.listTemplates()
+      if (!signal.cancelled) setTemplates(tmpl.filter(t => t.output_format === 'landscape_long'))
+    } catch (e) {
+      if (!signal.cancelled) console.warn('Failed to load templates:', e)
+    }
+    if (!signal.cancelled) setLoading(false)
   }
 
-  useEffect(() => { load() }, [filterStatus])
+  useEffect(() => {
+    const signal = { cancelled: false }
+    load(signal)
+    return () => { signal.cancelled = true }
+  }, [filterStatus])
 
   const handleRender = async (video) => {
     try {
