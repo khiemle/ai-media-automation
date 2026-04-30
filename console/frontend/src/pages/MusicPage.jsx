@@ -133,7 +133,7 @@ function EditModal({ track, niches, onClose, onSaved, onPollTrack }) {
 
 // ── Provider / Status badge colors ───────────────────────────────────────────
 const PROVIDER_COLORS = {
-  suno:        'bg-[#1a0e2e] text-[#7c6af7] border-[#2a1a50]',
+  sunoapi:     'bg-[#1a0e2e] text-[#7c6af7] border-[#2a1a50]',
   'lyria-clip':'bg-[#001624] text-[#4a9eff] border-[#002840]',
   'lyria-pro': 'bg-[#001e12] text-[#34d399] border-[#003020]',
   import:      'bg-[#1e1e2e] text-[#9090a8] border-[#2a2a42]',
@@ -460,7 +460,7 @@ export default function MusicPage() {
       {/* Stats */}
       <div className="flex gap-3 flex-wrap">
         <StatBox label="Total" value={totalTracks} />
-        <StatBox label="Suno" value={sunoCount} />
+        <StatBox label="SunoAPI" value={sunoCount} />
         <StatBox label="Lyria" value={lyriaCount} />
         <StatBox label="Imported" value={importCount} />
         <StatBox label="Favorites" value={favCount} />
