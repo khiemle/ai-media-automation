@@ -37,9 +37,69 @@ function CreationPanel({ template, onClose, onCreated }) {
   const [loading, setLoading]       = useState(false)
   const [toast, setToast]           = useState(null)
 
+  const [showMusicUpload, setShowMusicUpload] = useState(false)
+  const [musicUploadFile, setMusicUploadFile] = useState(null)
+  const [musicUploadTitle, setMusicUploadTitle] = useState('')
+  const [musicUploading, setMusicUploading] = useState(false)
+
+  const [showVisualUpload, setShowVisualUpload] = useState(false)
+  const [visualUploadFile, setVisualUploadFile] = useState(null)
+  const [visualUploadDesc, setVisualUploadDesc] = useState('')
+  const [visualUploadSource, setVisualUploadSource] = useState('manual')
+  const [visualUploading, setVisualUploading] = useState(false)
+
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type })
     setTimeout(() => setToast(null), 3000)
+  }
+
+  const handleMusicUpload = async () => {
+    if (!musicUploadFile) { showToast('Select a file', 'error'); return }
+    if (!musicUploadTitle.trim()) { showToast('Title is required', 'error'); return }
+    setMusicUploading(true)
+    try {
+      const newTrack = await musicApi.upload(musicUploadFile, {
+        title: musicUploadTitle.trim(),
+        niches: [],
+        moods: [],
+        genres: [],
+        is_vocal: false,
+        volume: 0.15,
+        quality_score: 80,
+      })
+      setMusicList(prev => [...prev, newTrack])
+      setForm(f => ({ ...f, music_track_id: String(newTrack.id) }))
+      setShowMusicUpload(false)
+      setMusicUploadFile(null)
+      setMusicUploadTitle('')
+      showToast('Track uploaded', 'success')
+    } catch (e) {
+      showToast(e.message, 'error')
+    } finally {
+      setMusicUploading(false)
+    }
+  }
+
+  const handleVisualUpload = async () => {
+    if (!visualUploadFile) { showToast('Select a file', 'error'); return }
+    setVisualUploading(true)
+    try {
+      const newAsset = await assetsApi.upload(visualUploadFile, {
+        source: visualUploadSource,
+        description: visualUploadDesc,
+      })
+      setAssetList(prev => [...prev, newAsset])
+      setForm(f => ({ ...f, visual_asset_id: String(newAsset.id) }))
+      setShowVisualUpload(false)
+      setVisualUploadFile(null)
+      setVisualUploadDesc('')
+      setVisualUploadSource('manual')
+      showToast('Asset uploaded', 'success')
+    } catch (e) {
+      showToast(e.message, 'error')
+    } finally {
+      setVisualUploading(false)
+    }
   }
 
   useEffect(() => {
@@ -183,7 +243,20 @@ function CreationPanel({ template, onClose, onCreated }) {
 
           {/* ② MUSIC */}
           <section>
-            <div className="text-xs font-bold text-[#5a5a70] tracking-widest mb-3">② MUSIC</div>
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-xs font-bold text-[#5a5a70] tracking-widest">② MUSIC</div>
+              <button
+                type="button"
+                onClick={() => setShowMusicUpload(v => !v)}
+                className={`text-xs px-2 py-1 rounded border transition-colors ${
+                  showMusicUpload
+                    ? 'bg-[#7c6af7] border-[#7c6af7] text-white'
+                    : 'bg-[#16161a] border-[#2a2a32] text-[#9090a8] hover:text-[#e8e8f0]'
+                }`}
+              >
+                ↑ Upload
+              </button>
+            </div>
             <div className="flex flex-col gap-3">
               <Select
                 label="Music Track"
@@ -195,6 +268,42 @@ function CreationPanel({ template, onClose, onCreated }) {
                   <option key={m.id} value={m.id}>{m.title} ({m.provider})</option>
                 ))}
               </Select>
+              {showMusicUpload && (
+                <div className="flex flex-col gap-2 bg-[#0d0d0f] border border-[#2a2a32] rounded-lg p-3">
+                  <div className="text-xs text-[#5a5a70] font-medium">Upload Music Track</div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-[#9090a8] font-medium">File (.mp3 / .wav / .m4a / .ogg)</label>
+                    <input
+                      type="file"
+                      accept=".mp3,.wav,.m4a,.ogg"
+                      onChange={e => {
+                        const f = e.target.files?.[0] || null
+                        setMusicUploadFile(f)
+                        if (f && !musicUploadTitle) setMusicUploadTitle(f.name.replace(/\.[^.]+$/, ''))
+                      }}
+                      className="text-sm text-[#9090a8] file:mr-3 file:py-1 file:px-2 file:rounded file:border-0 file:bg-[#2a2a32] file:text-[#e8e8f0] file:text-xs cursor-pointer"
+                    />
+                  </div>
+                  <Input
+                    label="Title"
+                    value={musicUploadTitle}
+                    onChange={e => setMusicUploadTitle(e.target.value)}
+                    placeholder="Track title"
+                  />
+                  <div className="flex gap-2 justify-end">
+                    <Button variant="ghost" size="sm" onClick={() => {
+                      setShowMusicUpload(false)
+                      setMusicUploadFile(null)
+                      setMusicUploadTitle('')
+                    }}>
+                      Cancel
+                    </Button>
+                    <Button variant="primary" size="sm" loading={musicUploading} onClick={handleMusicUpload}>
+                      Upload
+                    </Button>
+                  </div>
+                </div>
+              )}
               {template?.suno_prompt_template && (
                 <div className="bg-[#0d0d0f] border border-[#2a2a32] rounded-lg p-3 relative">
                   <div className="text-xs text-[#5a5a70] mb-1">Suno Prompt (reference)</div>
@@ -214,7 +323,20 @@ function CreationPanel({ template, onClose, onCreated }) {
 
           {/* ③ VISUAL */}
           <section>
-            <div className="text-xs font-bold text-[#5a5a70] tracking-widest mb-3">③ VISUAL</div>
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-xs font-bold text-[#5a5a70] tracking-widest">③ VISUAL</div>
+              <button
+                type="button"
+                onClick={() => setShowVisualUpload(v => !v)}
+                className={`text-xs px-2 py-1 rounded border transition-colors ${
+                  showVisualUpload
+                    ? 'bg-[#7c6af7] border-[#7c6af7] text-white'
+                    : 'bg-[#16161a] border-[#2a2a32] text-[#9090a8] hover:text-[#e8e8f0]'
+                }`}
+              >
+                ↑ Upload
+              </button>
+            </div>
             <div className="flex flex-col gap-3">
               <Select
                 label="Visual Loop"
@@ -228,6 +350,47 @@ function CreationPanel({ template, onClose, onCreated }) {
                   </option>
                 ))}
               </Select>
+              {showVisualUpload && (
+                <div className="flex flex-col gap-2 bg-[#0d0d0f] border border-[#2a2a32] rounded-lg p-3">
+                  <div className="text-xs text-[#5a5a70] font-medium">Upload Visual Asset</div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-[#9090a8] font-medium">File (image or video)</label>
+                    <input
+                      type="file"
+                      accept=".jpg,.jpeg,.png,.webp,.mp4,.mov,.webm"
+                      onChange={e => setVisualUploadFile(e.target.files?.[0] || null)}
+                      className="text-sm text-[#9090a8] file:mr-3 file:py-1 file:px-2 file:rounded file:border-0 file:bg-[#2a2a32] file:text-[#e8e8f0] file:text-xs cursor-pointer"
+                    />
+                  </div>
+                  <Select label="Source" value={visualUploadSource} onChange={e => setVisualUploadSource(e.target.value)}>
+                    {['manual', 'midjourney', 'runway', 'pexels', 'veo', 'stock'].map(s => (
+                      <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+                    ))}
+                  </Select>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-[#9090a8] font-medium">Description <span className="text-[#5a5a70]">(optional)</span></label>
+                    <input
+                      value={visualUploadDesc}
+                      onChange={e => setVisualUploadDesc(e.target.value)}
+                      placeholder="e.g. Rainy window close-up"
+                      className="bg-[#16161a] border border-[#2a2a32] rounded-lg px-3 py-1.5 text-sm text-[#e8e8f0] placeholder:text-[#5a5a70] focus:outline-none focus:border-[#7c6af7] transition-colors"
+                    />
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <Button variant="ghost" size="sm" onClick={() => {
+                      setShowVisualUpload(false)
+                      setVisualUploadFile(null)
+                      setVisualUploadDesc('')
+                      setVisualUploadSource('manual')
+                    }}>
+                      Cancel
+                    </Button>
+                    <Button variant="primary" size="sm" loading={visualUploading} onClick={handleVisualUpload}>
+                      Upload
+                    </Button>
+                  </div>
+                </div>
+              )}
               {template?.runway_prompt_template && (
                 <div className="bg-[#0d0d0f] border border-[#2a2a32] rounded-lg p-3 relative">
                   <div className="text-xs text-[#5a5a70] mb-1">Runway Prompt (reference)</div>
