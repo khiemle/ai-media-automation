@@ -284,6 +284,7 @@ function MakeShortModal({ video, shortTemplates, onClose, onCreated }) {
   const shortTemplate = shortTemplates[0]
 
   const handleSubmit = async () => {
+    if (loading) return
     if (!shortTemplate) { showToast('No short template found', 'error'); return }
     setLoading(true)
     try {
