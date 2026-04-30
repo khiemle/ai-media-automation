@@ -330,9 +330,12 @@ function GenerateModal({ niches, onClose, onGenerated, onPollTrack }) {
   const showToast = (msg, type='error') => { setToast({msg,type}); setTimeout(()=>setToast(null),3000) }
 
   useEffect(() => {
-    if (form.provider === 'suno') {
-      templatesApi.musicTypes().then(setMusicTemplates).catch(() => {})
-    }
+    if (form.provider !== 'suno') return
+    let cancelled = false
+    templatesApi.musicTypes()
+      .then(data => { if (!cancelled) setMusicTemplates(data) })
+      .catch(e => { if (!cancelled) showToast(`Failed to load Suno templates: ${e.message}`, 'error') })
+    return () => { cancelled = true }
   }, [form.provider])
 
   const handleExpand = async () => {
@@ -368,6 +371,11 @@ function GenerateModal({ niches, onClose, onGenerated, onPollTrack }) {
     if (!form.uploadFile || !form.title) {
       showToast('Title and file are required', 'error'); return
     }
+    const allowedTypes = ['audio/mpeg', 'audio/wav', 'audio/mp3', 'audio/x-wav']
+    if (form.uploadFile && !allowedTypes.includes(form.uploadFile.type)) {
+      showToast('Only MP3 and WAV files are supported', 'error')
+      return
+    }
     setLoading(true)
     try {
       await musicApi.upload(form.uploadFile, {
@@ -375,7 +383,7 @@ function GenerateModal({ niches, onClose, onGenerated, onPollTrack }) {
         niches: form.niches,
         moods: form.moods,
         genres: form.genres,
-        is_vocal: false,
+        is_vocal: form.is_vocal || false,
         provider: 'suno',
       })
       onGenerated()
@@ -479,7 +487,18 @@ function ImportModal({ niches, onClose, onImported }) {
     // Detect duration client-side
     const url = URL.createObjectURL(f)
     const audio = new Audio(url)
-    audio.onloadedmetadata = () => { setDetectedDur(Math.round(audio.duration)); URL.revokeObjectURL(url) }
+    const timeout = setTimeout(() => {
+      URL.revokeObjectURL(url)
+    }, 5000)
+    audio.onloadedmetadata = () => {
+      clearTimeout(timeout)
+      setDetectedDur(Math.round(audio.duration))
+      URL.revokeObjectURL(url)
+    }
+    audio.onerror = () => {
+      clearTimeout(timeout)
+      URL.revokeObjectURL(url)
+    }
   }
 
   const handleImport = async () => {
@@ -563,9 +582,9 @@ export default function MusicPage() {
 
   // Poll pending tracks every 10s
   useEffect(() => {
-    const pending = trackList.filter(t => t.generation_status === 'pending' && pendingPolls[t.id])
-    if (!pending.length) return
+    if (Object.keys(pendingPolls).length === 0) return
     const timer = setInterval(async () => {
+      const pending = trackList.filter(t => t.generation_status === 'pending' && pendingPolls[t.id])
       for (const t of pending) {
         try {
           const res = await musicApi.pollTask(pendingPolls[t.id])
@@ -573,11 +592,11 @@ export default function MusicPage() {
             refetch()
             setPendingPolls(p => { const n = { ...p }; delete n[t.id]; return n })
           }
-        } catch { /* ignore */ }
+        } catch (e) { console.error(`Poll failed for track ${t.id}:`, e.message) }
       }
     }, 10000)
     return () => clearInterval(timer)
-  }, [tracks, pendingPolls])
+  }, [trackList, pendingPolls])
 
   const handleDelete = async (track) => {
     setDeletingId(track.id)
