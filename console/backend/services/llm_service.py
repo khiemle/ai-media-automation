@@ -27,7 +27,7 @@ def _mask_config(cfg: dict) -> dict:
             masked["gemini"][use_case]["api_key"] = _mask(
                 cfg["gemini"][use_case].get("api_key", "")
             )
-    for provider in ("elevenlabs", "suno", "pexels"):
+    for provider in ("elevenlabs", "sunoapi", "pexels"):
         if provider in masked:
             masked[provider]["api_key"] = _mask(
                 cfg[provider].get("api_key", "")
@@ -56,7 +56,7 @@ class LLMService:
                 "music":  self._simple_status(g.get("music", {}).get("api_key", ""), g.get("music", {}).get("model", "")),
             },
             "elevenlabs": self._simple_status(cfg.get("elevenlabs", {}).get("api_key", "")),
-            "suno":       self._simple_status(cfg.get("suno", {}).get("api_key", "")),
+            "sunoapi":   self._simple_status(cfg.get("sunoapi", {}).get("api_key", "")),
             "pexels":     self._simple_status(cfg.get("pexels", {}).get("api_key", "")),
             "kokoro":     {"available": True},
             "timestamp":  datetime.now(timezone.utc).isoformat(),
@@ -109,7 +109,7 @@ class LLMService:
             result["elevenlabs"] = {"error": "API key not configured"}
 
         # Suno — real API credits
-        suno_key = cfg.get("suno", {}).get("api_key", "")
+        suno_key = cfg.get("sunoapi", {}).get("api_key", "")
         if suno_key:
             try:
                 resp = httpx.get(
@@ -119,11 +119,11 @@ class LLMService:
                 )
                 resp.raise_for_status()
                 data = resp.json()
-                result["suno"] = {"credits": data.get("credits", 0)}
+                result["sunoapi"] = {"credits": data.get("credits", 0)}
             except Exception as e:
-                result["suno"] = {"error": str(e)}
+                result["sunoapi"] = {"error": str(e)}
         else:
-            result["suno"] = {"error": "API key not configured"}
+            result["sunoapi"] = {"error": "API key not configured"}
 
         # Pexels — lightweight ping
         pexels_key = cfg.get("pexels", {}).get("api_key", "")

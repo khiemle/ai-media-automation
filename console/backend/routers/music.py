@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from console.backend.auth import require_editor_or_admin
 from console.backend.celery_app import celery_app
 from console.backend.database import get_db
+from console.backend.models.video_template import VideoTemplate
 from console.backend.services.music_service import MusicService
 
 router = APIRouter(prefix="/music", tags=["music"])
@@ -25,7 +26,7 @@ class GenerateBody(BaseModel):
     niches: list[str] = []
     moods: list[str] = []
     genres: list[str] = []
-    provider: str = "suno"         # suno | lyria-clip | lyria-pro
+    provider: str = "sunoapi"         # sunoapi | lyria-clip | lyria-pro
     is_vocal: bool = False
     title: str = ""
     expand_only: bool = False      # True = return expanded prompt only, no generation
@@ -43,6 +44,24 @@ class UpdateBody(BaseModel):
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
+
+@router.get("/templates")
+def list_video_templates(
+    db: Session = Depends(get_db),
+    _user=Depends(require_editor_or_admin),
+):
+    """Return video templates for use in Suno manual music generation modal."""
+    rows = db.query(VideoTemplate).order_by(VideoTemplate.id).all()
+    return [
+        {
+            "id": t.id,
+            "slug": t.slug,
+            "label": t.label,
+            "output_format": t.output_format,
+        }
+        for t in rows
+    ]
+
 
 @router.get("")
 def list_tracks(
@@ -93,7 +112,7 @@ def generate_or_expand(
     )
     track_id = track["id"]
 
-    if body.provider == "suno":
+    if body.provider == "sunoapi":
         from console.backend.tasks.music_tasks import generate_suno_music_task
         celery_task = generate_suno_music_task.delay(track_id)
     else:
