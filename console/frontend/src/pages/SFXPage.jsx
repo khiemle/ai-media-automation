@@ -114,25 +114,52 @@ export default function SFXPage() {
   const [playing, setPlaying] = useState(null)
   const audioRef = useRef(null)
 
-  const load = async () => {
+  const load = async (signal = { cancelled: false }) => {
     setLoading(true)
-    const [list, types] = await Promise.all([
-      sfxApi.list({ sound_type: filterType || undefined, search: search || undefined }),
-      sfxApi.listSoundTypes(),
-    ])
-    setSfxList(list)
-    setSoundTypes(types)
-    setLoading(false)
+    try {
+      const [list, types] = await Promise.all([
+        sfxApi.list({ sound_type: filterType || undefined, search: search || undefined }),
+        sfxApi.listSoundTypes(),
+      ])
+      if (!signal.cancelled) {
+        setSfxList(list)
+        setSoundTypes(types)
+      }
+    } catch (e) {
+      console.error('Failed to load SFX:', e)
+      if (!signal.cancelled) {
+        setSfxList([])
+        setSoundTypes([])
+      }
+    } finally {
+      if (!signal.cancelled) setLoading(false)
+    }
   }
 
-  useEffect(() => { load() }, [filterType, search])
+  useEffect(() => {
+    const signal = { cancelled: false }
+    load(signal)
+    return () => { signal.cancelled = true }
+  }, [filterType, search])
+
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current = null
+      }
+    }
+  }, [])
 
   const handlePlay = (sfx) => {
     if (playing === sfx.id) {
       audioRef.current?.pause()
       setPlaying(null)
     } else {
-      if (audioRef.current) audioRef.current.pause()
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current.onended = null
+      }
       audioRef.current = new Audio(sfxApi.streamUrl(sfx.id))
       audioRef.current.play()
       audioRef.current.onended = () => setPlaying(null)
@@ -142,8 +169,12 @@ export default function SFXPage() {
 
   const handleDelete = async (sfx) => {
     if (!confirm(`Delete "${sfx.title}"?`)) return
-    await sfxApi.delete(sfx.id)
-    load()
+    try {
+      await sfxApi.delete(sfx.id)
+      load()
+    } catch (e) {
+      alert(`Failed to delete: ${e.message}`)
+    }
   }
 
   return (
