@@ -44,7 +44,7 @@ export default function LLMPage() {
   const [status,   setStatus]   = useState(null)
   const [quota,    setQuota]    = useState(null)
   const [loading,  setLoading]  = useState(true)
-  const [saving,   setSaving]   = useState(null)  // 'script'|'media'|'music'|'elevenlabs'|'kokoro'|'suno'|'pexels'
+  const [saving,   setSaving]   = useState(null)  // 'script'|'media'|'music'|'elevenlabs'|'kokoro'|'sunoapi'|'pexels'
   const [voices,   setVoices]   = useState(null)
   const [toast,    setToast]    = useState(null)
   const timerRef = useRef(null)
@@ -112,7 +112,7 @@ export default function LLMPage() {
 
   const g  = formData.gemini || {}
   const el = formData.elevenlabs || {}
-  const su = formData.suno || {}
+  const su = formData.sunoapi || {}
   const px = formData.pexels || {}
   const ko = formData.kokoro || {}
   const st = status || {}
@@ -346,24 +346,24 @@ export default function LLMPage() {
       {/* Suno */}
       <Card title={
         <span className="flex items-center gap-2">
-          <StatusDot available={st.suno?.available} />
+          <StatusDot available={st.sunoapi?.available} />
           Suno
         </span>
-      } actions={saving === 'suno' && <Spinner size={16} />}>
+      } actions={saving === 'sunoapi' && <Spinner size={16} />}>
         <div className="space-y-3">
           <label className="text-xs text-[#9090a8]">API Key</label>
-          <KeyInput value={su.api_key || ''} onChange={v => patch('suno.api_key', v)} />
+          <KeyInput value={su.api_key || ''} onChange={v => patch('sunoapi.api_key', v)} />
           <Select
             label="Model"
             value={su.model || ''}
-            onChange={e => patch('suno.model', e.target.value)}
+            onChange={e => patch('sunoapi.model', e.target.value)}
             options={SUNO_MODELS.map(m => ({ value: m, label: m }))}
           />
-          {q.suno?.credits != null && (
-            <p className="text-xs text-[#9090a8] font-mono">Credits remaining: {q.suno.credits}</p>
+          {q.sunoapi?.credits != null && (
+            <p className="text-xs text-[#9090a8] font-mono">Credits remaining: {q.sunoapi.credits}</p>
           )}
-          {q.suno?.error && <p className="text-xs text-[#f87171] font-mono">{q.suno.error}</p>}
-          <Button size="sm" onClick={() => saveCard('suno')}>Save</Button>
+          {q.sunoapi?.error && <p className="text-xs text-[#f87171] font-mono">{q.sunoapi.error}</p>}
+          <Button size="sm" onClick={() => saveCard('sunoapi')}>Save</Button>
         </div>
       </Card>
 

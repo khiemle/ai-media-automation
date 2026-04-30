@@ -202,7 +202,7 @@ function GenerateModal({ niches, onClose, onGenerated, onPollTrack }) {
   const [selNiches, setSelNiches] = useState([])
   const [selMoods,  setSelMoods]  = useState([])
   const [selGenres, setSelGenres] = useState([])
-  const [provider,  setProvider]  = useState('suno')
+  const [provider,  setProvider]  = useState('sunoapi')
   const [isVocal,   setIsVocal]   = useState(false)
   const [expanded,  setExpanded]  = useState('')
   const [expanding, setExpanding] = useState(false)
@@ -277,7 +277,7 @@ function GenerateModal({ niches, onClose, onGenerated, onPollTrack }) {
             <label className="text-xs text-[#9090a8] font-medium">Provider</label>
             <select value={provider} onChange={e => setProvider(e.target.value)}
               className="bg-[#16161a] border border-[#2a2a32] rounded-lg px-3 py-1.5 text-sm text-[#e8e8f0] focus:outline-none focus:border-[#7c6af7]">
-              <option value="suno">Suno</option>
+              <option value="sunoapi">Suno</option>
               <option value="lyria-clip">Lyria Clip (30s)</option>
               <option value="lyria-pro">Lyria Pro (full song)</option>
             </select>
@@ -439,7 +439,7 @@ export default function MusicPage() {
 
   // Stats
   const totalTracks  = trackList.length
-  const sunoCount    = trackList.filter(t => t.provider === 'suno').length
+  const sunoCount    = trackList.filter(t => t.provider === 'sunoapi').length
   const lyriaCount   = trackList.filter(t => t.provider?.startsWith('lyria')).length
   const importCount  = trackList.filter(t => t.provider === 'import').length
   const favCount     = trackList.filter(t => t.is_favorite).length

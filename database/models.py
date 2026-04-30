@@ -36,7 +36,7 @@ class MusicTrack(Base):
     volume            = Column(Float, default=0.15)
     usage_count       = Column(Integer, default=0)
     quality_score     = Column(Integer, default=80)
-    provider          = Column(String(20))   # suno | lyria-clip | lyria-pro | import
+    provider          = Column(String(20))   # sunoapi | lyria-clip | lyria-pro | import
     provider_task_id  = Column(String(200))
     generation_status = Column(String(20), default="pending")  # pending | ready | failed
     generation_prompt = Column(Text)

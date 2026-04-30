@@ -51,16 +51,19 @@ def list_video_templates(
     _user=Depends(require_editor_or_admin),
 ):
     """Return video templates for use in Suno manual music generation modal."""
-    rows = db.query(VideoTemplate).order_by(VideoTemplate.id).all()
-    return [
-        {
-            "id": t.id,
-            "slug": t.slug,
-            "label": t.label,
-            "output_format": t.output_format,
-        }
-        for t in rows
-    ]
+    try:
+        rows = db.query(VideoTemplate).order_by(VideoTemplate.id).all()
+        return [
+            {
+                "id": t.id,
+                "slug": t.slug,
+                "label": t.label,
+                "output_format": t.output_format,
+            }
+            for t in rows
+        ]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to load video templates")
 
 
 @router.get("")
