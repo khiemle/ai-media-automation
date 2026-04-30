@@ -196,7 +196,7 @@ function AnimateModal({ asset, onClose, onAnimated }) {
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button variant="primary" loading={loading} onClick={handleGenerate}>Generate Loop →</Button>
+          <Button variant="primary" loading={loading} onClick={handleGenerate}>Animate →</Button>
         </>
       }
     >
