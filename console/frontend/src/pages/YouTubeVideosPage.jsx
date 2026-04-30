@@ -84,9 +84,12 @@ function CreationPanel({ template, onClose, onCreated }) {
     if (!visualUploadFile) { showToast('Select a file', 'error'); return }
     setVisualUploading(true)
     try {
+      const ext = (visualUploadFile.name.split('.').pop() || '').toLowerCase()
+      const asset_type = ['mp4', 'mov', 'webm'].includes(ext) ? 'video_clip' : 'still_image'
       const newAsset = await assetsApi.upload(visualUploadFile, {
         source: visualUploadSource,
         description: visualUploadDesc,
+        asset_type,
       })
       setAssetList(prev => [...prev, newAsset])
       setForm(f => ({ ...f, visual_asset_id: String(newAsset.id) }))
@@ -367,15 +370,12 @@ function CreationPanel({ template, onClose, onCreated }) {
                       <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
                     ))}
                   </Select>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs text-[#9090a8] font-medium">Description <span className="text-[#5a5a70]">(optional)</span></label>
-                    <input
-                      value={visualUploadDesc}
-                      onChange={e => setVisualUploadDesc(e.target.value)}
-                      placeholder="e.g. Rainy window close-up"
-                      className="bg-[#16161a] border border-[#2a2a32] rounded-lg px-3 py-1.5 text-sm text-[#e8e8f0] placeholder:text-[#5a5a70] focus:outline-none focus:border-[#7c6af7] transition-colors"
-                    />
-                  </div>
+                  <Input
+                    label="Description (optional)"
+                    value={visualUploadDesc}
+                    onChange={e => setVisualUploadDesc(e.target.value)}
+                    placeholder="e.g. Rainy window close-up"
+                  />
                   <div className="flex gap-2 justify-end">
                     <Button variant="ghost" size="sm" onClick={() => {
                       setShowVisualUpload(false)
