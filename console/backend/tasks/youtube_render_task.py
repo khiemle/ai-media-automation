@@ -24,6 +24,7 @@ def render_youtube_video_task(self, youtube_video_id: int):
     """Orchestrate rendering of a long-form YouTube video."""
     from console.backend.database import SessionLocal
     from console.backend.models.youtube_video import YoutubeVideo
+    from console.backend.models.video_template import VideoTemplate  # noqa: F401 — registers FK target in SA metadata
 
     db = SessionLocal()
     video = None
