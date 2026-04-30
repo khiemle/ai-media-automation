@@ -25,3 +25,5 @@ class PipelineJob(Base):
         server_default=func.now(),
         default=lambda: datetime.now(timezone.utc),
     )
+    video_format: Mapped[str] = mapped_column(String(20), default="short", server_default="short")
+    parent_youtube_video_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
