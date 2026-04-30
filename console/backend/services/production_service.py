@@ -36,6 +36,7 @@ class ProductionService:
         niche: list[str] | None = None,
         source: str | None = None,
         min_duration: float | None = None,
+        asset_type: str | None = None,
         page: int = 1,
         per_page: int = 20,
     ) -> PaginatedResponse:
@@ -53,6 +54,9 @@ class ProductionService:
 
         if min_duration is not None:
             query = query.filter(VideoAsset.duration_s >= min_duration)
+
+        if asset_type:
+            query = query.filter(VideoAsset.asset_type == asset_type)
 
         total = query.count()
         rows = (

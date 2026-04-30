@@ -34,6 +34,7 @@ def search_assets(
     niche: str | None = Query(None),
     source: str | None = Query(None),
     min_duration: float | None = Query(None),
+    asset_type: str | None = Query(None),
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -47,6 +48,7 @@ def search_assets(
         niche=niche_list,
         source=source,
         min_duration=min_duration,
+        asset_type=asset_type,
         page=page,
         per_page=per_page,
     )
@@ -188,3 +190,62 @@ def start_production(
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# ── Animate still image with Runway ───────────────────────────────────────────
+
+class AnimateBody(BaseModel):
+    prompt: str
+    motion_intensity: int = 2
+    duration: int = 5
+
+
+@router.post("/assets/{asset_id}/animate")
+def animate_asset_endpoint(
+    asset_id: int,
+    body: AnimateBody,
+    db: Session = Depends(get_db),
+    _user=Depends(require_editor_or_admin),
+):
+    import os
+    from console.backend.models.video_asset import VideoAsset
+    from console.backend.tasks.runway_task import animate_asset_task
+    from console.backend.services.runway_service import RunwayService
+
+    asset = db.get(VideoAsset, asset_id)
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    if asset.asset_type != "still_image":
+        raise HTTPException(status_code=400, detail="Only still images can be animated")
+
+    api_key = os.environ.get("RUNWAY_API_KEY", "").strip()
+    if not api_key:
+        raise HTTPException(status_code=400, detail="RUNWAY_API_KEY not configured")
+
+    model = os.environ.get("RUNWAY_MODEL", "gen3-alpha")
+    svc = RunwayService(api_key=api_key, model=model)
+
+    public_url = os.environ.get("PUBLIC_API_URL", "http://localhost:8080")
+    image_url = f"{public_url}/api/production/assets/{asset_id}/stream"
+    runway_task_id = svc.submit_image_to_video(image_url, body.prompt, body.duration, body.motion_intensity)
+
+    child = VideoAsset(
+        file_path="",
+        source="runway",
+        asset_type="video_clip",
+        parent_asset_id=asset_id,
+        generation_prompt=body.prompt,
+        runway_status="pending",
+        description=f"Runway animation of asset {asset_id}",
+    )
+    db.add(child)
+    db.commit()
+    db.refresh(child)
+
+    output_filename = f"runway_{child.id}.mp4"
+    task = animate_asset_task.delay(child.id, runway_task_id, output_filename, api_key, model)
+
+    child.runway_status = "pending"
+    db.commit()
+
+    return {"asset_id": child.id, "task_id": task.id, "runway_task_id": runway_task_id}

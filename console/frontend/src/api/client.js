@@ -138,6 +138,9 @@ export const assetsApi = {
   delete: (id) =>
     fetchApi(`/api/production/assets/${id}`, { method: 'DELETE' }),
   streamUrl: (id) => `/api/production/assets/${id}/stream`,
+  thumbnailUrl: (id) => `/api/production/assets/${id}/thumbnail`,
+  animateWithRunway: (id, body) =>
+    fetchApi(`/api/production/assets/${id}/animate`, { method: 'POST', body: JSON.stringify(body) }),
 }
 
 // ── SFX ─────────────────────────────────────────────────────────────────────────

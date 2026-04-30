@@ -1,19 +1,28 @@
 import { useState } from 'react'
 import { assetsApi, nichesApi } from '../api/client.js'
 import { useApi } from '../hooks/useApi.js'
-import { Card, Button, StatBox, Modal, Input, Spinner, EmptyState, Toast } from '../components/index.jsx'
+import { Card, Button, StatBox, Modal, Input, Select, Spinner, EmptyState, Toast } from '../components/index.jsx'
 
 // ── Source badge ──────────────────────────────────────────────────────────────
 const SOURCE_COLORS = {
-  pexels: 'bg-[#001624] text-[#4a9eff] border-[#002840]',
-  veo:    'bg-[#001e12] text-[#34d399] border-[#003020]',
+  pexels:     'bg-[#001624] text-[#4a9eff] border-[#002840]',
+  veo:        'bg-[#001e12] text-[#34d399] border-[#003020]',
+  manual:     'bg-[#1e1e2e] text-[#9090a8] border-[#2a2a42]',
+  stock:      'bg-[#1e1e2e] text-[#9090a8] border-[#2a2a42]',
+  midjourney: 'bg-[#1f0d00] text-[#f97316] border-[#2e1500]',
+  runway:     'bg-[#0a1e1e] text-[#14b8a6] border-[#0d2e2e]',
 }
 
-function SourceBadge({ source }) {
+function SourceBadge({ source, runwayStatus }) {
   const cls = SOURCE_COLORS[source] || 'bg-[#1e1e2e] text-[#9090a8] border-[#2a2a42]'
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-mono font-medium border ${cls}`}>
-      {(source || 'manual').toUpperCase()}
+    <span className="inline-flex items-center gap-1.5">
+      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-mono font-medium border ${cls}`}>
+        {(source || 'manual').toUpperCase()}
+      </span>
+      {runwayStatus === 'pending' && (
+        <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#14b8a6] bg-opacity-20 text-[#14b8a6] font-mono animate-pulse">RUNWAY ●</span>
+      )}
     </span>
   )
 }
@@ -161,14 +170,77 @@ function EditModal({ asset, niches, onClose, onSaved }) {
   )
 }
 
+// ── Animate Modal ─────────────────────────────────────────────────────────────
+function AnimateModal({ asset, onClose, onAnimated }) {
+  const [prompt, setPrompt] = useState('')
+  const [intensity, setIntensity] = useState(2)
+  const [duration, setDuration] = useState(5)
+  const [loading, setLoading] = useState(false)
+  const [toast, setToast] = useState(null)
+  const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000) }
+
+  const handleGenerate = async () => {
+    if (!prompt) { showToast('Runway prompt is required', 'error'); return }
+    setLoading(true)
+    try {
+      await assetsApi.animateWithRunway(asset.id, { prompt, motion_intensity: intensity, duration })
+      showToast('Animation queued — check back in a few minutes', 'success')
+      onAnimated()
+      onClose()
+    } catch (e) { showToast(e.message, 'error') }
+    finally { setLoading(false) }
+  }
+
+  return (
+    <Modal open onClose={onClose} title="Animate with Runway →" width="max-w-lg"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" loading={loading} onClick={handleGenerate}>Generate Loop →</Button>
+        </>
+      }
+    >
+      {toast && <Toast message={toast.msg} type={toast.type} />}
+      <div className="flex flex-col gap-4">
+        {asset.thumbnail_path && (
+          <img src={assetsApi.thumbnailUrl(asset.id)} alt={asset.description} className="w-full h-32 object-cover rounded-lg" />
+        )}
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-[#9090a8] font-medium">Runway Prompt</label>
+          <textarea
+            value={prompt}
+            onChange={e => setPrompt(e.target.value)}
+            rows={3}
+            className="w-full px-3 py-2 rounded-lg bg-[#16161a] border border-[#2a2a32] text-sm text-[#e8e8f0] resize-none focus:outline-none focus:border-[#7c6af7]"
+            placeholder="Slow rain droplets running down glass. No camera movement. Hypnotic loop."
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-[#9090a8] font-medium">Motion Intensity ({intensity}/10)</label>
+            <input type="range" min={1} max={10} value={intensity} onChange={e => setIntensity(Number(e.target.value))}
+              className="w-full accent-[#7c6af7]" />
+          </div>
+          <Select label="Duration" value={duration} onChange={e => setDuration(Number(e.target.value))}>
+            <option value={5}>5s</option>
+            <option value={10}>10s</option>
+          </Select>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function VideoAssetsPage() {
   const [filterKeywords,  setFilterKeywords]  = useState('')
   const [filterSource,    setFilterSource]    = useState('')
   const [filterNiches,    setFilterNiches]    = useState([])
   const [filterMinDur,    setFilterMinDur]    = useState('')
+  const [filterAssetType, setFilterAssetType] = useState('')
   const [previewAsset,    setPreviewAsset]    = useState(null)
   const [editingAsset,    setEditingAsset]    = useState(null)
+  const [animateTarget,   setAnimateTarget]   = useState(null)
   const [deletingId,      setDeletingId]      = useState(null)
   const [toast,           setToast]           = useState(null)
 
@@ -185,8 +257,9 @@ export default function VideoAssetsPage() {
       source:      filterSource   || undefined,
       niche:       nichesKey || undefined,
       min_duration: filterMinDur  || undefined,
+      asset_type:  filterAssetType || undefined,
     }),
-    [filterKeywords, filterSource, nichesKey, filterMinDur]
+    [filterKeywords, filterSource, nichesKey, filterMinDur, filterAssetType]
   )
 
   const nicheList  = niches  || []
@@ -298,6 +371,26 @@ export default function VideoAssetsPage() {
             </div>
           </div>
         )}
+
+        {/* Asset type toggle */}
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-[#9090a8] font-medium">Type</label>
+          <div className="flex items-center gap-1 bg-[#16161a] border border-[#2a2a32] rounded-lg p-1">
+            {['all', 'video_clip', 'still_image'].map(t => (
+              <button
+                key={t}
+                onClick={() => setFilterAssetType(t === 'all' ? '' : t)}
+                className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+                  (filterAssetType || 'all') === t
+                    ? 'bg-[#7c6af7] text-white'
+                    : 'text-[#9090a8] hover:text-[#e8e8f0]'
+                }`}
+              >
+                {t === 'all' ? 'All' : t === 'video_clip' ? 'Video Clips' : 'Stills'}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Asset table */}
@@ -361,7 +454,7 @@ export default function VideoAssetsPage() {
 
                     {/* Source badge */}
                     <td className="py-2.5 pr-4 whitespace-nowrap">
-                      <SourceBadge source={asset.source} />
+                      <SourceBadge source={asset.source} runwayStatus={asset.runway_status} />
                     </td>
 
                     {/* Duration */}
@@ -407,6 +500,9 @@ export default function VideoAssetsPage() {
                         <Button variant="ghost" size="sm" onClick={() => setEditingAsset(asset)} title="Edit">
                           ✎
                         </Button>
+                        {asset.asset_type === 'still_image' && (
+                          <Button variant="ghost" size="sm" onClick={() => setAnimateTarget(asset)}>Animate →</Button>
+                        )}
                         <Button
                           variant="danger"
                           size="sm"
@@ -437,6 +533,14 @@ export default function VideoAssetsPage() {
           niches={nicheList}
           onClose={() => setEditingAsset(null)}
           onSaved={refetch}
+        />
+      )}
+
+      {animateTarget && (
+        <AnimateModal
+          asset={animateTarget}
+          onClose={() => setAnimateTarget(null)}
+          onAnimated={refetch}
         />
       )}
 
