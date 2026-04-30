@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useLocation, Routes, Route, Navigate, NavLink } from 'react-router-dom'
-import { setToken, clearToken, authApi } from './api/client.js'
+import { setToken, clearToken, restoreToken, authApi } from './api/client.js'
 import LoginPage from './pages/LoginPage.jsx'
 import ScraperPage from './pages/ScraperPage.jsx'
 import ScriptsPage from './pages/ScriptsPage.jsx'
@@ -177,7 +177,11 @@ export default function App() {
   const location = useLocation()
 
   useEffect(() => {
-    // No persisted token — user must log in each session
+    const token = restoreToken()
+    if (!token) return
+    authApi.me()
+      .then(userData => setUser(userData))
+      .catch(() => clearToken())
   }, [])
 
   const handleLogin = (token, userData) => {

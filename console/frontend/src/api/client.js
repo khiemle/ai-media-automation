@@ -1,16 +1,24 @@
-// ── Token storage (memory only — never persisted) ─────────────────────────────
+// ── Token storage (session-persistent) ────────────────────────────────────────
 let _token = null
 
 export function setToken(token) {
   if (!token) return
   _token = token
+  sessionStorage.setItem('console_token', token)
 }
 
 export function clearToken() {
   _token = null
+  sessionStorage.removeItem('console_token')
 }
 
 export function getToken() { return _token }
+
+export function restoreToken() {
+  const t = sessionStorage.getItem('console_token')
+  if (t) _token = t
+  return t || null
+}
 
 // ── Base fetch wrapper ─────────────────────────────────────────────────────────
 export async function fetchApi(url, options = {}) {
