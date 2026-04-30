@@ -77,7 +77,7 @@ class SfxService:
         if not row:
             raise KeyError(f"SFX {sfx_id} not found")
         path = Path(row.file_path)
-        if path.exists():
-            path.unlink(missing_ok=True)
         self.db.delete(row)
         self.db.commit()
+        if path.exists():
+            path.unlink(missing_ok=True)

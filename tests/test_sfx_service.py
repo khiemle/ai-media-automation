@@ -39,8 +39,10 @@ def test_delete_sfx(db, tmp_path):
     svc = SfxService(db)
     fake = b"RIFF" + b"\x00" * 40
     track = svc.import_sfx("Rain", "rain_heavy", "import", fake, "r.wav", tmp_path)
+    file_path = tmp_path / f"sfx_{track['id']}.wav"
     svc.delete_sfx(track["id"])
     assert svc.list_sfx() == []
+    assert not file_path.exists()
 
 
 def test_list_distinct_sound_types(db, tmp_path):

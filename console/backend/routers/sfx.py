@@ -11,6 +11,8 @@ from console.backend.services.sfx_service import SfxService
 router = APIRouter(prefix="/sfx", tags=["sfx"])
 
 ALLOWED_AUDIO_EXTENSIONS = {".mp3", ".wav", ".m4a", ".ogg"}
+MEDIA_TYPES = {".mp3": "audio/mpeg", ".wav": "audio/wav", ".m4a": "audio/mp4", ".ogg": "audio/ogg"}
+MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50 MB
 
 
 @router.get("")
@@ -43,7 +45,9 @@ async def import_sfx(
     ext = Path(file.filename or "").suffix.lower()
     if ext not in ALLOWED_AUDIO_EXTENSIONS:
         raise HTTPException(status_code=400, detail=f"Unsupported format: {ext}")
-    content = await file.read()
+    content = await file.read(MAX_UPLOAD_BYTES + 1)
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="File too large (max 50 MB)")
     return SfxService(db).import_sfx(
         title=title,
         sound_type=sound_type,
@@ -66,7 +70,7 @@ def delete_sfx(
 
 
 @router.get("/{sfx_id}/stream")
-def stream_sfx(sfx_id: int, db: Session = Depends(get_db)):
+def stream_sfx(sfx_id: int, db: Session = Depends(get_db), _user=Depends(require_editor_or_admin)):
     from console.backend.models.sfx_asset import SfxAsset
     row = db.get(SfxAsset, sfx_id)
     if not row:
@@ -74,4 +78,6 @@ def stream_sfx(sfx_id: int, db: Session = Depends(get_db)):
     path = Path(row.file_path)
     if not path.exists():
         raise HTTPException(status_code=404, detail="File not found on disk")
-    return FileResponse(str(path), media_type="audio/wav")
+    ext = path.suffix.lower()
+    media_type = MEDIA_TYPES.get(ext, "application/octet-stream")
+    return FileResponse(str(path), media_type=media_type)
