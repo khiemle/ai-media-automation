@@ -162,7 +162,7 @@ function EditModal({ asset, niches, onClose, onSaved }) {
           label="Quality Score (0–100)"
           type="number"
           value={qualityScore}
-          onChange={e => setQualityScore(parseInt(e.target.value) || 0)}
+          onChange={e => setQualityScore(parseFloat(e.target.value) || 0)}
         />
       </div>
       {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
@@ -200,9 +200,9 @@ function AnimateModal({ asset, onClose, onAnimated }) {
         </>
       }
     >
-      {toast && <Toast message={toast.msg} type={toast.type} />}
+      {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
       <div className="flex flex-col gap-4">
-        {asset.thumbnail_path && (
+        {asset.thumbnail_url && (
           <img src={assetsApi.thumbnailUrl(asset.id)} alt={asset.description} className="w-full h-32 object-cover rounded-lg" />
         )}
         <div className="flex flex-col gap-1">
@@ -334,6 +334,8 @@ export default function VideoAssetsPage() {
             <option value="pexels">Pexels</option>
             <option value="veo">Veo</option>
             <option value="manual">Manual</option>
+            <option value="midjourney">MidJourney</option>
+            <option value="runway">Runway</option>
           </select>
         </div>
 

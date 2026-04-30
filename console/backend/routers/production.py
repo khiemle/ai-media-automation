@@ -243,9 +243,6 @@ def animate_asset_endpoint(
     db.refresh(child)
 
     output_filename = f"runway_{child.id}.mp4"
-    task = animate_asset_task.delay(child.id, runway_task_id, output_filename, api_key, model)
-
-    child.runway_status = "pending"
-    db.commit()
+    task = animate_asset_task.delay(child.id, runway_task_id, output_filename)
 
     return {"asset_id": child.id, "task_id": task.id, "runway_task_id": runway_task_id}

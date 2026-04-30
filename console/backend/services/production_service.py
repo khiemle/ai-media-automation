@@ -87,6 +87,8 @@ class ProductionService:
             "file_path": asset.file_path,
             "thumbnail_url": asset.thumbnail_path,
             "source": asset.source,
+            "asset_type": asset.asset_type,
+            "runway_status": asset.runway_status,
             "description": asset.description,
             "keywords": asset.keywords or [],
             "niche": asset.niche or [],

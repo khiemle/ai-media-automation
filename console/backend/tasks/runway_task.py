@@ -4,6 +4,7 @@ import time
 from pathlib import Path
 
 import requests
+import requests as _requests
 
 from console.backend.celery_app import celery_app
 
@@ -18,10 +19,11 @@ def animate_asset_task(
     asset_id: int,
     runway_task_id: str,
     output_filename: str,
-    api_key: str,
-    model: str = "gen3-alpha",
 ):
     """Poll Runway until succeeded/failed/timeout, then save video and update asset."""
+    api_key = os.environ.get("RUNWAY_API_KEY", "").strip()
+    model = os.environ.get("RUNWAY_MODEL", "gen3-alpha")
+
     from console.backend.database import SessionLocal
     from console.backend.models.video_asset import VideoAsset
     from console.backend.services.runway_service import RunwayService
@@ -30,7 +32,10 @@ def animate_asset_task(
     deadline = time.time() + TIMEOUT_S
 
     while time.time() < deadline:
-        result = svc.poll_task(runway_task_id)
+        try:
+            result = svc.poll_task(runway_task_id)
+        except _requests.RequestException as exc:
+            raise self.retry(exc=exc, countdown=30)
         status = result["status"]
 
         if status == "succeeded" and result["output_url"]:
