@@ -106,10 +106,9 @@ const ALL_TABS = [
   { id: 'production',  label: 'Production',     Icon: Icons.Production,  roles: ['admin', 'editor'], section: 'short' },
   // YOUTUBE VIDEOS
   { id: 'youtube',     label: 'YouTube Videos', Icon: Icons.YouTube,     roles: ['admin', 'editor'], section: 'youtube' },
-  // SHARED
-  { id: 'uploads',     label: 'Uploads',        Icon: Icons.Uploads,     roles: ['admin', 'editor'], section: 'shared' },
-  { id: 'pipeline',    label: 'Pipeline',       Icon: Icons.Pipeline,    roles: ['admin', 'editor'], section: 'shared' },
   // ADMIN
+  { id: 'uploads',     label: 'Uploads',        Icon: Icons.Uploads,     roles: ['admin', 'editor'], section: 'admin' },
+  { id: 'pipeline',    label: 'Pipeline',       Icon: Icons.Pipeline,    roles: ['admin', 'editor'], section: 'admin' },
   { id: 'llm',         label: 'LLM',            Icon: Icons.LLM,         roles: ['admin'],            section: 'admin' },
   { id: 'performance', label: 'Performance',    Icon: Icons.Performance, roles: ['admin', 'editor'], section: 'admin' },
   { id: 'system',      label: 'System',         Icon: Icons.System,      roles: ['admin'],            section: 'admin' },
@@ -119,7 +118,6 @@ const SECTION_LABELS = {
   library: 'LIBRARY',
   short:   'SHORT VIDEOS',
   youtube: 'YOUTUBE VIDEOS',
-  shared:  null,
   admin:   'ADMIN',
 }
 
