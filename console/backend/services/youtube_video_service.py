@@ -7,7 +7,9 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from console.backend.models.audit_log import AuditLog
+from console.backend.models.channel import Channel
 from console.backend.models.youtube_video import YoutubeVideo
+from console.backend.models.youtube_video_upload import YoutubeVideoUpload
 from console.backend.models.video_template import VideoTemplate
 
 # Valid status transitions for the YoutubeVideo state machine
@@ -121,9 +123,6 @@ class YoutubeVideoService:
     # ── Videos ─────────────────────────────────────────────────────────────
 
     def list_videos(self, status: str | None = None, template_id: int | None = None) -> list[dict]:
-        from console.backend.models.youtube_video_upload import YoutubeVideoUpload
-        from console.backend.models.channel import Channel
-
         q = self.db.query(YoutubeVideo)
         if status:
             q = q.filter(YoutubeVideo.status == status)
@@ -162,11 +161,25 @@ class YoutubeVideoService:
             for v in videos
         ]
 
-    def get_video(self, video_id: int) -> dict:
+    def get_video(self, video_id: int) -> dict | None:
         v = self.db.get(YoutubeVideo, video_id)
         if not v:
-            raise KeyError(f"YoutubeVideo {video_id} not found")
-        return _video_to_dict(v)
+            return None
+
+        template_label = None
+        if v.template_id:
+            t = self.db.query(VideoTemplate).filter(VideoTemplate.id == v.template_id).first()
+            template_label = t.label if t else None
+
+        upload_rows = (
+            self.db.query(YoutubeVideoUpload, Channel.name)
+            .outerjoin(Channel, YoutubeVideoUpload.channel_id == Channel.id)
+            .filter(YoutubeVideoUpload.youtube_video_id == video_id)
+            .all()
+        )
+        uploads = [_upload_to_dict(u, ch_name) for u, ch_name in upload_rows]
+
+        return _video_to_dict(v, template_label=template_label, uploads=uploads)
 
     def create_video(self, data: dict, user_id: int | None = None) -> dict:
         """Create a new YouTube video project."""
@@ -290,8 +303,6 @@ class YoutubeVideoService:
 
     def queue_upload(self, video_id: int, channel_id: int) -> dict:
         """Create a YoutubeVideoUpload record and dispatch the upload Celery task."""
-        from console.backend.models.youtube_video_upload import YoutubeVideoUpload
-
         v = self.db.get(YoutubeVideo, video_id)
         if not v:
             raise KeyError(f"YoutubeVideo {video_id} not found")
@@ -303,7 +314,6 @@ class YoutubeVideoService:
             .filter(
                 YoutubeVideoUpload.youtube_video_id == video_id,
                 YoutubeVideoUpload.channel_id == channel_id,
-                YoutubeVideoUpload.status.in_(["queued", "uploading", "done"]),
             )
             .first()
         )
