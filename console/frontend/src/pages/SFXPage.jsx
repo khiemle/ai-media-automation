@@ -165,15 +165,29 @@ export default function SFXPage() {
       if (audioRef.current) {
         audioRef.current.pause()
         audioRef.current.onended = null
+        audioRef.current.onerror = null
       }
       const audio = new Audio(sfxApi.streamUrl(sfx.id))
       audioRef.current = audio
-      audio.play().catch(() => {
-        setPlaying(null)
-        showError(`Could not load audio for "${sfx.title}". Check that the file exists on disk.`)
-      })
+      
+      let errorShown = false
+      audio.onerror = () => {
+        if (!errorShown) {
+          errorShown = true
+          setPlaying(null)
+          showError(`Could not load audio for "${sfx.title}". Check that the file exists on disk.`)
+        }
+      }
       audio.onended = () => setPlaying(null)
       setPlaying(sfx.id)
+      
+      audio.play().catch((err) => {
+        // Only show error if it's not a user abort (AbortError happens when pausing before play starts)
+        if (!errorShown && err?.name !== 'AbortError') {
+          errorShown = true
+          showError(`Could not play audio for "${sfx.title}".`)
+        }
+      })
     }
   }
 
