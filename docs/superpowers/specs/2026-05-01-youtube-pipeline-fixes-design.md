@@ -132,12 +132,43 @@ Grid class: `grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4` — adapts to viewp
 
 ---
 
+## Issue 7 — Make Short button broken + parent link not stored
+
+**Root causes (three separate gaps):**
+
+1. **Button hidden**: `+ Make Short` shows only for `v.status === 'ready'`, but the render pipeline uses `'done'`. Fixed as part of Issue 1 (Task 1 in the plan).
+
+2. **`parent_youtube_video_id` stored in wrong place**: `MakeShortModal` packs `parent_youtube_video_id` inside `sfx_overrides` JSON (line 573 of `YouTubeVideosPage.jsx`) instead of a dedicated column. The `YoutubeVideo` model has no `parent_youtube_video_id` field, so the parent link is saved but not queryable or displayable.
+
+3. **`sfx_overrides` shape conflict**: `MakeShortModal` sets `sfx_overrides = { parent_youtube_video_id, cta_text, cta_position }`. After Issue 5's fix, `_resolve_sfx_layers()` looks for `foreground`/`midground`/`background` keys — it ignores these foreign keys — but mixing render-config data with parent-link data in the same JSON field is messy. `cta_text`/`cta_position` should stay in `sfx_overrides` under a dedicated `cta` sub-key, cleanly separated from SFX layer keys.
+
+**Fix:**
+
+- **Migration 009**: `ALTER TABLE youtube_videos ADD COLUMN parent_youtube_video_id INTEGER REFERENCES youtube_videos(id) ON DELETE SET NULL`
+- **`YoutubeVideo` model**: add `parent_youtube_video_id` mapped column
+- **`YoutubeVideoCreate` schema**: add optional `parent_youtube_video_id: int | None = None`
+- **`MakeShortModal` (frontend)**: pass `parent_youtube_video_id` as a top-level request field; restructure `sfx_overrides` to `{ cta: { text: ctaText, position: ctaPosition } }` so CTA config is cleanly namespaced and SFX layer keys (`foreground`/`midground`/`background`) are unambiguous
+
+CTA overlay rendering (applying the text over the video) is a separate feature not yet in the render pipeline — stored correctly for now, rendered in a future task.
+
+**Files:**
+- `console/backend/alembic/versions/009_youtube_video_parent.py` — new migration
+- `console/backend/models/youtube_video.py` — add `parent_youtube_video_id`
+- `console/backend/routers/youtube_videos.py` — add field to `YoutubeVideoCreate`
+- `console/frontend/src/pages/YouTubeVideosPage.jsx` — fix `MakeShortModal.handleSubmit`
+
+---
+
 ## File Map
 
 | File | Change |
 |---|---|
-| `console/frontend/src/pages/YouTubeVideosPage.jsx` | Fix Preview button status check; fix AI_SOURCES filter |
+| `console/frontend/src/pages/YouTubeVideosPage.jsx` | Fix Preview status check; fix STATUS_COLORS; fix asset list per_page; fix MakeShortModal data |
+| `console/frontend/src/api/client.js` | Add `youtubeVideosApi.upload()` |
 | `console/frontend/src/pages/UploadsPage.jsx` | Remove `youtube_long` from format filter; add YouTube Long Videos section |
 | `console/frontend/src/pages/SFXPage.jsx` | Redesign to 3-column grid layout |
+| `console/backend/tasks/youtube_upload_task.py` | New Celery task for YouTube Long uploads |
+| `console/backend/routers/youtube_videos.py` | Add `POST /{id}/upload` endpoint; add `parent_youtube_video_id` to schema |
 | `console/backend/tasks/youtube_render_task.py` | Add `_resolve_sfx_layers()`; update `_render_video()` for dynamic audio mix |
-| `console/backend/routers/youtube_videos.py` | Add `POST /{id}/upload` endpoint |
+| `console/backend/models/youtube_video.py` | Add `parent_youtube_video_id` column |
+| `console/backend/alembic/versions/009_youtube_video_parent.py` | New migration |

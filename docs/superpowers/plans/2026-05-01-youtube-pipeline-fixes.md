@@ -837,6 +837,197 @@ git commit -m "feat: sfx library — redesign to 3-column compact grid layout"
 
 ---
 
+## Task 9: Fix Make Short — parent_youtube_video_id column + modal data fix
+
+**Files:**
+- Create: `console/backend/alembic/versions/009_youtube_video_parent.py`
+- Modify: `console/backend/models/youtube_video.py`
+- Modify: `console/backend/routers/youtube_videos.py:19-30`
+- Modify: `console/frontend/src/pages/YouTubeVideosPage.jsx:561-579`
+
+**What's broken:**
+- `MakeShortModal` packs `parent_youtube_video_id` inside `sfx_overrides` JSON (line 573) instead of a dedicated DB column
+- `YoutubeVideo` model has no `parent_youtube_video_id` field — the parent link is stored but not queryable
+- `sfx_overrides` receives `{ parent_youtube_video_id, cta_text, cta_position }` which should be `{ cta: { text, position } }` so SFX layer keys remain unambiguous
+- The `+ Make Short` button visibility is fixed by Task 1 (status `'done'`)
+
+- [ ] **Step 1: Create migration 009**
+
+Create `console/backend/alembic/versions/009_youtube_video_parent.py`:
+
+```python
+"""youtube_videos — add parent_youtube_video_id self-FK
+
+Revision ID: 009
+Revises: 008
+Create Date: 2026-05-01
+"""
+from typing import Sequence, Union
+
+import sqlalchemy as sa
+from alembic import op
+
+revision: str = "009"
+down_revision: Union[str, None] = "008"
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+def upgrade() -> None:
+    op.add_column(
+        "youtube_videos",
+        sa.Column(
+            "parent_youtube_video_id",
+            sa.Integer,
+            sa.ForeignKey("youtube_videos.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
+    )
+
+
+def downgrade() -> None:
+    op.drop_column("youtube_videos", "parent_youtube_video_id")
+```
+
+- [ ] **Step 2: Run the migration**
+
+```bash
+cd /Volumes/SSD/Workspace/ai-media-automation/console/backend
+alembic upgrade head
+```
+
+Expected: `Running upgrade 008 -> 009, youtube_videos — add parent_youtube_video_id self-FK`
+
+- [ ] **Step 3: Add `parent_youtube_video_id` to the YoutubeVideo model**
+
+In `console/backend/models/youtube_video.py`, add after line 21 (`visual_asset_id`):
+
+```python
+    parent_youtube_video_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("youtube_videos.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+```
+
+- [ ] **Step 4: Add `parent_youtube_video_id` to `YoutubeVideoCreate` schema**
+
+In `console/backend/routers/youtube_videos.py`, replace the `YoutubeVideoCreate` class (lines 19–30):
+
+```python
+class YoutubeVideoCreate(BaseModel):
+    title: str
+    template_id: int
+    theme: str | None = None
+    music_track_id: int | None = None
+    sfx_overrides: dict | None = None
+    visual_asset_id: int | None = None
+    target_duration_h: float | None = None
+    output_quality: str = "1080p"
+    seo_title: str | None = None
+    seo_description: str | None = None
+    seo_tags: list[str] | None = None
+    parent_youtube_video_id: int | None = None
+```
+
+- [ ] **Step 5: Persist `parent_youtube_video_id` in YoutubeVideoService**
+
+In `console/backend/services/youtube_video_service.py`, replace the `YoutubeVideo(...)` constructor block (lines 125–138):
+
+```python
+        video = YoutubeVideo(
+            title=data["title"],
+            template_id=template_id,
+            theme=data.get("theme"),
+            music_track_id=data.get("music_track_id"),
+            visual_asset_id=data.get("visual_asset_id"),
+            sfx_overrides=data.get("sfx_overrides"),
+            target_duration_h=data.get("target_duration_h"),
+            output_quality=data.get("output_quality", "1080p"),
+            seo_title=data.get("seo_title"),
+            seo_description=data.get("seo_description"),
+            seo_tags=data.get("seo_tags"),
+            parent_youtube_video_id=data.get("parent_youtube_video_id"),
+            status="draft",
+        )
+```
+
+Also update `_video_to_dict` (lines 44–63) to expose the field in API responses — add after `"sfx_overrides"`:
+
+```python
+        "parent_youtube_video_id": v.parent_youtube_video_id,
+```
+
+- [ ] **Step 6: Fix MakeShortModal to pass parent_youtube_video_id as a top-level field**
+
+In `console/frontend/src/pages/YouTubeVideosPage.jsx`, replace the `handleSubmit` function inside `MakeShortModal` (lines 561–579):
+
+```js
+  const handleSubmit = async () => {
+    if (loading) return
+    if (!shortTemplate) { showToast('No short template found', 'error'); return }
+    setLoading(true)
+    try {
+      await youtubeVideosApi.create({
+        title: `${video.title} — Short`,
+        template_id: shortTemplate.id,
+        theme: video.theme,
+        target_duration_h: 58 / 3600,
+        music_track_id: form.sameMusic ? video.music_track_id : null,
+        visual_asset_id: form.sameVisual ? video.visual_asset_id : null,
+        parent_youtube_video_id: video.id,
+        sfx_overrides: { cta: { text: form.ctaText, position: form.ctaPosition } },
+      })
+      onCreated()
+      onClose()
+    } catch (e) { showToast(e.message, 'error') }
+    finally { setLoading(false) }
+  }
+```
+
+- [ ] **Step 7: Verify the module imports cleanly**
+
+```bash
+cd /Volumes/SSD/Workspace/ai-media-automation
+python3 -c "
+from console.backend.models.youtube_video import YoutubeVideo
+print('parent_youtube_video_id field:', hasattr(YoutubeVideo, 'parent_youtube_video_id'))
+"
+```
+
+Expected: `parent_youtube_video_id field: True`
+
+- [ ] **Step 8: Manual test**
+
+1. Set a YouTube video to `done` status in the DB:
+   ```bash
+   psql "postgresql://admin:123456@localhost:5432/ai_media" \
+     -c "UPDATE youtube_videos SET status='done', output_path='/tmp/test.mp4' WHERE id=<id>"
+   ```
+2. Open YouTube Videos page — the video card should show `▶ Preview` and `+ Make Short` buttons (Task 1 fix required)
+3. Click `+ Make Short` — modal opens showing parent video name, Music/Visual toggles, CTA field, CTA position
+4. Fill in CTA text, click "Queue Render →"
+5. Verify in the DB that a new `youtube_videos` row was created with `parent_youtube_video_id` set:
+   ```bash
+   psql "postgresql://admin:123456@localhost:5432/ai_media" \
+     -c "SELECT id, title, status, parent_youtube_video_id, sfx_overrides FROM youtube_videos ORDER BY id DESC LIMIT 3"
+   ```
+   Expected: newest row has `parent_youtube_video_id = <parent_id>` and `sfx_overrides = {"cta": {"text": "...", "position": "..."}}`
+
+- [ ] **Step 9: Commit**
+
+```bash
+git add \
+  console/backend/alembic/versions/009_youtube_video_parent.py \
+  console/backend/models/youtube_video.py \
+  console/backend/routers/youtube_videos.py \
+  console/backend/services/youtube_video_service.py \
+  console/frontend/src/pages/YouTubeVideosPage.jsx
+git commit -m "fix: make short — add parent_youtube_video_id column, fix modal data shape"
+```
+
+---
+
 ## Self-Review — Spec Coverage Check
 
 | Spec requirement | Task |
@@ -852,3 +1043,6 @@ git commit -m "feat: sfx library — redesign to 3-column compact grid layout"
 | _resolve_sfx_layers() helper | Task 7 |
 | Dynamic audio mix in _render_video() | Task 7 |
 | SFX Library grid redesign | Task 8 |
+| Migration 009 — parent_youtube_video_id column | Task 9 |
+| YoutubeVideo model + schema update | Task 9 |
+| MakeShortModal data shape fix | Task 9 |
