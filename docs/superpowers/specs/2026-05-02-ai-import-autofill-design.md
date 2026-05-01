@@ -118,7 +118,7 @@ Each modal type has a dedicated prompt template in `services/llm_service.py`. Te
 
 Collected from the `File` object at button-click time:
 - `file.name`, `file.size`, `file.type` — always available
-- `duration_s` — extracted via Web Audio API (already implemented in MusicPage; SFX reuses same pattern; assets omit)
+- `duration_s` — extracted via Web Audio API for Music only (already implemented in MusicPage); SFX and assets send `null`
 
 ### Field Mapping (`handleAutofill`)
 
