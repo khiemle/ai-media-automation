@@ -125,3 +125,66 @@ def test_build_music_form_values_false_boolean_included():
         {"is_vocal": False},
     )
     assert "is_vocal" in prompt
+
+
+# ── Endpoint ──────────────────────────────────────────────────────────────────
+
+from unittest.mock import patch
+from fastapi.testclient import TestClient
+
+
+def _make_client():
+    from console.backend.main import app
+    from console.backend.auth import require_editor_or_admin
+    app.dependency_overrides[require_editor_or_admin] = lambda: {"id": 1, "role": "admin"}
+    return TestClient(app)
+
+
+def test_autofill_endpoint_music_happy_path():
+    mock_response = {
+        "title": "Lo-Fi Chill",
+        "niches": ["study"],
+        "moods": ["calm_focus"],
+        "genres": ["ambient"],
+        "volume": 0.15,
+        "quality_score": 80,
+        "is_vocal": False,
+    }
+    with patch("rag.llm_router.get_router") as mock_get_router:
+        mock_get_router.return_value.generate.return_value = mock_response
+        resp = _make_client().post("/api/llm/autofill", json={
+            "modal_type": "music",
+            "metadata": {
+                "filename": "lofi-chill.mp3",
+                "file_size_bytes": 1_024_000,
+                "mime_type": "audio/mpeg",
+                "duration_s": 120.0,
+            },
+            "form_values": {"title": "My Track"},
+        })
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["title"] == "Lo-Fi Chill"
+    assert data["moods"] == ["calm_focus"]
+
+
+def test_autofill_endpoint_rate_limited_returns_429():
+    with patch("rag.llm_router.get_router") as mock_get_router:
+        mock_get_router.return_value.generate.side_effect = RuntimeError("429 rate limit exceeded")
+        resp = _make_client().post("/api/llm/autofill", json={
+            "modal_type": "sfx",
+            "metadata": {"filename": "rain.wav", "file_size_bytes": 500, "mime_type": "audio/wav"},
+            "form_values": {},
+        })
+    assert resp.status_code == 429
+
+
+def test_autofill_endpoint_gemini_failure_returns_422():
+    with patch("rag.llm_router.get_router") as mock_get_router:
+        mock_get_router.return_value.generate.side_effect = RuntimeError("Gemini failed after 3 attempts")
+        resp = _make_client().post("/api/llm/autofill", json={
+            "modal_type": "asset",
+            "metadata": {"filename": "photo.jpg", "file_size_bytes": 200_000, "mime_type": "image/jpeg"},
+            "form_values": {},
+        })
+    assert resp.status_code == 422
