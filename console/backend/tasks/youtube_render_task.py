@@ -86,7 +86,7 @@ def render_youtube_video_task(self, youtube_video_id: int):
 
 
 def _render_video(video, output_path: Path, db) -> None:
-    """Compose the YouTube video using the linked visual asset and music track."""
+    """Compose the YouTube video using visual asset, music track, and SFX layers."""
     if not shutil.which("ffmpeg"):
         raise RuntimeError("ffmpeg not found in PATH")
 
@@ -95,37 +95,72 @@ def _render_video(video, output_path: Path, db) -> None:
     w, h = scale.split(":")
 
     visual_path = _resolve_visual(video, db)
-    audio_path = _resolve_audio(video, db)
+    music_path = _resolve_audio(video, db)
+    sfx_layers = _resolve_sfx_layers(video, db)
     is_image = visual_path is not None and Path(visual_path).suffix.lower() in _IMAGE_EXTS
+
+    # Collect all audio inputs: music first, then SFX layers
+    audio_inputs: list[tuple[str, float]] = []
+    if music_path and Path(music_path).is_file():
+        audio_inputs.append((music_path, 1.0))
+    audio_inputs.extend(sfx_layers)
+
+    vf = (
+        f"scale={w}:{h}:force_original_aspect_ratio=decrease,"
+        f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2:black,fps=30"
+    )
 
     cmd = ["ffmpeg", "-y"]
 
-    # ── Video input ───────────────────────────────────────────────────────────
+    # Video input (index 0)
     if visual_path and Path(visual_path).is_file():
         if is_image:
             cmd += ["-loop", "1", "-i", visual_path]
         else:
             cmd += ["-stream_loop", "-1", "-i", visual_path]
     else:
-        # Fallback: solid black background
         cmd += ["-f", "lavfi", "-i", f"color=c=black:s={w}x{h}:r=30"]
 
-    # ── Audio input ───────────────────────────────────────────────────────────
-    if audio_path and Path(audio_path).is_file():
-        cmd += ["-stream_loop", "-1", "-i", audio_path]
+    # Audio inputs (indices 1+)
+    if audio_inputs:
+        for (path, _) in audio_inputs:
+            cmd += ["-stream_loop", "-1", "-i", path]
+
+        # Build filter_complex: per-input volume + video vf (must be in filter_complex when -map is used)
+        parts: list[str] = []
+        audio_labels: list[str] = []
+        for i, (_, vol) in enumerate(audio_inputs):
+            parts.append(f"[{i + 1}:a]volume={vol}[a{i}]")
+            audio_labels.append(f"[a{i}]")
+
+        parts.append(f"[0:v]{vf}[vout]")
+
+        if len(audio_inputs) == 1:
+            filter_complex = ";".join(parts)
+            cmd += [
+                "-filter_complex", filter_complex,
+                "-map", "[vout]",
+                "-map", "[a0]",
+            ]
+        else:
+            mix_in = "".join(audio_labels)
+            parts.append(
+                f"{mix_in}amix=inputs={len(audio_inputs)}:duration=first:normalize=0[aout]"
+            )
+            cmd += [
+                "-filter_complex", ";".join(parts),
+                "-map", "[vout]",
+                "-map", "[aout]",
+            ]
     else:
-        # Fallback: silence
+        # No audio — silence fallback, use simple -vf (no explicit -map needed)
         cmd += ["-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo"]
+        cmd += ["-vf", vf]
 
-    # ── Duration + filters ────────────────────────────────────────────────────
-    vf = f"scale={w}:{h}:force_original_aspect_ratio=decrease,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2:black,fps=30"
+    # Duration
+    cmd += ["-t", str(duration_s)]
 
-    cmd += [
-        "-t", str(duration_s),
-        "-vf", vf,
-    ]
-
-    # ── Codec settings ────────────────────────────────────────────────────────
+    # Codec
     if is_image:
         cmd += ["-c:v", "libx264", "-preset", "slow", "-tune", "stillimage", "-crf", "18"]
     else:
@@ -139,7 +174,7 @@ def _render_video(video, output_path: Path, db) -> None:
 
     logger.info("ffmpeg render cmd: %s", " ".join(cmd))
 
-    timeout = max(duration_s * 4, 600)  # at least 10 min; allow ~4× realtime for slow machines
+    timeout = max(duration_s * 4, 600)
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     except subprocess.TimeoutExpired:
@@ -175,3 +210,31 @@ def _resolve_audio(video, db) -> str | None:
     except Exception as exc:
         logger.warning("Could not load music track %s: %s", video.music_track_id, exc)
     return None
+
+
+def _resolve_sfx_layers(video, db) -> list[tuple[str, float]]:
+    """Resolve SFX layer file paths from video.sfx_overrides."""
+    overrides = video.sfx_overrides
+    if not overrides:
+        return []
+
+    results = []
+    for layer_name in ("foreground", "midground", "background"):
+        layer = overrides.get(layer_name)
+        if not layer:
+            continue
+        asset_id = layer.get("asset_id")
+        volume = float(layer.get("volume", 0.5))
+        if not asset_id:
+            continue
+        try:
+            from console.backend.models.sfx_asset import SfxAsset
+            asset = db.get(SfxAsset, int(asset_id))
+            if asset and asset.file_path and Path(asset.file_path).is_file():
+                results.append((asset.file_path, volume))
+            else:
+                logger.warning("SFX asset %s not found or missing file on disk", asset_id)
+        except Exception as exc:
+            logger.warning("Could not resolve SFX asset %s: %s", asset_id, exc)
+
+    return results
