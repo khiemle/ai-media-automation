@@ -83,3 +83,37 @@ def test_escape_drawtext_escapes_colon():
 def test_escape_drawtext_escapes_backslash():
     from pipeline.youtube_ffmpeg import _escape_drawtext
     assert _escape_drawtext("Watch\\video") == "Watch\\\\video"
+
+
+# ── render_landscape ──────────────────────────────────────────────────────────
+
+def test_render_landscape_raises_when_ffmpeg_missing():
+    from pipeline.youtube_ffmpeg import render_landscape
+    with patch("shutil.which", return_value=None):
+        with pytest.raises(RuntimeError, match="ffmpeg not found"):
+            render_landscape(_make_video(), Path("/tmp/out.mp4"), MagicMock())
+
+
+def test_render_landscape_calls_ffmpeg_with_landscape_scale(tmp_path):
+    output = tmp_path / "out.mp4"
+    with patch("shutil.which", return_value="/usr/bin/ffmpeg"), \
+         patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stderr="")
+        from pipeline.youtube_ffmpeg import render_landscape
+        render_landscape(_make_video(), output, MagicMock())
+
+    cmd = " ".join(mock_run.call_args[0][0])
+    assert "1920:1080" in cmd or "1920x1080" in cmd
+
+
+def test_render_landscape_uses_duration_from_video(tmp_path):
+    output = tmp_path / "out.mp4"
+    with patch("shutil.which", return_value="/usr/bin/ffmpeg"), \
+         patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stderr="")
+        from pipeline.youtube_ffmpeg import render_landscape
+        render_landscape(_make_video(target_duration_h=1.0), output, MagicMock())
+
+    cmd_list = mock_run.call_args[0][0]
+    t_idx = cmd_list.index("-t")
+    assert cmd_list[t_idx + 1] == "3600"
