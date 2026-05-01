@@ -10,6 +10,8 @@ const STATUS_COLORS = {
 }
 
 const QUALITY_OPTIONS = ['1080p', '4K']
+const AI_SOURCES = ['midjourney', 'runway', 'veo']
+
 const DURATION_PRESETS = [
   { label: '10min', value: 10 / 60 },
   { label: '1h',    value: 1 },
@@ -118,7 +120,6 @@ function CreationPanel({ template, onClose, onCreated }) {
     musicApi.list({ status: 'ready' })
       .then(d => { if (mounted) setMusicList(d.items || d || []) })
       .catch(() => {})
-    const AI_SOURCES = ['midjourney', 'runway', 'veo']
     assetsApi.list({ asset_type: 'video_clip' })
       .then(d => {
         if (mounted) setAssetList((d.items || d || []).filter(a => AI_SOURCES.includes(a.source)))
@@ -135,14 +136,15 @@ function CreationPanel({ template, onClose, onCreated }) {
       const h = form.isCustomDuration
         ? (parseFloat(form.customDuration) || 8)
         : form.target_duration_h
+      const durationDisplay = h < 1 ? `${Math.round(h * 60)}min` : h
       setForm(f => ({
         ...f,
         seo_title: (template.seo_title_formula || '{theme} — {duration}h')
           .replace('{theme}', form.theme)
-          .replace('{duration}', h),
+          .replace('{duration}', durationDisplay),
         seo_description: (template.seo_description_template || '')
           .replace('{theme}', form.theme)
-          .replace('{duration}', h),
+          .replace('{duration}', durationDisplay),
       }))
     }
   }, [form.theme, form.target_duration_h, form.customDuration, form.isCustomDuration])
