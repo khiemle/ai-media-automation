@@ -79,6 +79,8 @@ def _template_to_dict(t: VideoTemplate) -> dict[str, Any]:
         "sound_rules": t.sound_rules,
         "seo_title_formula": t.seo_title_formula,
         "seo_description_template": t.seo_description_template,
+        "short_cta_text": t.short_cta_text,
+        "short_duration_s": t.short_duration_s if t.short_duration_s is not None else 58,
     }
 
 

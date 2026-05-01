@@ -21,3 +21,5 @@ class VideoTemplate(Base):
     sound_rules: Mapped[list | None] = mapped_column(JSONB, nullable=True)
     seo_title_formula: Mapped[str | None] = mapped_column(Text, nullable=True)
     seo_description_template: Mapped[str | None] = mapped_column(Text, nullable=True)
+    short_cta_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    short_duration_s: Mapped[int | None] = mapped_column(Integer, nullable=True, default=58, server_default="58")
