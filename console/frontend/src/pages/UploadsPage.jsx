@@ -325,7 +325,20 @@ function YouTubeLongSection({ channels }) {
     try {
       await youtubeVideosApi.upload(videoId, channelId)
       showToast('Upload queued')
-      load()
+      // Optimistic update: show queued badge immediately; polling will sync the real status
+      const ch = ytChannels.find(c => c.id === channelId)
+      setVideos(vs => vs.map(v => v.id !== videoId ? v : {
+        ...v,
+        uploads: [...(v.uploads || []), {
+          id: `temp-${Date.now()}`,
+          channel_id: channelId,
+          channel_name: ch?.name ?? `ch-${channelId}`,
+          status: 'queued',
+          platform_id: null,
+          uploaded_at: null,
+          error: null,
+        }],
+      }))
     } catch (e) {
       const msg = e.message || 'Upload failed'
       showToast(msg.includes('409') || msg.includes('already') ? 'Already uploading to this channel' : msg, 'error')
