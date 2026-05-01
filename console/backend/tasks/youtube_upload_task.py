@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 @celery_app.task(
     bind=True,
-    name="tasks.upload_youtube_video",
+    name="console.backend.tasks.youtube_upload_task.upload_youtube_video_task",
     queue="upload_q",
     max_retries=2,
     default_retry_delay=60,
