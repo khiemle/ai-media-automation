@@ -1,5 +1,8 @@
 # console/backend/routers/youtube_videos.py
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -181,8 +184,7 @@ def start_render(
 @router.get("/{video_id}/stream")
 def stream_video(video_id: int, db: Session = Depends(get_db)):
     """Stream the rendered output file. No auth — same pattern as music/sfx streams."""
-    from pathlib import Path
-    from fastapi.responses import FileResponse
+    from console.backend.models.youtube_video import YoutubeVideo
 
     video = db.get(YoutubeVideo, video_id)
     if not video:
