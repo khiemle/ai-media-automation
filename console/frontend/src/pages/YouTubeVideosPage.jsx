@@ -4,9 +4,11 @@ import { Card, Badge, Button, Input, Select, Toast, Spinner, EmptyState, Modal }
 
 const STATUS_COLORS = {
   draft:     '#9090a8',
+  queued:    '#fbbf24',
   rendering: '#fbbf24',
-  ready:     '#34d399',
-  uploaded:  '#4a9eff',
+  done:      '#34d399',
+  failed:    '#f87171',
+  published: '#4a9eff',
 }
 
 const QUALITY_OPTIONS = ['1080p', '4K']
@@ -718,9 +720,11 @@ export default function YouTubeVideosPage() {
         >
           <option value="">All Status</option>
           <option value="draft">Draft</option>
+          <option value="queued">Queued</option>
           <option value="rendering">Rendering</option>
-          <option value="ready">Ready</option>
-          <option value="uploaded">Uploaded</option>
+          <option value="done">Done</option>
+          <option value="failed">Failed</option>
+          <option value="published">Published</option>
         </Select>
       </div>
 
@@ -764,7 +768,7 @@ export default function YouTubeVideosPage() {
                         Render →
                       </Button>
                     )}
-                    {v.status === 'ready' && (
+                    {v.status === 'done' && (
                       <>
                         <Button variant="ghost" size="sm" onClick={() => setPreviewVideo(v)}>
                           ▶ Preview
