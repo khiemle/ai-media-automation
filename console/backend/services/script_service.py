@@ -85,7 +85,7 @@ class ScriptService:
 
     # ── Update ────────────────────────────────────────────────────────────────
 
-    def update_script(self, script_id: int, script_json: dict, editor_notes: str | None, user_id: int, language: str | None = None) -> ScriptDetail:
+    def update_script(self, script_id: int, script_json: dict, editor_notes: str | None, user_id: int, language: str | None = None, video_format: str | None = None) -> ScriptDetail:
         Script = self._get_model()
         row = self.db.query(Script).filter(Script.id == script_id).first()
         if not row:
@@ -113,6 +113,11 @@ class ScriptService:
         row.edited_by = user_id
         if language is not None:
             row.language = language
+        if video_format is not None:
+            # Validate format
+            if video_format not in ("short", "youtube_long"):
+                raise ValueError(f"video_format must be 'short' or 'youtube_long', got '{video_format}'")
+            row.video_format = video_format
 
         # Move approved scripts back to editing
         if row.status == "approved":

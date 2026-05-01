@@ -109,6 +109,7 @@ function ScriptEditorModal({ scriptId, onClose, onSaved }) {
   const { data, loading } = useApi(() => scriptsApi.get(scriptId), [scriptId])
   const [draft, setDraft] = useState(null)
   const [language, setLanguage] = useState('vietnamese')
+  const [videoFormat, setVideoFormat] = useState('short')
   const [voices, setVoices] = useState(null)
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
@@ -120,7 +121,10 @@ function ScriptEditorModal({ scriptId, onClose, onSaved }) {
   }, [])
 
   useEffect(() => {
-    if (data) setLanguage(data.language || 'vietnamese')
+    if (data) {
+      setLanguage(data.language || 'vietnamese')
+      setVideoFormat(data.video_format || 'short')
+    }
   }, [data])
 
   // Initialize subtitle_style default when editor opens for older scripts
@@ -190,7 +194,7 @@ function ScriptEditorModal({ scriptId, onClose, onSaved }) {
   const handleSave = async () => {
     setSaving(true)
     try {
-      await scriptsApi.update(scriptId, { script_json: scriptJson, editor_notes: notes, language })
+      await scriptsApi.update(scriptId, { script_json: scriptJson, editor_notes: notes, language, video_format: videoFormat })
       showToast('Script saved', 'success')
       onSaved?.()
     } catch (e) {
@@ -239,6 +243,15 @@ function ScriptEditorModal({ scriptId, onClose, onSaved }) {
               options={[
                 { value: 'vietnamese', label: 'Vietnamese' },
                 { value: 'english',    label: 'English' },
+              ]}
+            />
+            <Select
+              label="Format"
+              value={videoFormat}
+              onChange={e => setVideoFormat(e.target.value)}
+              options={[
+                { value: 'short', label: 'Short (TikTok/Reels)' },
+                { value: 'youtube_long', label: 'YouTube Long (16:9)' },
               ]}
             />
           </div>

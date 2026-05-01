@@ -273,7 +273,7 @@ class ProductionService:
         """Validate script status, set to 'producing', create a job, dispatch render task."""
         # 1. Load script
         row = self.db.execute(
-            text("SELECT id, status FROM generated_scripts WHERE id = :id"),
+            text("SELECT id, status, video_format FROM generated_scripts WHERE id = :id"),
             {"id": script_id},
         ).fetchone()
         if not row:
@@ -291,11 +291,12 @@ class ProductionService:
             {"id": script_id},
         )
 
-        # 4. Create pipeline_job row
+        # 4. Create pipeline_job row with video_format from script
         job = PipelineJob(
             job_type="render",
             status="queued",
             script_id=script_id,
+            video_format=row.video_format or "short",  # Propagate format from script
         )
         self.db.add(job)
         self.db.flush()  # get job.id before dispatch

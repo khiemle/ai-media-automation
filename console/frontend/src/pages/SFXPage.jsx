@@ -166,11 +166,31 @@ export default function SFXPage() {
         audioRef.current.pause()
         audioRef.current.onended = null
         audioRef.current.onerror = null
+        audioRef.current.oncanplay = null
+        audioRef.current.src = ''  // Clear source to free memory
       }
+      
       const audio = new Audio(sfxApi.streamUrl(sfx.id))
+      audio.crossOrigin = 'anonymous'  // Allow CORS requests
       audioRef.current = audio
       
       let errorShown = false
+      let playAttempted = false
+      
+      // Wait for audio to be ready before playing
+      const handleCanPlay = () => {
+        if (!errorShown && !playAttempted && audioRef.current === audio) {
+          playAttempted = true
+          audio.play().catch((err) => {
+            if (!errorShown && err?.name !== 'AbortError') {
+              errorShown = true
+              setPlaying(null)
+              showError(`Could not play audio for "${sfx.title}".`)
+            }
+          })
+        }
+      }
+      
       audio.onerror = () => {
         if (!errorShown) {
           errorShown = true
@@ -178,14 +198,26 @@ export default function SFXPage() {
           showError(`Could not load audio for "${sfx.title}". Check that the file exists on disk.`)
         }
       }
+      
       audio.onended = () => setPlaying(null)
+      audio.oncanplay = handleCanPlay
+      
       setPlaying(sfx.id)
       
+      // Also try to play immediately in case oncanplay fires before we set the handler
       audio.play().catch((err) => {
-        // Only show error if it's not a user abort (AbortError happens when pausing before play starts)
-        if (!errorShown && err?.name !== 'AbortError') {
-          errorShown = true
-          showError(`Could not play audio for "${sfx.title}".`)
+        if (!errorShown && err?.name !== 'AbortError' && !playAttempted) {
+          playAttempted = true
+          // Wait a bit and try again
+          setTimeout(() => {
+            audio.play().catch((e) => {
+              if (!errorShown && e?.name !== 'AbortError') {
+                errorShown = true
+                setPlaying(null)
+                showError(`Could not play audio for "${sfx.title}".`)
+              }
+            })
+          }, 100)
         }
       })
     }

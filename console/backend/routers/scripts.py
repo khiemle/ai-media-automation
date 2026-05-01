@@ -101,6 +101,7 @@ def update_script(
             editor_notes=body.editor_notes,
             user_id=user.id,
             language=body.language,
+            video_format=body.video_format,
         )
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e))

@@ -25,6 +25,7 @@ class ScriptUpdate(BaseModel):
     script_json: dict
     editor_notes: str | None = None
     language: str | None = None
+    video_format: str | None = None  # Allow setting format ('short' or 'youtube_long')
 
 
 class ScriptGenerateRequest(BaseModel):
