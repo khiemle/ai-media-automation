@@ -111,3 +111,17 @@ def test_parse_malformed_json_string_returns_empty():
 def test_parse_unknown_modal_type_returns_empty():
     result = AutofillResponseParser().parse("unknown", {"title": "x"})
     assert result == {}
+
+
+def test_parse_music_quality_score_float_is_preserved():
+    result = AutofillResponseParser().parse("music", {"title": "X", "quality_score": 80.5})
+    assert result["quality_score"] == 80.5
+
+
+def test_build_music_form_values_false_boolean_included():
+    prompt = AutofillPromptBuilder().build(
+        "music",
+        {"filename": "track.mp3", "file_size_bytes": 500_000, "mime_type": "audio/mpeg", "duration_s": None},
+        {"is_vocal": False},
+    )
+    assert "is_vocal" in prompt

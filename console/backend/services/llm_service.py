@@ -3,6 +3,9 @@ import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path as _Path
+from typing import Any, Optional
+
+from pydantic import BaseModel
 
 import httpx
 
@@ -186,9 +189,6 @@ class LLMService:
 
 # ── Autofill helpers ───────────────────────────────────────────────────────────
 
-from typing import Any, Optional
-from pydantic import BaseModel
-
 
 class _MusicAutofill(BaseModel):
     title: Optional[str] = None
@@ -196,7 +196,7 @@ class _MusicAutofill(BaseModel):
     moods: Optional[list[str]] = None
     genres: Optional[list[str]] = None
     volume: Optional[float] = None
-    quality_score: Optional[int] = None
+    quality_score: Optional[float] = None
     is_vocal: Optional[bool] = None
 
 
@@ -335,7 +335,7 @@ class AutofillPromptBuilder:
 
 
 class AutofillResponseParser:
-    _SCHEMAS: dict[str, type] = {
+    _SCHEMAS: dict[str, type[BaseModel]] = {
         "music": _MusicAutofill,
         "sfx": _SFXAutofill,
         "asset": _AssetAutofill,
@@ -347,8 +347,7 @@ class AutofillResponseParser:
             return {}
         if isinstance(raw, str):
             try:
-                import json as _json
-                raw = _json.loads(raw)
+                raw = json.loads(raw)
             except Exception:
                 return {}
         if not isinstance(raw, dict):
