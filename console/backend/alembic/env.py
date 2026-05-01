@@ -22,9 +22,15 @@ from console.backend.config import settings
 from console.backend.database import Base
 import console.backend.models.console_user   # noqa
 import console.backend.models.credentials    # noqa
-import console.backend.models.channel        # noqa
 import console.backend.models.audit_log      # noqa
+import console.backend.models.channel        # noqa
 import console.backend.models.niche          # noqa
+import console.backend.models.pipeline_job   # noqa
+import console.backend.models.sfx_asset      # noqa
+import console.backend.models.video_asset    # noqa
+import console.backend.models.video_template # noqa
+import console.backend.models.youtube_video  # noqa
+import console.backend.models.youtube_video_upload  # noqa
 
 # ── Alembic Config ────────────────────────────────────────────────────────────
 config = context.config
