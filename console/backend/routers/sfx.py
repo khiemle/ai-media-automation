@@ -71,6 +71,7 @@ def delete_sfx(
 
 @router.get("/{sfx_id}/stream")
 def stream_sfx(sfx_id: int, db: Session = Depends(get_db)):
+    """Stream SFX audio — no auth required so browser <audio> tags can load it directly."""
     from console.backend.models.sfx_asset import SfxAsset
     row = db.get(SfxAsset, sfx_id)
     if not row:
