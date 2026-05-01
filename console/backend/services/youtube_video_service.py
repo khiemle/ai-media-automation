@@ -41,11 +41,16 @@ def _audit(
     db.add(log)
 
 
-def _video_to_dict(v: YoutubeVideo) -> dict[str, Any]:
+def _video_to_dict(
+    v: YoutubeVideo,
+    template_label: str | None = None,
+    uploads: list | None = None,
+) -> dict[str, Any]:
     return {
         "id": v.id,
         "title": v.title,
         "template_id": v.template_id,
+        "template_label": template_label,
         "theme": v.theme,
         "status": v.status,
         "music_track_id": v.music_track_id,
@@ -59,8 +64,21 @@ def _video_to_dict(v: YoutubeVideo) -> dict[str, Any]:
         "seo_tags": v.seo_tags,
         "celery_task_id": v.celery_task_id,
         "output_path": v.output_path,
+        "uploads": uploads if uploads is not None else [],
         "created_at": v.created_at.isoformat() if v.created_at else None,
         "updated_at": v.updated_at.isoformat() if v.updated_at else None,
+    }
+
+
+def _upload_to_dict(u, channel_name: str | None = None) -> dict[str, Any]:
+    return {
+        "id": u.id,
+        "channel_id": u.channel_id,
+        "channel_name": channel_name,
+        "status": u.status,
+        "platform_id": u.platform_id,
+        "uploaded_at": u.uploaded_at.isoformat() if u.uploaded_at else None,
+        "error": u.error,
     }
 
 
@@ -103,12 +121,46 @@ class YoutubeVideoService:
     # ── Videos ─────────────────────────────────────────────────────────────
 
     def list_videos(self, status: str | None = None, template_id: int | None = None) -> list[dict]:
+        from console.backend.models.youtube_video_upload import YoutubeVideoUpload
+        from console.backend.models.channel import Channel
+
         q = self.db.query(YoutubeVideo)
         if status:
             q = q.filter(YoutubeVideo.status == status)
         if template_id:
             q = q.filter(YoutubeVideo.template_id == template_id)
-        return [_video_to_dict(v) for v in q.order_by(YoutubeVideo.created_at.desc()).all()]
+        videos = q.order_by(YoutubeVideo.created_at.desc()).all()
+
+        # batch-resolve template labels
+        template_ids = {v.template_id for v in videos if v.template_id}
+        templates = {
+            t.id: t.label
+            for t in self.db.query(VideoTemplate).filter(VideoTemplate.id.in_(template_ids)).all()
+        } if template_ids else {}
+
+        # batch-resolve upload records with channel names
+        video_ids = [v.id for v in videos]
+        upload_rows = (
+            self.db.query(YoutubeVideoUpload, Channel.name)
+            .outerjoin(Channel, YoutubeVideoUpload.channel_id == Channel.id)
+            .filter(YoutubeVideoUpload.youtube_video_id.in_(video_ids))
+            .all()
+        ) if video_ids else []
+
+        uploads_by_video: dict[int, list] = {}
+        for upload, channel_name in upload_rows:
+            uploads_by_video.setdefault(upload.youtube_video_id, []).append(
+                _upload_to_dict(upload, channel_name)
+            )
+
+        return [
+            _video_to_dict(
+                v,
+                template_label=templates.get(v.template_id),
+                uploads=uploads_by_video.get(v.id, []),
+            )
+            for v in videos
+        ]
 
     def get_video(self, video_id: int) -> dict:
         v = self.db.get(YoutubeVideo, video_id)
@@ -235,3 +287,47 @@ class YoutubeVideoService:
         v.celery_task_id = task.id
         self.db.commit()
         return task.id
+
+    def queue_upload(self, video_id: int, channel_id: int) -> dict:
+        """Create a YoutubeVideoUpload record and dispatch the upload Celery task."""
+        from console.backend.models.youtube_video_upload import YoutubeVideoUpload
+
+        v = self.db.get(YoutubeVideo, video_id)
+        if not v:
+            raise KeyError(f"YoutubeVideo {video_id} not found")
+        if v.status != "done":
+            raise ValueError(f"Video must be 'done' to upload (current: '{v.status}')")
+
+        existing = (
+            self.db.query(YoutubeVideoUpload)
+            .filter(
+                YoutubeVideoUpload.youtube_video_id == video_id,
+                YoutubeVideoUpload.channel_id == channel_id,
+                YoutubeVideoUpload.status.in_(["queued", "uploading", "done"]),
+            )
+            .first()
+        )
+        if existing:
+            raise ValueError(
+                f"Upload already exists for video {video_id} → channel {channel_id} "
+                f"(status: {existing.status})"
+            )
+
+        upload = YoutubeVideoUpload(
+            youtube_video_id=video_id,
+            channel_id=channel_id,
+            status="queued",
+        )
+        self.db.add(upload)
+        try:
+            self.db.flush()
+            from console.backend.tasks.youtube_upload_task import upload_youtube_video_task
+            task = upload_youtube_video_task.delay(video_id, channel_id, upload.id)
+            upload.celery_task_id = task.id
+            self.db.commit()
+            self.db.refresh(upload)
+        except Exception:
+            self.db.rollback()
+            raise
+
+        return {"task_id": task.id, "upload_id": upload.id, "status": "queued"}
