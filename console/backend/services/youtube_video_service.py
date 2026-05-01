@@ -215,3 +215,23 @@ class YoutubeVideoService:
             self.db.rollback()
             raise
 
+    def dispatch_render(self, video_id: int) -> str:
+        """Queue the correct render task based on template.output_format. Returns Celery task_id."""
+        v = self.db.get(YoutubeVideo, video_id)
+        if not v:
+            raise KeyError(f"YoutubeVideo {video_id} not found")
+
+        template = self.db.get(VideoTemplate, v.template_id)
+        if not template:
+            raise ValueError(f"VideoTemplate {v.template_id} not found")
+
+        if template.output_format == "portrait_short":
+            from console.backend.tasks.youtube_short_render_task import render_youtube_short_task
+            task = render_youtube_short_task.delay(video_id)
+        else:
+            from console.backend.tasks.youtube_render_task import render_youtube_video_task
+            task = render_youtube_video_task.delay(video_id)
+
+        v.celery_task_id = task.id
+        self.db.commit()
+        return task.id

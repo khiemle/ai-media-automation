@@ -172,14 +172,12 @@ def start_render(
 
     svc.update_status(video_id, "queued", user_id=user.id)
 
-    from console.backend.tasks.youtube_render_task import render_youtube_video_task
-    from console.backend.models.youtube_video import YoutubeVideo
+    try:
+        task_id = svc.dispatch_render(video_id)
+    except (KeyError, ValueError) as e:
+        raise HTTPException(status_code=422, detail=str(e))
 
-    task = render_youtube_video_task.delay(video_id)
-    db.query(YoutubeVideo).filter(YoutubeVideo.id == video_id).update({"celery_task_id": task.id})
-    db.commit()
-
-    return {"task_id": task.id, "status": "queued"}
+    return {"task_id": task_id, "status": "queued"}
 
 
 @router.get("/{video_id}/stream")
