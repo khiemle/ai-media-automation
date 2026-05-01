@@ -548,17 +548,16 @@ function CreationPanel({ template, onClose, onCreated }) {
 }
 
 function MakeShortModal({ video, shortTemplates, onClose, onCreated }) {
+  const shortTemplate = shortTemplates[0]
   const [form, setForm] = useState({
     sameMusic: true,
     sameVisual: true,
-    ctaText: `Full ${video.target_duration_h ? video.target_duration_h + 'h' : ''} version on channel ↑`,
+    ctaText: shortTemplate?.short_cta_text || `Full ${video.target_duration_h ? video.target_duration_h + 'h' : ''} version on channel ↑`,
     ctaPosition: 'last_10s',
   })
   const [loading, setLoading] = useState(false)
   const [toast, setToast] = useState(null)
   const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000) }
-
-  const shortTemplate = shortTemplates[0]
 
   const handleSubmit = async () => {
     if (loading) return
@@ -569,7 +568,7 @@ function MakeShortModal({ video, shortTemplates, onClose, onCreated }) {
         title: `${video.title} — Short`,
         template_id: shortTemplate.id,
         theme: video.theme,
-        target_duration_h: 58 / 3600,
+        target_duration_h: (shortTemplate?.short_duration_s ?? 58) / 3600,
         music_track_id: form.sameMusic ? video.music_track_id : null,
         visual_asset_id: form.sameVisual ? video.visual_asset_id : null,
         parent_youtube_video_id: video.id,
@@ -624,7 +623,7 @@ function MakeShortModal({ video, shortTemplates, onClose, onCreated }) {
             </div>
           </div>
         </div>
-        <div className="text-xs text-[#9090a8]">Duration: <strong className="text-[#e8e8f0]">58 seconds</strong> (fixed)</div>
+        <div className="text-xs text-[#9090a8]">Duration: <strong className="text-[#e8e8f0]">{shortTemplate?.short_duration_s ?? 58} seconds</strong> (fixed)</div>
         <Input label="CTA Overlay Text" value={form.ctaText} onChange={e => setForm(f => ({ ...f, ctaText: e.target.value }))} />
         <Select label="CTA Position" value={form.ctaPosition} onChange={e => setForm(f => ({ ...f, ctaPosition: e.target.value }))}>
           <option value="last_10s">Last 10 seconds</option>
