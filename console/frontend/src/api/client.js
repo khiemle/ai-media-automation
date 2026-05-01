@@ -230,6 +230,7 @@ export const youtubeVideosApi = {
   }),
   delete: (id) => fetchApi(`/api/youtube-videos/${id}`, { method: 'DELETE' }),
   render: (id) => fetchApi(`/api/youtube-videos/${id}/render`, { method: 'POST' }),
+  streamUrl: (id) => `/api/youtube-videos/${id}/stream`,
 }
 
 // ── Templates ───────────────────────────────────────────────────────────────────

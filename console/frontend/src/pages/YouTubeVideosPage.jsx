@@ -21,6 +21,36 @@ const DURATION_PRESETS = [
   { label: 'Custom', value: null },
 ]
 
+function VideoPreviewModal({ video, onClose }) {
+  if (!video) return null
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
+      onClick={onClose}
+    >
+      <div
+        className="bg-[#1c1c22] border border-[#2a2a32] rounded-xl p-4 flex flex-col gap-3"
+        style={{ width: '80vw', maxWidth: '1200px' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div className="text-sm font-medium text-[#e8e8f0] leading-snug">{video.title}</div>
+          <button onClick={onClose} className="text-[#9090a8] hover:text-[#f87171] flex-shrink-0 transition-colors text-lg leading-none">
+            ✕
+          </button>
+        </div>
+        <video
+          controls
+          autoPlay
+          src={youtubeVideosApi.streamUrl(video.id)}
+          className="w-full rounded-lg bg-black"
+          style={{ aspectRatio: '16/9', maxHeight: '70vh', objectFit: 'contain' }}
+        />
+      </div>
+    </div>
+  )
+}
+
 function CreationPanel({ template, onClose, onCreated }) {
   const [form, setForm] = useState({
     theme: '',
@@ -609,6 +639,7 @@ export default function YouTubeVideosPage() {
   const [filterStatus, setFilterStatus]   = useState('')
   const [activeTemplate, setActiveTemplate] = useState(null)
   const [makeShortVideo, setMakeShortVideo] = useState(null)
+  const [previewVideo, setPreviewVideo] = useState(null)
   const [toast, setToast]                 = useState(null)
 
   const showToast = (msg, type = 'success') => {
@@ -734,9 +765,14 @@ export default function YouTubeVideosPage() {
                       </Button>
                     )}
                     {v.status === 'ready' && (
-                      <Button variant="ghost" size="sm" onClick={() => setMakeShortVideo(v)}>
-                        + Make Short
-                      </Button>
+                      <>
+                        <Button variant="ghost" size="sm" onClick={() => setPreviewVideo(v)}>
+                          ▶ Preview
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => setMakeShortVideo(v)}>
+                          + Make Short
+                        </Button>
+                      </>
                     )}
                     <button
                       onClick={() => handleDelete(v)}
@@ -759,6 +795,10 @@ export default function YouTubeVideosPage() {
           onClose={() => setActiveTemplate(null)}
           onCreated={() => { setActiveTemplate(null); load() }}
         />
+      )}
+
+      {previewVideo && (
+        <VideoPreviewModal video={previewVideo} onClose={() => setPreviewVideo(null)} />
       )}
 
       {/* Make Short Modal */}
