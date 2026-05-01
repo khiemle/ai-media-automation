@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Card, Badge, Button, Tabs, Spinner, EmptyState, Modal, Input, Select, Toast } from '../components/index.jsx'
 import ChannelPicker from '../components/ChannelPicker.jsx'
 import YouTubeSetupWizard from '../components/YouTubeSetupWizard.jsx'
@@ -27,6 +27,14 @@ function PlatformDot({ platform }) {
 function StatusBadge({ status }) {
   const map = { pending: 'pending_review', uploading: 'editing', published: 'completed', failed: 'rejected' }
   return <Badge status={map[status] || 'planned'} label={status} />
+}
+
+function formatDuration(hours) {
+  if (!hours) return '—'
+  const s = Math.round(hours * 3600)
+  if (s < 60)   return `${s}s`
+  if (s < 3600) return `${Math.round(s / 60)}m`
+  return `${+(hours.toFixed(1))}h`
 }
 
 // ── Video Preview Modal ───────────────────────────────────────────────────────
@@ -261,7 +269,9 @@ function YouTubeLongSection({ channels }) {
   const [loading, setLoading] = useState(true)
   const [selectedChannel, setSelectedChannel] = useState({})
   const [previewVideo, setPreviewVideo] = useState(null)
+  const [confirmDelete, setConfirmDelete] = useState(null)
   const [toast, setToast] = useState(null)
+  const pollRef = useRef(null)
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type })
@@ -279,6 +289,36 @@ function YouTubeLongSection({ channels }) {
 
   useEffect(() => { load() }, [load])
 
+  // Auto-poll while any upload is in-progress
+  useEffect(() => {
+    const hasActive = videos.some(v =>
+      (v.uploads || []).some(u => u.status === 'queued' || u.status === 'uploading')
+    )
+    if (hasActive && !pollRef.current) {
+      pollRef.current = setInterval(async () => {
+        try {
+          const res = await youtubeVideosApi.list({ status: 'done' })
+          const updated = res.items || res || []
+          setVideos(updated)
+          const stillActive = updated.some(v =>
+            (v.uploads || []).some(u => u.status === 'queued' || u.status === 'uploading')
+          )
+          if (!stillActive) {
+            clearInterval(pollRef.current)
+            pollRef.current = null
+          }
+        } catch {}
+      }, 4000)
+    }
+    if (!hasActive && pollRef.current) {
+      clearInterval(pollRef.current)
+      pollRef.current = null
+    }
+    return () => {}
+  }, [videos])
+
+  useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current) }, [])
+
   const handleUpload = async (videoId) => {
     const channelId = selectedChannel[videoId]
     if (!channelId) { showToast('Select a channel first', 'error'); return }
@@ -286,7 +326,19 @@ function YouTubeLongSection({ channels }) {
       await youtubeVideosApi.upload(videoId, channelId)
       showToast('Upload queued')
       load()
+    } catch (e) {
+      const msg = e.message || 'Upload failed'
+      showToast(msg.includes('409') || msg.includes('already') ? 'Already uploading to this channel' : msg, 'error')
+    }
+  }
+
+  const handleDelete = async (videoId) => {
+    try {
+      await youtubeVideosApi.delete(videoId)
+      setVideos(vs => vs.filter(v => v.id !== videoId))
+      showToast('Video deleted')
     } catch (e) { showToast(e.message, 'error') }
+    setConfirmDelete(null)
   }
 
   const ytChannels = channels.filter(c => c.platform === 'youtube')
@@ -302,60 +354,115 @@ function YouTubeLongSection({ channels }) {
         />
       ) : (
         <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-[#2a2a32] text-xs text-[#5a5a70] uppercase tracking-wider">
-                <th className="pb-2 text-left font-medium">Title</th>
-                <th className="pb-2 text-left font-medium">Duration</th>
-                <th className="pb-2 text-left font-medium">Created</th>
-                <th className="pb-2 text-left font-medium">Channel</th>
-                <th className="pb-2 text-right font-medium">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#2a2a32]">
-              {videos.map(v => (
+          <thead>
+            <tr className="border-b border-[#2a2a32] text-xs text-[#5a5a70] uppercase tracking-wider">
+              <th className="pb-2 text-left font-medium">Title</th>
+              <th className="pb-2 text-left font-medium">Template</th>
+              <th className="pb-2 text-left font-medium">Duration</th>
+              <th className="pb-2 text-left font-medium">Created</th>
+              <th className="pb-2 text-left font-medium">Uploaded To</th>
+              <th className="pb-2 text-left font-medium">Channel</th>
+              <th className="pb-2 text-right font-medium">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[#2a2a32]">
+            {videos.map(v => {
+              const uploads = v.uploads || []
+              const hasActive = uploads.some(u => u.status === 'queued' || u.status === 'uploading')
+              const selectedCh = selectedChannel[v.id]
+              const alreadyDone = uploads.some(u => u.channel_id === selectedCh && u.status === 'done')
+
+              return (
                 <tr key={v.id}>
-                  <td className="py-2.5 pr-4 text-xs text-[#e8e8f0] font-medium max-w-[200px] truncate">{v.title}</td>
-                  <td className="py-2.5 pr-4 text-xs text-[#9090a8] font-mono">
-                    {v.target_duration_h ? `${v.target_duration_h}h` : '—'}
+                  <td className="py-2.5 pr-3 text-xs text-[#e8e8f0] font-medium max-w-[160px] truncate">{v.title}</td>
+                  <td className="py-2.5 pr-3 text-xs text-[#9090a8]">{v.template_label || '—'}</td>
+                  <td className="py-2.5 pr-3 text-xs text-[#9090a8] font-mono">{formatDuration(v.target_duration_h)}</td>
+                  <td className="py-2.5 pr-3 text-xs text-[#9090a8]">{new Date(v.created_at).toLocaleDateString()}</td>
+                  <td className="py-2.5 pr-3">
+                    {uploads.length === 0 ? (
+                      <span className="text-xs text-[#5a5a70]">—</span>
+                    ) : (
+                      <div className="flex flex-wrap gap-1">
+                        {uploads.map(u => (
+                          <span
+                            key={u.id}
+                            className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                              u.status === 'done'    ? 'bg-[#34d399]/15 text-[#34d399]' :
+                              u.status === 'failed'  ? 'bg-[#f87171]/15 text-[#f87171]' :
+                                                       'bg-[#fbbf24]/15 text-[#fbbf24]'
+                            }`}
+                          >
+                            {(u.status === 'queued' || u.status === 'uploading') && (
+                              <svg className="animate-spin" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+                              </svg>
+                            )}
+                            {u.channel_name || `ch-${u.channel_id}`}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </td>
-                  <td className="py-2.5 pr-4 text-xs text-[#9090a8]">
-                    {new Date(v.created_at).toLocaleDateString()}
-                  </td>
-                  <td className="py-2.5 pr-4">
+                  <td className="py-2.5 pr-3">
                     <ChannelPicker
                       channels={ytChannels}
-                      selected={selectedChannel[v.id] ? [selectedChannel[v.id]] : []}
+                      selected={selectedCh ? [selectedCh] : []}
                       onChange={(ids) => setSelectedChannel(prev => ({ ...prev, [v.id]: ids[0] ?? null }))}
                       onDone={(ids) => setSelectedChannel(prev => ({ ...prev, [v.id]: ids[0] ?? null }))}
                     />
                   </td>
                   <td className="py-2.5 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      {v.output_path && (
-                        <button
-                          title="Preview video"
-                          onClick={() => setPreviewVideo(v)}
-                          className="text-[#9090a8] hover:text-[#7c6af7] transition-colors"
+                    {confirmDelete === v.id ? (
+                      <div className="flex items-center justify-end gap-1">
+                        <span className="text-[10px] text-[#f87171]">Delete?</span>
+                        <button onClick={() => handleDelete(v.id)} className="text-[10px] text-[#f87171] hover:underline font-medium">Yes</button>
+                        <button onClick={() => setConfirmDelete(null)} className="text-[10px] text-[#9090a8] hover:underline">No</button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-end gap-2">
+                        {v.output_path && (
+                          <button
+                            title="Preview video"
+                            onClick={() => setPreviewVideo(v)}
+                            className="text-[#9090a8] hover:text-[#7c6af7] transition-colors"
+                          >
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                          </button>
+                        )}
+                        <Button
+                          variant="primary"
+                          className="text-xs px-2 py-1"
+                          disabled={!selectedCh || alreadyDone || hasActive}
+                          onClick={() => handleUpload(v.id)}
                         >
-                          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M8 5v14l11-7z"/>
-                          </svg>
-                        </button>
-                      )}
-                      <Button
-                        variant="primary"
-                        className="text-xs px-2 py-1"
-                        disabled={!selectedChannel[v.id]}
-                        onClick={() => handleUpload(v.id)}
-                      >
-                        Upload
-                      </Button>
-                    </div>
+                          {hasActive ? (
+                            <span className="flex items-center gap-1">
+                              <svg className="animate-spin" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+                              </svg>
+                              Uploading
+                            </span>
+                          ) : 'Upload'}
+                        </Button>
+                        {!hasActive && (
+                          <button
+                            title="Delete video"
+                            onClick={() => setConfirmDelete(v.id)}
+                            className="text-[#5a5a70] hover:text-[#f87171] transition-colors"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              )
+            })}
+          </tbody>
+        </table>
       )}
       {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
       <VideoPreviewModal
