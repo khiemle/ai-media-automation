@@ -50,7 +50,11 @@ function VideoPreviewModal({ video, onClose }) {
           autoPlay
           src={`/api/uploads/videos/${video.id}/stream`}
           className="w-full rounded-lg bg-black"
-          style={{ aspectRatio: '9/16', maxHeight: '60vh', objectFit: 'contain' }}
+          style={{
+            aspectRatio: video.video_format === 'youtube_long' ? '16/9' : '9/16',
+            maxHeight: '60vh',
+            objectFit: 'contain',
+          }}
         />
       </div>
     </div>
