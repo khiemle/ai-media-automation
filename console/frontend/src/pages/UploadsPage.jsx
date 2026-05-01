@@ -298,8 +298,7 @@ function YouTubeLongSection({ channels }) {
           description="Videos appear here when rendering completes (status: done)."
         />
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+        <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[#2a2a32] text-xs text-[#5a5a70] uppercase tracking-wider">
                 <th className="pb-2 text-left font-medium">Title</th>
@@ -341,7 +340,6 @@ function YouTubeLongSection({ channels }) {
               ))}
             </tbody>
           </table>
-        </div>
       )}
       {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
     </Card>

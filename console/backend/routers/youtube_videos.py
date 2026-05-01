@@ -1,8 +1,8 @@
 # console/backend/routers/youtube_videos.py
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -183,8 +183,8 @@ def start_render(
 
 
 @router.get("/{video_id}/stream")
-def stream_video(video_id: int, db: Session = Depends(get_db)):
-    """Stream the rendered output file. No auth — same pattern as music/sfx streams."""
+def stream_video(video_id: int, request: Request, db: Session = Depends(get_db)):
+    """Stream the rendered output file with Range request support for seeking."""
     from console.backend.models.youtube_video import YoutubeVideo
 
     video = db.get(YoutubeVideo, video_id)
@@ -195,7 +195,45 @@ def stream_video(video_id: int, db: Session = Depends(get_db)):
     path = Path(video.output_path)
     if not path.exists():
         raise HTTPException(status_code=404, detail="Render file not found on disk")
-    return FileResponse(str(path), media_type="video/mp4")
+
+    file_size = path.stat().st_size
+    range_header = request.headers.get("range")
+
+    if range_header:
+        range_val = range_header.replace("bytes=", "")
+        parts = range_val.split("-")
+        start = int(parts[0]) if parts[0] else 0
+        end = int(parts[1]) if len(parts) > 1 and parts[1] else file_size - 1
+        end = min(end, file_size - 1)
+        chunk_size = end - start + 1
+
+        def iterfile():
+            with open(path, "rb") as f:
+                f.seek(start)
+                remaining = chunk_size
+                while remaining > 0:
+                    data = f.read(min(65536, remaining))
+                    if not data:
+                        break
+                    remaining -= len(data)
+                    yield data
+
+        return StreamingResponse(
+            iterfile(),
+            status_code=206,
+            media_type="video/mp4",
+            headers={
+                "Content-Range": f"bytes {start}-{end}/{file_size}",
+                "Accept-Ranges": "bytes",
+                "Content-Length": str(chunk_size),
+            },
+        )
+
+    return FileResponse(
+        str(path),
+        media_type="video/mp4",
+        headers={"Accept-Ranges": "bytes", "Content-Length": str(file_size)},
+    )
 
 
 class UploadBody(BaseModel):

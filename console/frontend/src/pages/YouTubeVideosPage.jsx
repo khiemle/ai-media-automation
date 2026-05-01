@@ -660,7 +660,7 @@ export default function YouTubeVideosPage() {
     }
     try {
       const tmpl = await youtubeVideosApi.listTemplates()
-      if (!signal.cancelled) setTemplates(tmpl.filter(t => t.output_format === 'landscape_long'))
+      if (!signal.cancelled) setTemplates(tmpl)
     } catch (e) {
       if (!signal.cancelled) console.warn('Failed to load templates:', e)
     }
@@ -704,7 +704,7 @@ export default function YouTubeVideosPage() {
           <p className="text-sm text-[#9090a8] mt-0.5">{videos.length} videos</p>
         </div>
         <div className="flex gap-2">
-          {templates.map(t => (
+          {templates.filter(t => t.output_format === 'landscape_long').map(t => (
             <Button key={t.slug} variant="primary" onClick={() => setActiveTemplate(t)}>
               + New {t.label}
             </Button>
