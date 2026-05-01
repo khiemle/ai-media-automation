@@ -223,6 +223,131 @@ class CredentialService:
         self.db.commit()
         return self._safe_dict(cred)
 
+    # ── Wizard: multi-credential support ─────────────────────────────────────
+
+    def create_youtube_credential(
+        self,
+        name: str,
+        client_id: str,
+        client_secret: str,
+        redirect_uri: str,
+    ) -> dict:
+        """Create a new YouTube credential row (always inserts, never upserts)."""
+        defaults = PLATFORM_DEFAULTS["youtube"]
+        cred = PlatformCredential(
+            platform="youtube",
+            name=name,
+            auth_endpoint=defaults["auth_endpoint"],
+            token_endpoint=defaults["token_endpoint"],
+            scopes=defaults["scopes"],
+            client_id=client_id,
+            client_secret=encrypt(client_secret),
+            redirect_uri=redirect_uri,
+            status="pending",
+        )
+        self.db.add(cred)
+        self.db.commit()
+        self.db.refresh(cred)
+        return self._safe_dict(cred)
+
+    def build_oauth_url_for_credential(self, cred_id: int, state: str) -> str:
+        """Build Google OAuth URL for a specific credential row."""
+        cred = self._get_or_404(cred_id)
+        if not cred.client_id or not cred.auth_endpoint:
+            raise ValueError(f"Credential {cred_id} is not fully configured")
+        params = {
+            "client_id":     cred.client_id,
+            "redirect_uri":  cred.redirect_uri or "",
+            "response_type": "code",
+            "scope":         " ".join(cred.scopes or []),
+            "access_type":   "offline",
+            "prompt":        "consent",  # always returns refresh_token
+            "state":         state,
+        }
+        return f"{cred.auth_endpoint}?{urlencode(params)}"
+
+    def exchange_code_for_credential(self, cred_id: int, code: str) -> dict:
+        """Exchange OAuth code for a specific credential row (not platform-wide)."""
+        cred = self._get_or_404(cred_id)
+        if not cred.token_endpoint:
+            raise ValueError(f"Credential {cred_id} not configured")
+        client_secret = decrypt(cred.client_secret) if cred.client_secret else ""
+        resp = httpx.post(
+            cred.token_endpoint,
+            data={
+                "code":          code,
+                "client_id":     cred.client_id,
+                "client_secret": client_secret,
+                "redirect_uri":  cred.redirect_uri,
+                "grant_type":    "authorization_code",
+            },
+            timeout=15,
+        )
+        resp.raise_for_status()
+        tokens = resp.json()
+        cred.access_token = encrypt(tokens["access_token"])
+        if "refresh_token" in tokens:
+            cred.refresh_token = encrypt(tokens["refresh_token"])
+        expires_in = tokens.get("expires_in", 3600)
+        cred.token_expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+        cred.last_refreshed = datetime.now(timezone.utc)
+        cred.status = "connected"
+        cred.updated_at = datetime.now(timezone.utc)
+        self.db.commit()
+        return self._safe_dict(cred)
+
+    def verify_youtube_credential(self, cred_id: int) -> dict:
+        """Call YouTube Data API channels.list to confirm the token works.
+
+        Returns { channel_id, channel_title, subscriber_count }.
+        Costs 1 quota unit (10,000 unit daily limit).
+        """
+        cred = self._get_or_404(cred_id)
+        if not cred.access_token:
+            raise ValueError("No access token — complete OAuth authorization first")
+        access_token = decrypt(cred.access_token)
+        resp = httpx.get(
+            "https://www.googleapis.com/youtube/v3/channels",
+            params={"part": "snippet,statistics", "mine": "true"},
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=10,
+        )
+        if resp.status_code != 200:
+            raise ValueError(f"YouTube API error {resp.status_code}: {resp.text[:300]}")
+        items = resp.json().get("items", [])
+        if not items:
+            raise ValueError("No YouTube channel found for this Google account")
+        ch = items[0]
+        return {
+            "channel_id":       ch["id"],
+            "channel_title":    ch["snippet"]["title"],
+            "subscriber_count": int(ch.get("statistics", {}).get("subscriberCount", 0)),
+        }
+
+    def create_channel_from_credential(self, cred_id: int) -> dict:
+        """Verify the credential then create a Channel row linked to it."""
+        from console.backend.models.channel import Channel
+        info = self.verify_youtube_credential(cred_id)
+        cred = self._get_or_404(cred_id)
+        channel = Channel(
+            name=info["channel_title"],
+            platform="youtube",
+            credential_id=cred.id,
+            subscriber_count=info["subscriber_count"],
+            status="active",
+        )
+        self.db.add(channel)
+        self.db.commit()
+        self.db.refresh(channel)
+        return {
+            "id":               channel.id,
+            "name":             channel.name,
+            "platform":         channel.platform,
+            "status":           channel.status,
+            "channel_id":       info["channel_id"],
+            "subscriber_count": info["subscriber_count"],
+        }
+
     # ── Helpers ───────────────────────────────────────────────────────────────
 
     def _get_or_404(self, cred_id: int) -> PlatformCredential:
