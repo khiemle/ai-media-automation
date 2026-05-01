@@ -245,19 +245,14 @@ def start_upload(
     db: Session = Depends(get_db),
     _user=Depends(require_editor_or_admin),
 ):
-    """Queue a rendered YouTube Long video for upload to a channel."""
-    from console.backend.models.youtube_video import YoutubeVideo
-    from console.backend.tasks.youtube_upload_task import upload_youtube_video_task
-
-    video = db.get(YoutubeVideo, video_id)
-    if not video:
-        raise HTTPException(status_code=404, detail="Video not found")
-    if video.status != "done":
-        raise HTTPException(
-            status_code=400,
-            detail=f"Video must be in 'done' status to upload (current: '{video.status}')",
-        )
-
-    task = upload_youtube_video_task.delay(video_id, body.channel_id)
-    return {"task_id": task.id, "status": "queued"}
+    svc = YoutubeVideoService(db)
+    try:
+        return svc.queue_upload(video_id, channel_id=body.channel_id)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        msg = str(e)
+        if "already exists" in msg:
+            raise HTTPException(status_code=409, detail=msg)
+        raise HTTPException(status_code=400, detail=msg)
 
