@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Card, Badge, Button, Tabs, Spinner, EmptyState, Modal, Input, Select, Toast } from '../components/index.jsx'
 import ChannelPicker from '../components/ChannelPicker.jsx'
+import YouTubeSetupWizard from '../components/YouTubeSetupWizard.jsx'
 import { fetchApi } from '../api/client.js'
 
 // ── Platform config ───────────────────────────────────────────────────────────
@@ -260,6 +261,7 @@ function CredentialsTab() {
   const [loading,  setLoading]  = useState(true)
   const [expanded, setExpanded] = useState({})
   const [toast,    setToast]    = useState(null)
+  const [showWizard, setShowWizard] = useState(false)
 
   const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000) }
 
@@ -318,6 +320,12 @@ function CredentialsTab() {
 
   return (
     <div className="space-y-3">
+      {/* Quick-add wizard for YouTube — supports multiple accounts */}
+      <div className="flex justify-end">
+        <Button variant="primary" onClick={() => setShowWizard(true)}>
+          + Add YouTube Channel
+        </Button>
+      </div>
       {PLATFORMS.map(p => {
         const cred = credFor(p.id)
         const isExpanded = expanded[p.id]
@@ -422,6 +430,12 @@ function CredentialsTab() {
         )
       })}
       {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+      {showWizard && (
+        <YouTubeSetupWizard
+          onClose={() => setShowWizard(false)}
+          onComplete={() => { setShowWizard(false); load() }}
+        />
+      )}
     </div>
   )
 }
