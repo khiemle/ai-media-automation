@@ -196,3 +196,31 @@ def stream_video(video_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Render file not found on disk")
     return FileResponse(str(path), media_type="video/mp4")
 
+
+class UploadBody(BaseModel):
+    channel_id: int
+
+
+@router.post("/{video_id}/upload", status_code=202)
+def start_upload(
+    video_id: int,
+    body: UploadBody,
+    db: Session = Depends(get_db),
+    _user=Depends(require_editor_or_admin),
+):
+    """Queue a rendered YouTube Long video for upload to a channel."""
+    from console.backend.models.youtube_video import YoutubeVideo
+    from console.backend.tasks.youtube_upload_task import upload_youtube_video_task
+
+    video = db.get(YoutubeVideo, video_id)
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found")
+    if video.status != "done":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Video must be in 'done' status to upload (current: '{video.status}')",
+        )
+
+    task = upload_youtube_video_task.delay(video_id, body.channel_id)
+    return {"task_id": task.id, "status": "queued"}
+
