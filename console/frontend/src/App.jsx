@@ -107,8 +107,8 @@ const ALL_TABS = [
   // YOUTUBE VIDEOS
   { id: 'youtube',     label: 'YouTube Videos', Icon: Icons.YouTube,     roles: ['admin', 'editor'], section: 'youtube' },
   // ADMIN
+  { id: 'pipeline',    label: 'Pipeline',       Icon: Icons.Pipeline,    roles: ['admin', 'editor'], section: 'short' },
   { id: 'uploads',     label: 'Uploads',        Icon: Icons.Uploads,     roles: ['admin', 'editor'], section: 'admin' },
-  { id: 'pipeline',    label: 'Pipeline',       Icon: Icons.Pipeline,    roles: ['admin', 'editor'], section: 'admin' },
   { id: 'llm',         label: 'LLM',            Icon: Icons.LLM,         roles: ['admin'],            section: 'admin' },
   { id: 'performance', label: 'Performance',    Icon: Icons.Performance, roles: ['admin', 'editor'], section: 'admin' },
   { id: 'system',      label: 'System',         Icon: Icons.System,      roles: ['admin'],            section: 'admin' },

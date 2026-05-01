@@ -30,8 +30,10 @@ function StatusBadge({ status }) {
 }
 
 // ── Video Preview Modal ───────────────────────────────────────────────────────
-function VideoPreviewModal({ video, onClose }) {
+function VideoPreviewModal({ video, onClose, streamUrl, aspectRatio }) {
   if (!video) return null
+  const src = streamUrl || `/api/uploads/videos/${video.id}/stream`
+  const ratio = aspectRatio || (video.video_format === 'youtube_long' ? '16/9' : '9/16')
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70" onClick={onClose}>
       <div
@@ -49,10 +51,10 @@ function VideoPreviewModal({ video, onClose }) {
         <video
           controls
           autoPlay
-          src={`/api/uploads/videos/${video.id}/stream`}
+          src={src}
           className="w-full rounded-lg bg-black"
           style={{
-            aspectRatio: video.video_format === 'youtube_long' ? '16/9' : '9/16',
+            aspectRatio: ratio,
             maxHeight: '60vh',
             objectFit: 'contain',
           }}
@@ -258,6 +260,7 @@ function YouTubeLongSection({ channels }) {
   const [videos, setVideos] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedChannel, setSelectedChannel] = useState({})
+  const [previewVideo, setPreviewVideo] = useState(null)
   const [toast, setToast] = useState(null)
 
   const showToast = (msg, type = 'success') => {
@@ -327,14 +330,27 @@ function YouTubeLongSection({ channels }) {
                     />
                   </td>
                   <td className="py-2.5 text-right">
-                    <Button
-                      variant="primary"
-                      className="text-xs px-2 py-1"
-                      disabled={!selectedChannel[v.id]}
-                      onClick={() => handleUpload(v.id)}
-                    >
-                      Upload
-                    </Button>
+                    <div className="flex items-center justify-end gap-2">
+                      {v.output_path && (
+                        <button
+                          title="Preview video"
+                          onClick={() => setPreviewVideo(v)}
+                          className="text-[#9090a8] hover:text-[#7c6af7] transition-colors"
+                        >
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M8 5v14l11-7z"/>
+                          </svg>
+                        </button>
+                      )}
+                      <Button
+                        variant="primary"
+                        className="text-xs px-2 py-1"
+                        disabled={!selectedChannel[v.id]}
+                        onClick={() => handleUpload(v.id)}
+                      >
+                        Upload
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -342,6 +358,12 @@ function YouTubeLongSection({ channels }) {
           </table>
       )}
       {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+      <VideoPreviewModal
+        video={previewVideo}
+        onClose={() => setPreviewVideo(null)}
+        streamUrl={previewVideo ? `/api/youtube-videos/${previewVideo.id}/stream` : null}
+        aspectRatio="16/9"
+      />
     </Card>
   )
 }
