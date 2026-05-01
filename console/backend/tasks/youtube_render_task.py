@@ -214,6 +214,8 @@ def _resolve_audio(video, db) -> str | None:
 
 def _resolve_sfx_layers(video, db) -> list[tuple[str, float]]:
     """Resolve SFX layer file paths from video.sfx_overrides."""
+    from console.backend.models.sfx_asset import SfxAsset
+
     overrides = video.sfx_overrides
     if not overrides:
         return []
@@ -228,7 +230,6 @@ def _resolve_sfx_layers(video, db) -> list[tuple[str, float]]:
         if not asset_id:
             continue
         try:
-            from console.backend.models.sfx_asset import SfxAsset
             asset = db.get(SfxAsset, int(asset_id))
             if asset and asset.file_path and Path(asset.file_path).is_file():
                 results.append((asset.file_path, volume))
