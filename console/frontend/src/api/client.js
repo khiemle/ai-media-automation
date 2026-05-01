@@ -231,6 +231,10 @@ export const youtubeVideosApi = {
   delete: (id) => fetchApi(`/api/youtube-videos/${id}`, { method: 'DELETE' }),
   render: (id) => fetchApi(`/api/youtube-videos/${id}/render`, { method: 'POST' }),
   streamUrl: (id) => `/api/youtube-videos/${id}/stream`,
+  upload: (id, channelId) => fetchApi(`/api/youtube-videos/${id}/upload`, {
+    method: 'POST',
+    body: JSON.stringify({ channel_id: channelId }),
+  }),
 }
 
 // ── Templates ───────────────────────────────────────────────────────────────────
