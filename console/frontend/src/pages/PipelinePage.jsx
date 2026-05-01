@@ -86,6 +86,10 @@ function JobRow({ job, videoMap = {}, onRetry, onCancel, onError }) {
       {expanded && (
         <div className="border-t border-[#2a2a32] px-4 py-3 text-xs font-mono text-[#9090a8] space-y-1">
           {job.celery_task_id && <div>Task ID: <span className="text-[#e8e8f0]">{job.celery_task_id}</span></div>}
+          {job.started_at && <div>Started: <span className="text-[#e8e8f0]">{new Date(job.started_at).toLocaleString()}</span></div>}
+          {job.completed_at && <div>Completed: <span className="text-[#e8e8f0]">{new Date(job.completed_at).toLocaleString()}</span></div>}
+          {job.error && <div className="text-[#f87171]">Error: {job.error}</div>}
+          {job.details && <div>Details: <span className="text-[#e8e8f0]">{JSON.stringify(job.details)}</span></div>}
           {job.parent_youtube_video_id && (
             <div>
               YouTube Video:{' '}
@@ -96,10 +100,6 @@ function JobRow({ job, videoMap = {}, onRetry, onCancel, onError }) {
               </span>
             </div>
           )}
-          {job.started_at && <div>Started: <span className="text-[#e8e8f0]">{new Date(job.started_at).toLocaleString()}</span></div>}
-          {job.completed_at && <div>Completed: <span className="text-[#e8e8f0]">{new Date(job.completed_at).toLocaleString()}</span></div>}
-          {job.error && <div className="text-[#f87171]">Error: {job.error}</div>}
-          {job.details && <div>Details: <span className="text-[#e8e8f0]">{JSON.stringify(job.details)}</span></div>}
 
           {/* Logs */}
           {job.status === 'running' && <LogPanel logs={liveLogs} />}
@@ -128,22 +128,24 @@ export default function PipelinePage() {
   const [filterFormat, setFilterFormat] = useState('')
   const [loading,    setLoading]    = useState(false)
   const [toast,      setToast]      = useState(null)
-  const [videoMap,   setVideoMap]   = useState({})  // { id: title }
+  const [videoMap, setVideoMap] = useState({})  // { id: title }
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type })
     setTimeout(() => setToast(null), 3000)
   }
 
-  // Fetch YouTube videos on mount
   useEffect(() => {
+    let mounted = true
     youtubeVideosApi.list()
       .then(res => {
+        if (!mounted) return
         const m = {}
         for (const v of res.items || res || []) m[v.id] = v.title
         setVideoMap(m)
       })
       .catch(() => {})
+    return () => { mounted = false }
   }, [])
 
   // WebSocket for live updates

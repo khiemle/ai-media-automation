@@ -1,5 +1,8 @@
 # console/backend/routers/youtube_videos.py
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -176,4 +179,20 @@ def start_render(
     db.commit()
 
     return {"task_id": task.id, "status": "queued"}
+
+
+@router.get("/{video_id}/stream")
+def stream_video(video_id: int, db: Session = Depends(get_db)):
+    """Stream the rendered output file. No auth — same pattern as music/sfx streams."""
+    from console.backend.models.youtube_video import YoutubeVideo
+
+    video = db.get(YoutubeVideo, video_id)
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found")
+    if not video.output_path:
+        raise HTTPException(status_code=404, detail="Video has no rendered output yet")
+    path = Path(video.output_path)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Render file not found on disk")
+    return FileResponse(str(path), media_type="video/mp4")
 

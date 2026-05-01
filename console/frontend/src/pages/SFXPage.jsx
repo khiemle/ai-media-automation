@@ -112,7 +112,13 @@ export default function SFXPage() {
   const [search, setSearch] = useState('')
   const [showImport, setShowImport] = useState(false)
   const [playing, setPlaying] = useState(null)
+  const [errorToast, setErrorToast] = useState(null)
   const audioRef = useRef(null)
+
+  const showError = (msg) => {
+    setErrorToast(msg)
+    setTimeout(() => setErrorToast(null), 4000)
+  }
 
   const load = async (signal = { cancelled: false }) => {
     setLoading(true)
@@ -160,9 +166,13 @@ export default function SFXPage() {
         audioRef.current.pause()
         audioRef.current.onended = null
       }
-      audioRef.current = new Audio(sfxApi.streamUrl(sfx.id))
-      audioRef.current.play()
-      audioRef.current.onended = () => setPlaying(null)
+      const audio = new Audio(sfxApi.streamUrl(sfx.id))
+      audioRef.current = audio
+      audio.play().catch(() => {
+        setPlaying(null)
+        showError(`Could not load audio for "${sfx.title}". Check that the file exists on disk.`)
+      })
+      audio.onended = () => setPlaying(null)
       setPlaying(sfx.id)
     }
   }
@@ -179,6 +189,7 @@ export default function SFXPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      {errorToast && <Toast message={errorToast} type="error" onClose={() => setErrorToast(null)} />}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-[#e8e8f0]">SFX Library</h1>
@@ -226,6 +237,14 @@ export default function SFXPage() {
                     <span className="text-xs text-[#5a5a70]">{sfx.duration_s.toFixed(0)}s</span>
                   )}
                 </div>
+                {sfx.duration_s && (
+                  <div className="mt-1.5 h-0.5 rounded-full bg-[#2a2a32] w-full max-w-[200px]">
+                    <div
+                      className="h-0.5 rounded-full bg-[#7c6af7]"
+                      style={{ width: `${Math.min(100, (sfx.duration_s / 60) * 100)}%` }}
+                    />
+                  </div>
+                )}
               </div>
               <span
                 className="text-[10px] font-medium px-2 py-0.5 rounded-full"

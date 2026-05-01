@@ -10,13 +10,46 @@ const STATUS_COLORS = {
 }
 
 const QUALITY_OPTIONS = ['1080p', '4K']
+const AI_SOURCES = ['midjourney', 'runway', 'veo']
+
 const DURATION_PRESETS = [
-  { label: '1h',     value: 1 },
-  { label: '3h',     value: 3 },
-  { label: '8h',     value: 8 },
-  { label: '10h',    value: 10 },
+  { label: '10min', value: 10 / 60 },
+  { label: '1h',    value: 1 },
+  { label: '3h',    value: 3 },
+  { label: '8h',    value: 8 },
+  { label: '10h',   value: 10 },
   { label: 'Custom', value: null },
 ]
+
+function VideoPreviewModal({ video, onClose }) {
+  if (!video) return null
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
+      onClick={onClose}
+    >
+      <div
+        className="bg-[#1c1c22] border border-[#2a2a32] rounded-xl p-4 flex flex-col gap-3"
+        style={{ width: '80vw', maxWidth: '1200px' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div className="text-sm font-medium text-[#e8e8f0] leading-snug">{video.title}</div>
+          <button onClick={onClose} className="text-[#9090a8] hover:text-[#f87171] flex-shrink-0 transition-colors text-lg leading-none">
+            ✕
+          </button>
+        </div>
+        <video
+          controls
+          autoPlay
+          src={youtubeVideosApi.streamUrl(video.id)}
+          className="w-full rounded-lg bg-black"
+          style={{ aspectRatio: '16/9', maxHeight: '70vh', objectFit: 'contain' }}
+        />
+      </div>
+    </div>
+  )
+}
 
 function CreationPanel({ template, onClose, onCreated }) {
   const [form, setForm] = useState({
@@ -118,7 +151,9 @@ function CreationPanel({ template, onClose, onCreated }) {
       .then(d => { if (mounted) setMusicList(d.items || d || []) })
       .catch(() => {})
     assetsApi.list({ asset_type: 'video_clip' })
-      .then(d => { if (mounted) setAssetList(d.items || d || []) })
+      .then(d => {
+        if (mounted) setAssetList((d.items || d || []).filter(a => AI_SOURCES.includes(a.source)))
+      })
       .catch(() => {})
     sfxApi.list()
       .then(d => { if (mounted) setSfxList(d.items || d || []) })
@@ -131,14 +166,15 @@ function CreationPanel({ template, onClose, onCreated }) {
       const h = form.isCustomDuration
         ? (parseFloat(form.customDuration) || 8)
         : form.target_duration_h
+      const durationDisplay = h < 1 ? `${Math.round(h * 60)}min` : h
       setForm(f => ({
         ...f,
         seo_title: (template.seo_title_formula || '{theme} — {duration}h')
           .replace('{theme}', form.theme)
-          .replace('{duration}', h),
+          .replace('{duration}', durationDisplay),
         seo_description: (template.seo_description_template || '')
           .replace('{theme}', form.theme)
-          .replace('{duration}', h),
+          .replace('{duration}', durationDisplay),
       }))
     }
   }, [form.theme, form.target_duration_h, form.customDuration, form.isCustomDuration])
@@ -192,8 +228,13 @@ function CreationPanel({ template, onClose, onCreated }) {
           <button onClick={onClose} className="text-[#9090a8] hover:text-[#e8e8f0]">✕</button>
         </div>
 
+        {/* Toast — outside scroll area so it doesn't shift layout */}
+        {toast && (
+          <div className="absolute top-16 left-0 right-0 z-10 px-6">
+            <Toast message={toast.msg} type={toast.type} />
+          </div>
+        )}
         <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-6">
-          {toast && <Toast message={toast.msg} type={toast.type} />}
 
           {/* ① THEME & SEO */}
           <section>
@@ -357,6 +398,7 @@ function CreationPanel({ template, onClose, onCreated }) {
               </button>
             </div>
             <div className="flex flex-col gap-3">
+              <p className="text-xs text-[#5a5a70]">Showing AI-generated clips only (Midjourney · Runway · Veo)</p>
               <Select
                 label="Visual Loop"
                 value={form.visual_asset_id || ''}
@@ -597,6 +639,7 @@ export default function YouTubeVideosPage() {
   const [filterStatus, setFilterStatus]   = useState('')
   const [activeTemplate, setActiveTemplate] = useState(null)
   const [makeShortVideo, setMakeShortVideo] = useState(null)
+  const [previewVideo, setPreviewVideo] = useState(null)
   const [toast, setToast]                 = useState(null)
 
   const showToast = (msg, type = 'success') => {
@@ -722,9 +765,14 @@ export default function YouTubeVideosPage() {
                       </Button>
                     )}
                     {v.status === 'ready' && (
-                      <Button variant="ghost" size="sm" onClick={() => setMakeShortVideo(v)}>
-                        + Make Short
-                      </Button>
+                      <>
+                        <Button variant="ghost" size="sm" onClick={() => setPreviewVideo(v)}>
+                          ▶ Preview
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => setMakeShortVideo(v)}>
+                          + Make Short
+                        </Button>
+                      </>
                     )}
                     <button
                       onClick={() => handleDelete(v)}
@@ -747,6 +795,10 @@ export default function YouTubeVideosPage() {
           onClose={() => setActiveTemplate(null)}
           onCreated={() => { setActiveTemplate(null); load() }}
         />
+      )}
+
+      {previewVideo && (
+        <VideoPreviewModal video={previewVideo} onClose={() => setPreviewVideo(null)} />
       )}
 
       {/* Make Short Modal */}
