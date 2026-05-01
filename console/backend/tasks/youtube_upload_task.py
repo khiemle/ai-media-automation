@@ -1,9 +1,19 @@
-"""Celery task: upload a rendered YouTube Long video to a YouTube channel."""
+"""Celery task: upload a rendered YouTube video to a YouTube channel."""
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
+
+from cryptography.fernet import Fernet
 
 from console.backend.celery_app import celery_app
+from console.backend.config import settings
+from console.backend.database import SessionLocal
+from console.backend.models.channel import Channel
+from console.backend.models.credentials import PlatformCredential
+from console.backend.models.youtube_video import YoutubeVideo
+from console.backend.models.youtube_video_upload import YoutubeVideoUpload
+from uploader.youtube_uploader import upload_to_youtube
 
 logger = logging.getLogger(__name__)
 
@@ -15,25 +25,20 @@ logger = logging.getLogger(__name__)
     max_retries=2,
     default_retry_delay=60,
 )
-def upload_youtube_video_task(self, youtube_video_id: int, channel_id: int):
-    """Upload a rendered YouTube Long video to a YouTube channel."""
-    from datetime import datetime, timezone
-
-    from cryptography.fernet import Fernet
-
-    from console.backend.config import settings
-    from console.backend.database import SessionLocal
-    from console.backend.models.channel import Channel
-    from console.backend.models.credentials import PlatformCredential
-    from console.backend.models.youtube_video import YoutubeVideo
-
+def upload_youtube_video_task(self, youtube_video_id: int, channel_id: int, upload_id: int):
+    """Upload a rendered YouTube video to a channel; track status on YoutubeVideoUpload."""
     db = SessionLocal()
+    upload = None
     try:
         video = db.get(YoutubeVideo, youtube_video_id)
         if not video:
             raise ValueError(f"YoutubeVideo {youtube_video_id} not found")
         if not video.output_path:
             raise ValueError(f"YoutubeVideo {youtube_video_id} has no output_path")
+
+        upload = db.get(YoutubeVideoUpload, upload_id)
+        if not upload:
+            raise ValueError(f"YoutubeVideoUpload {upload_id} not found")
 
         channel = db.get(Channel, channel_id)
         if not channel:
@@ -43,10 +48,12 @@ def upload_youtube_video_task(self, youtube_video_id: int, channel_id: int):
         if not cred:
             raise ValueError(f"Credential not found for channel {channel_id}")
 
-        fernet = Fernet(settings.FERNET_KEY.encode())
+        # Mark uploading
+        upload.status = "uploading"
+        db.commit()
 
         def _decrypt(val: str | None) -> str | None:
-            return fernet.decrypt(val.encode()).decode() if val else None
+            return Fernet(settings.FERNET_KEY.encode()).decrypt(val.encode()).decode() if val else None
 
         credentials_dict = {
             "client_id":     cred.client_id,
@@ -63,11 +70,11 @@ def upload_youtube_video_task(self, youtube_video_id: int, channel_id: int):
             "privacy_status": "unlisted",
         }
 
-        from uploader.youtube_uploader import upload_to_youtube
         platform_id = upload_to_youtube(video.output_path, video_meta, credentials_dict)
 
-        video.status = "published"
-        video.updated_at = datetime.now(timezone.utc)
+        upload.status = "done"
+        upload.platform_id = platform_id
+        upload.uploaded_at = datetime.now(timezone.utc)
         db.commit()
 
         logger.info(
@@ -77,6 +84,7 @@ def upload_youtube_video_task(self, youtube_video_id: int, channel_id: int):
         return {
             "youtube_video_id": youtube_video_id,
             "channel_id":       channel_id,
+            "upload_id":        upload_id,
             "platform_id":      platform_id,
         }
 
@@ -85,6 +93,13 @@ def upload_youtube_video_task(self, youtube_video_id: int, channel_id: int):
             "Upload failed for YoutubeVideo %s to channel %s: %s",
             youtube_video_id, channel_id, exc,
         )
+        if upload is not None:
+            try:
+                upload.status = "failed"
+                upload.error = str(exc)
+                db.commit()
+            except Exception:
+                db.rollback()
         raise self.retry(exc=exc)
     finally:
         db.close()
