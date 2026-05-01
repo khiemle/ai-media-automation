@@ -18,6 +18,11 @@ class YoutubeVideo(Base):
     theme: Mapped[str | None] = mapped_column(Text, nullable=True)
     music_track_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     visual_asset_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    parent_youtube_video_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("youtube_videos.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     sfx_overrides: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     seo_title: Mapped[str | None] = mapped_column(Text, nullable=True)
     seo_description: Mapped[str | None] = mapped_column(Text, nullable=True)

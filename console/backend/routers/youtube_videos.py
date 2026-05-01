@@ -28,6 +28,7 @@ class YoutubeVideoCreate(BaseModel):
     seo_title: str | None = None
     seo_description: str | None = None
     seo_tags: list[str] | None = None
+    parent_youtube_video_id: int | None = None
 
 
 class YoutubeVideoUpdate(BaseModel):
