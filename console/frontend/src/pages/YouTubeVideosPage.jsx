@@ -572,7 +572,7 @@ function MakeShortModal({ video, shortTemplates, onClose, onCreated }) {
         music_track_id: form.sameMusic ? video.music_track_id : null,
         visual_asset_id: form.sameVisual ? video.visual_asset_id : null,
         parent_youtube_video_id: video.id,
-        sfx_overrides: { cta: { text: form.ctaText, position: form.ctaPosition } },
+        sfx_overrides: { ...(video.sfx_overrides || {}), cta: { text: form.ctaText, position: form.ctaPosition } },
       })
       onCreated()
       onClose()
