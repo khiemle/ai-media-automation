@@ -262,52 +262,65 @@ export default function SFXPage() {
       ) : sfxList.length === 0 ? (
         <EmptyState title="No SFX assets" description="Import your first SFX file to get started." />
       ) : (
-        <div className="flex flex-col gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           {sfxList.map(sfx => (
-            <Card key={sfx.id} className="flex items-center gap-4 px-4 py-3">
-              <button
-                onClick={() => handlePlay(sfx)}
-                className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
-                  playing === sfx.id
-                    ? 'bg-[#f87171] text-white'
-                    : 'bg-[#2a2a32] text-[#9090a8] hover:text-[#e8e8f0]'
-                }`}
-              >
-                {playing === sfx.id ? '■' : '▶'}
-              </button>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-[#e8e8f0] truncate">{sfx.title}</div>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-xs text-[#9090a8] font-mono">{sfx.sound_type}</span>
-                  {sfx.duration_s && (
-                    <span className="text-xs text-[#5a5a70]">{sfx.duration_s.toFixed(0)}s</span>
-                  )}
-                </div>
-                {sfx.duration_s && (
-                  <div className="mt-1.5 h-0.5 rounded-full bg-[#2a2a32] w-full max-w-[200px]">
-                    <div
-                      className="h-0.5 rounded-full bg-[#7c6af7]"
-                      style={{ width: `${Math.min(100, (sfx.duration_s / 60) * 100)}%` }}
-                    />
-                  </div>
-                )}
-              </div>
-              <span
-                className="text-[10px] font-medium px-2 py-0.5 rounded-full"
-                style={{
-                  backgroundColor: SOURCE_COLOR[sfx.source] || '#5a5a70',
-                  color: 'white',
-                }}
-              >
-                {sfx.source.toUpperCase()}
-              </span>
+            <div
+              key={sfx.id}
+              className="relative bg-[#1c1c22] border border-[#2a2a32] rounded-xl p-3 flex flex-col gap-2 group"
+            >
+              {/* Delete — visible on hover */}
               <button
                 onClick={() => handleDelete(sfx)}
-                className="text-[#5a5a70] hover:text-[#f87171] transition-colors"
+                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-[#5a5a70] hover:text-[#f87171] text-xs leading-none"
+                title="Delete"
               >
                 ✕
               </button>
-            </Card>
+
+              {/* Top row: play button + sound type badge */}
+              <div className="flex items-center justify-between gap-2">
+                <button
+                  onClick={() => handlePlay(sfx)}
+                  className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-xs transition-colors ${
+                    playing === sfx.id
+                      ? 'bg-[#f87171] text-white'
+                      : 'bg-[#2a2a32] text-[#9090a8] hover:text-[#e8e8f0]'
+                  }`}
+                >
+                  {playing === sfx.id ? '■' : '▶'}
+                </button>
+                <span className="text-[9px] font-mono text-[#5a5a70] truncate max-w-[80px] text-right">
+                  {sfx.sound_type || '—'}
+                </span>
+              </div>
+
+              {/* Title */}
+              <div
+                className="text-xs font-medium text-[#e8e8f0] leading-snug"
+                style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+              >
+                {sfx.title}
+              </div>
+
+              {/* Duration bar + label */}
+              <div className="flex items-center gap-2 mt-auto">
+                {sfx.duration_s ? (
+                  <>
+                    <div className="flex-1 h-0.5 rounded-full bg-[#2a2a32]">
+                      <div
+                        className="h-0.5 rounded-full bg-[#7c6af7]"
+                        style={{ width: `${Math.min(100, (sfx.duration_s / 60) * 100)}%` }}
+                      />
+                    </div>
+                    <span className="text-[9px] font-mono text-[#5a5a70] flex-shrink-0">
+                      {sfx.duration_s.toFixed(0)}s
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-[9px] font-mono text-[#5a5a70]">—</span>
+                )}
+              </div>
+            </div>
           ))}
         </div>
       )}
