@@ -11,10 +11,11 @@ const STATUS_COLORS = {
 
 const QUALITY_OPTIONS = ['1080p', '4K']
 const DURATION_PRESETS = [
-  { label: '1h',     value: 1 },
-  { label: '3h',     value: 3 },
-  { label: '8h',     value: 8 },
-  { label: '10h',    value: 10 },
+  { label: '10min', value: 10 / 60 },
+  { label: '1h',    value: 1 },
+  { label: '3h',    value: 3 },
+  { label: '8h',    value: 8 },
+  { label: '10h',   value: 10 },
   { label: 'Custom', value: null },
 ]
 
@@ -117,8 +118,11 @@ function CreationPanel({ template, onClose, onCreated }) {
     musicApi.list({ status: 'ready' })
       .then(d => { if (mounted) setMusicList(d.items || d || []) })
       .catch(() => {})
+    const AI_SOURCES = ['midjourney', 'runway', 'veo']
     assetsApi.list({ asset_type: 'video_clip' })
-      .then(d => { if (mounted) setAssetList(d.items || d || []) })
+      .then(d => {
+        if (mounted) setAssetList((d.items || d || []).filter(a => AI_SOURCES.includes(a.source)))
+      })
       .catch(() => {})
     sfxApi.list()
       .then(d => { if (mounted) setSfxList(d.items || d || []) })
@@ -192,8 +196,13 @@ function CreationPanel({ template, onClose, onCreated }) {
           <button onClick={onClose} className="text-[#9090a8] hover:text-[#e8e8f0]">✕</button>
         </div>
 
+        {/* Toast — outside scroll area so it doesn't shift layout */}
+        {toast && (
+          <div className="absolute top-16 left-0 right-0 z-10 px-6">
+            <Toast message={toast.msg} type={toast.type} />
+          </div>
+        )}
         <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-6">
-          {toast && <Toast message={toast.msg} type={toast.type} />}
 
           {/* ① THEME & SEO */}
           <section>
@@ -357,6 +366,7 @@ function CreationPanel({ template, onClose, onCreated }) {
               </button>
             </div>
             <div className="flex flex-col gap-3">
+              <p className="text-xs text-[#5a5a70]">Showing AI-generated clips only (Midjourney · Runway · Veo)</p>
               <Select
                 label="Visual Loop"
                 value={form.visual_asset_id || ''}
