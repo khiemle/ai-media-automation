@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Card, Badge, Button, Tabs, Spinner, EmptyState, Modal, Input, Select, Toast } from '../components/index.jsx'
 import ChannelPicker from '../components/ChannelPicker.jsx'
 import YouTubeSetupWizard from '../components/YouTubeSetupWizard.jsx'
-import { fetchApi } from '../api/client.js'
+import { fetchApi, youtubeVideosApi } from '../api/client.js'
 
 // ── Platform config ───────────────────────────────────────────────────────────
 const PLATFORMS = [
@@ -150,7 +150,7 @@ function VideosTab({ channels }) {
           <div className="mb-4 flex items-center gap-3 pb-4 border-b border-[#2a2a32]">
             <span className="text-xs font-medium text-[#5a5a70] uppercase tracking-wider">Format:</span>
             <div className="flex items-center gap-1 bg-[#16161a] border border-[#2a2a32] rounded-lg p-1">
-              {['all', 'short', 'youtube_long'].map(f => (
+              {['all', 'short'].map(f => (
                 <button
                   key={f}
                   onClick={() => setVideoFormat(f)}
@@ -160,7 +160,7 @@ function VideosTab({ channels }) {
                       : 'text-[#9090a8] hover:text-[#e8e8f0]'
                   }`}
                 >
-                  {f === 'all' ? 'All' : f === 'short' ? 'Short' : 'YouTube Long'}
+                  {f === 'all' ? 'All' : 'Short'}
                 </button>
               ))}
             </div>
@@ -249,6 +249,101 @@ function VideosTab({ channels }) {
       )}
       {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
       <VideoPreviewModal video={previewVideo} onClose={() => setPreviewVideo(null)} />
+    </Card>
+  )
+}
+
+// ── YouTube Long Section ──────────────────────────────────────────────────────
+function YouTubeLongSection({ channels }) {
+  const [videos, setVideos] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [selectedChannel, setSelectedChannel] = useState({})
+  const [toast, setToast] = useState(null)
+
+  const showToast = (msg, type = 'success') => {
+    setToast({ msg, type })
+    setTimeout(() => setToast(null), 3000)
+  }
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await youtubeVideosApi.list({ status: 'done' })
+      setVideos(res.items || res || [])
+    } catch { setVideos([]) }
+    finally { setLoading(false) }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const handleUpload = async (videoId) => {
+    const channelId = selectedChannel[videoId]
+    if (!channelId) { showToast('Select a channel first', 'error'); return }
+    try {
+      await youtubeVideosApi.upload(videoId, channelId)
+      showToast('Upload queued')
+      load()
+    } catch (e) { showToast(e.message, 'error') }
+  }
+
+  const ytChannels = channels.filter(c => c.platform === 'youtube')
+
+  return (
+    <Card title="YouTube Long Videos">
+      {loading ? (
+        <div className="flex items-center justify-center h-40"><Spinner /></div>
+      ) : videos.length === 0 ? (
+        <EmptyState
+          title="No rendered YouTube Long videos"
+          description="Videos appear here when rendering completes (status: done)."
+        />
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-[#2a2a32] text-xs text-[#5a5a70] uppercase tracking-wider">
+                <th className="pb-2 text-left font-medium">Title</th>
+                <th className="pb-2 text-left font-medium">Duration</th>
+                <th className="pb-2 text-left font-medium">Created</th>
+                <th className="pb-2 text-left font-medium">Channel</th>
+                <th className="pb-2 text-right font-medium">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#2a2a32]">
+              {videos.map(v => (
+                <tr key={v.id}>
+                  <td className="py-2.5 pr-4 text-xs text-[#e8e8f0] font-medium max-w-[200px] truncate">{v.title}</td>
+                  <td className="py-2.5 pr-4 text-xs text-[#9090a8] font-mono">
+                    {v.target_duration_h ? `${v.target_duration_h}h` : '—'}
+                  </td>
+                  <td className="py-2.5 pr-4 text-xs text-[#9090a8]">
+                    {new Date(v.created_at).toLocaleDateString()}
+                  </td>
+                  <td className="py-2.5 pr-4">
+                    <ChannelPicker
+                      channels={ytChannels}
+                      selected={selectedChannel[v.id] ? [selectedChannel[v.id]] : []}
+                      onChange={(ids) => setSelectedChannel(prev => ({ ...prev, [v.id]: ids[0] ?? null }))}
+                      onDone={(ids) => setSelectedChannel(prev => ({ ...prev, [v.id]: ids[0] ?? null }))}
+                    />
+                  </td>
+                  <td className="py-2.5 text-right">
+                    <Button
+                      variant="primary"
+                      className="text-xs px-2 py-1"
+                      disabled={!selectedChannel[v.id]}
+                      onClick={() => handleUpload(v.id)}
+                    >
+                      Upload
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
     </Card>
   )
 }
@@ -669,7 +764,12 @@ export default function UploadsPage() {
         ))}
       </div>
 
-      {tab === 'videos'      && <VideosTab channels={channels} />}
+      {tab === 'videos' && (
+        <div className="flex flex-col gap-6">
+          <VideosTab channels={channels} />
+          <YouTubeLongSection channels={channels} />
+        </div>
+      )}
       {tab === 'credentials' && <CredentialsTab />}
       {tab === 'channels'    && <ChannelsTab onChannelsLoaded={setChannels} />}
     </div>
