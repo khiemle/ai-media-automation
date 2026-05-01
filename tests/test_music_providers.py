@@ -32,7 +32,7 @@ def test_suno_provider_poll_returns_audio_url_on_success():
         "code": 200,
         "data": {
             "status": "SUCCESS",
-            "sunoData": [{"audioUrl": "https://cdn.suno.ai/track.mp3"}],
+            "response": {"sunoData": [{"audioUrl": "https://cdn.suno.ai/track.mp3"}]},
         },
     }
     mock_resp.raise_for_status = MagicMock()

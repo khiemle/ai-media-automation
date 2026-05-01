@@ -71,7 +71,7 @@ def test_get_quota_suno_real_credits():
     _cfg = {
         "gemini": {"script": {"api_key": "", "model": ""}, "media": {"api_key": "", "model": ""}, "music": {"api_key": "", "model": ""}},
         "elevenlabs": {"api_key": "", "voice_id_en": "", "voice_id_vi": "", "model": ""},
-        "suno": {"api_key": "test-suno-key", "model": "V4_5"},
+        "sunoapi": {"api_key": "test-suno-key", "model": "V4_5"},
         "pexels": {"api_key": ""},
         "kokoro": {"default_voice_en": "af_heart"},
     }
@@ -86,14 +86,14 @@ def test_get_quota_suno_real_credits():
         from console.backend.services.llm_service import LLMService
         result = LLMService().get_quota()
 
-    assert result["suno"] == {"credits": 42}
+    assert result["sunoapi"] == {"credits": 42}
 
 
 def test_get_quota_suno_api_error_returns_error():
     _cfg = {
         "gemini": {"script": {"api_key": "", "model": ""}, "media": {"api_key": "", "model": ""}, "music": {"api_key": "", "model": ""}},
         "elevenlabs": {"api_key": "", "voice_id_en": "", "voice_id_vi": "", "model": ""},
-        "suno": {"api_key": "test-suno-key", "model": "V4_5"},
+        "sunoapi": {"api_key": "test-suno-key", "model": "V4_5"},
         "pexels": {"api_key": ""},
         "kokoro": {"default_voice_en": "af_heart"},
     }
@@ -104,14 +104,14 @@ def test_get_quota_suno_api_error_returns_error():
         from console.backend.services.llm_service import LLMService
         result = LLMService().get_quota()
 
-    assert "error" in result["suno"]
+    assert "error" in result["sunoapi"]
 
 
 def test_get_quota_suno_no_key_returns_error():
     _cfg = {
         "gemini": {"script": {"api_key": "", "model": ""}, "media": {"api_key": "", "model": ""}, "music": {"api_key": "", "model": ""}},
         "elevenlabs": {"api_key": "", "voice_id_en": "", "voice_id_vi": "", "model": ""},
-        "suno": {"api_key": "", "model": "V4_5"},
+        "sunoapi": {"api_key": "", "model": "V4_5"},
         "pexels": {"api_key": ""},
         "kokoro": {"default_voice_en": "af_heart"},
     }
@@ -121,4 +121,4 @@ def test_get_quota_suno_no_key_returns_error():
         from console.backend.services.llm_service import LLMService
         result = LLMService().get_quota()
 
-    assert "error" in result["suno"]
+    assert "error" in result["sunoapi"]

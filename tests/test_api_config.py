@@ -28,8 +28,14 @@ def _reset_cache():
     m._cache_time = 0.0
 
 
-def test_get_config_reads_file(config_file):
+@pytest.fixture(autouse=True)
+def _cache_guard():
     _reset_cache()
+    yield
+    _reset_cache()
+
+
+def test_get_config_reads_file(config_file):
     with patch("config.api_config._CONFIG_PATH", config_file):
         from config.api_config import get_config
         cfg = get_config()
@@ -38,7 +44,6 @@ def test_get_config_reads_file(config_file):
 
 
 def test_get_config_caches(config_file):
-    _reset_cache()
     with patch("config.api_config._CONFIG_PATH", config_file):
         from config.api_config import get_config
         cfg1 = get_config()
@@ -49,7 +54,6 @@ def test_get_config_caches(config_file):
 
 
 def test_get_config_missing_file(tmp_path):
-    _reset_cache()
     with patch("config.api_config._CONFIG_PATH", tmp_path / "missing.json"):
         from config.api_config import get_config
         cfg = get_config()
@@ -58,7 +62,6 @@ def test_get_config_missing_file(tmp_path):
 
 
 def test_save_config_writes_and_busts_cache(config_file):
-    _reset_cache()
     with patch("config.api_config._CONFIG_PATH", config_file):
         from config.api_config import get_config, save_config
         get_config()  # prime cache
