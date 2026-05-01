@@ -158,3 +158,77 @@ def render_landscape(video, output_path: Path, db) -> None:
 
     logger.info("ffmpeg landscape cmd: %s", " ".join(cmd))
     _run_ffmpeg(cmd, duration_s * 4)
+
+
+def render_portrait_short(video, template, output_path: Path, db) -> None:
+    """Render a portrait 9:16 YouTube Short with CTA drawtext overlay in the last 10 seconds."""
+    if not shutil.which("ffmpeg"):
+        raise RuntimeError("ffmpeg not found in PATH")
+
+    duration_s = template.short_duration_s or 58
+
+    visual_path = resolve_visual(video, db)
+    music_path = resolve_audio(video, db)
+    sfx_layers = resolve_sfx_layers(video, db)
+    is_image = visual_path is not None and Path(visual_path).suffix.lower() in IMAGE_EXTS
+
+    audio_inputs: list[tuple[str, float]] = []
+    if music_path and Path(music_path).is_file():
+        audio_inputs.append((music_path, 1.0))
+    audio_inputs.extend(sfx_layers)
+
+    cta_text = _get_cta_text(video, template)
+    cta_start = max(0, duration_s - 10)
+    escaped = _escape_drawtext(cta_text)
+    drawtext = (
+        f"drawtext=text='{escaped}'"
+        f":fontcolor=white:fontsize=52"
+        f":x=(w-tw)/2:y=h*0.80"
+        f":box=1:boxcolor=black@0.5:boxborderw=10"
+        f":enable='between(t,{cta_start},{duration_s})'"
+    )
+
+    portrait_crop = "crop=ih*9/16:ih:(iw-ih*9/16)/2:0,scale=1080:1920,fps=30"
+    vf_chain = f"{portrait_crop},{drawtext}"
+
+    cmd = ["ffmpeg", "-y"]
+
+    if visual_path and Path(visual_path).is_file():
+        if is_image:
+            cmd += ["-loop", "1", "-i", visual_path]
+        else:
+            cmd += ["-stream_loop", "-1", "-i", visual_path]
+    else:
+        cmd += ["-f", "lavfi", "-i", "color=c=black:s=1080x1920:r=30"]
+
+    if audio_inputs:
+        for path, _ in audio_inputs:
+            cmd += ["-stream_loop", "-1", "-i", path]
+        parts, map_args = _build_audio_filter(audio_inputs, vf_chain)
+        cmd += ["-filter_complex", ";".join(parts)] + map_args
+    else:
+        cmd += ["-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo"]
+        cmd += ["-vf", vf_chain]
+
+    cmd += ["-t", str(duration_s)]
+
+    if is_image:
+        cmd += ["-c:v", "libx264", "-preset", "slow", "-tune", "stillimage", "-crf", "18"]
+    else:
+        cmd += ["-c:v", "libx264", "-preset", "slow", "-crf", "18"]
+
+    cmd += ["-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-movflags", "+faststart",
+            str(output_path)]
+
+    logger.info("ffmpeg portrait short cmd: %s", " ".join(cmd))
+    _run_ffmpeg(cmd, max(duration_s * 4, 120))
+
+
+def _get_cta_text(video, template) -> str:
+    overrides = video.sfx_overrides or {}
+    cta = overrides.get("cta") or {}
+    return (
+        cta.get("text")
+        or getattr(template, "short_cta_text", None)
+        or "Watch the full video — link in description!"
+    )

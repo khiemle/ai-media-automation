@@ -117,3 +117,104 @@ def test_render_landscape_uses_duration_from_video(tmp_path):
     cmd_list = mock_run.call_args[0][0]
     t_idx = cmd_list.index("-t")
     assert cmd_list[t_idx + 1] == "3600"
+
+
+# ── render_portrait_short ─────────────────────────────────────────────────────
+
+def test_render_portrait_short_raises_when_ffmpeg_missing():
+    from pipeline.youtube_ffmpeg import render_portrait_short
+    with patch("shutil.which", return_value=None):
+        with pytest.raises(RuntimeError, match="ffmpeg not found"):
+            render_portrait_short(
+                _make_video(), _make_template(), Path("/tmp/out.mp4"), MagicMock()
+            )
+
+
+def test_render_portrait_short_uses_portrait_resolution(tmp_path):
+    video = _make_video(sfx_overrides={"cta": {"text": "Watch full video!"}})
+    output = tmp_path / "short.mp4"
+    with patch("shutil.which", return_value="/usr/bin/ffmpeg"), \
+         patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stderr="")
+        from pipeline.youtube_ffmpeg import render_portrait_short
+        render_portrait_short(video, _make_template(), output, MagicMock())
+    cmd = " ".join(mock_run.call_args[0][0])
+    assert "1080:1920" in cmd
+
+
+def test_render_portrait_short_includes_center_crop_filter(tmp_path):
+    video = _make_video(sfx_overrides={"cta": {"text": "Subscribe!"}})
+    output = tmp_path / "short.mp4"
+    with patch("shutil.which", return_value="/usr/bin/ffmpeg"), \
+         patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stderr="")
+        from pipeline.youtube_ffmpeg import render_portrait_short
+        render_portrait_short(video, _make_template(), output, MagicMock())
+    cmd = " ".join(mock_run.call_args[0][0])
+    assert "crop=ih*9/16:ih:(iw-ih*9/16)/2:0" in cmd
+
+
+def test_render_portrait_short_includes_drawtext_with_cta_text(tmp_path):
+    video = _make_video(sfx_overrides={"cta": {"text": "Watch full video!"}})
+    output = tmp_path / "short.mp4"
+    with patch("shutil.which", return_value="/usr/bin/ffmpeg"), \
+         patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stderr="")
+        from pipeline.youtube_ffmpeg import render_portrait_short
+        render_portrait_short(video, _make_template(short_duration_s=58), output, MagicMock())
+    cmd = " ".join(mock_run.call_args[0][0])
+    assert "drawtext=text=" in cmd
+    assert "Watch full video" in cmd
+
+
+def test_render_portrait_short_cta_enabled_in_last_10s(tmp_path):
+    video = _make_video(sfx_overrides={"cta": {"text": "Watch!"}})
+    output = tmp_path / "short.mp4"
+    with patch("shutil.which", return_value="/usr/bin/ffmpeg"), \
+         patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stderr="")
+        from pipeline.youtube_ffmpeg import render_portrait_short
+        render_portrait_short(video, _make_template(short_duration_s=30), output, MagicMock())
+    cmd = " ".join(mock_run.call_args[0][0])
+    assert "between(t,20,30)" in cmd
+
+
+def test_render_portrait_short_uses_template_duration(tmp_path):
+    video = _make_video(sfx_overrides={"cta": {"text": "Watch!"}})
+    output = tmp_path / "short.mp4"
+    with patch("shutil.which", return_value="/usr/bin/ffmpeg"), \
+         patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stderr="")
+        from pipeline.youtube_ffmpeg import render_portrait_short
+        render_portrait_short(video, _make_template(short_duration_s=45), output, MagicMock())
+    cmd_list = mock_run.call_args[0][0]
+    t_idx = cmd_list.index("-t")
+    assert cmd_list[t_idx + 1] == "45"
+
+
+def test_render_portrait_short_falls_back_to_template_cta_text(tmp_path):
+    video = _make_video(sfx_overrides={})  # no cta key
+    output = tmp_path / "short.mp4"
+    with patch("shutil.which", return_value="/usr/bin/ffmpeg"), \
+         patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stderr="")
+        from pipeline.youtube_ffmpeg import render_portrait_short
+        render_portrait_short(
+            video, _make_template(short_cta_text="See link in description!"), output, MagicMock()
+        )
+    cmd = " ".join(mock_run.call_args[0][0])
+    assert "See link in description" in cmd
+
+
+def test_render_portrait_short_falls_back_to_hardcoded_default_when_no_cta(tmp_path):
+    video = _make_video(sfx_overrides={})
+    output = tmp_path / "short.mp4"
+    with patch("shutil.which", return_value="/usr/bin/ffmpeg"), \
+         patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stderr="")
+        from pipeline.youtube_ffmpeg import render_portrait_short
+        render_portrait_short(
+            video, _make_template(short_cta_text=None), output, MagicMock()
+        )
+    cmd = " ".join(mock_run.call_args[0][0])
+    assert "Watch the full video" in cmd
