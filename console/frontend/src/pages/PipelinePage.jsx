@@ -136,13 +136,16 @@ export default function PipelinePage() {
   }
 
   useEffect(() => {
+    let mounted = true
     youtubeVideosApi.list()
       .then(res => {
+        if (!mounted) return
         const m = {}
         for (const v of res.items || res || []) m[v.id] = v.title
         setVideoMap(m)
       })
       .catch(() => {})
+    return () => { mounted = false }
   }, [])
 
   // WebSocket for live updates
