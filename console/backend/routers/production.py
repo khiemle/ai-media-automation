@@ -36,7 +36,7 @@ def search_assets(
     min_duration: float | None = Query(None),
     asset_type: str | None = Query(None),
     page: int = Query(1, ge=1),
-    per_page: int = Query(20, ge=1, le=100),
+    per_page: int = Query(20, ge=1, le=500),
     db: Session = Depends(get_db),
     _user=Depends(require_editor_or_admin),
 ):
