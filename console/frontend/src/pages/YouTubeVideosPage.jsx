@@ -152,7 +152,7 @@ function CreationPanel({ template, onClose, onCreated }) {
     musicApi.list({ status: 'ready' })
       .then(d => { if (mounted) setMusicList(d.items || d || []) })
       .catch(() => {})
-    assetsApi.list({ asset_type: 'video_clip' })
+    assetsApi.list({ asset_type: 'video_clip', per_page: 200 })
       .then(d => {
         if (mounted) setAssetList((d.items || d || []).filter(a => AI_SOURCES.includes(a.source)))
       })
