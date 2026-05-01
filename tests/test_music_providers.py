@@ -1,10 +1,23 @@
 import pytest
 from unittest.mock import patch, MagicMock
 
+_FAKE_CFG = {
+    "suno": {"api_key": "test-suno-key", "model": "V4_5"},
+    "gemini": {
+        "script": {"api_key": "test-key", "model": "gemini-2.5-flash"},
+        "media":  {"api_key": "test-key", "model": "gemini-2.0-flash-exp"},
+        "music":  {"api_key": "test-gemini-music-key", "model": "lyria-3-clip-preview"},
+    },
+    "elevenlabs": {"api_key": "", "voice_id_en": "", "voice_id_vi": "", "model": "eleven_flash_v2_5"},
+    "pexels": {"api_key": ""},
+    "kokoro": {"default_voice_en": "af_heart"},
+}
+
 
 @pytest.fixture(autouse=True)
-def _fake_suno_key():
-    with patch.dict("os.environ", {"SUNO_API_KEY": "test-key"}):
+def _fake_keys():
+    with patch("pipeline.music_providers.suno_provider.get_config", return_value=_FAKE_CFG), \
+         patch("pipeline.music_providers.lyria_provider.get_config", return_value=_FAKE_CFG):
         yield
 
 
@@ -73,19 +86,18 @@ def test_lyria_provider_generate_returns_bytes():
     mock_response = MagicMock()
     mock_response.candidates = [mock_candidate]
 
-    with patch.dict("os.environ", {"GEMINI_MEDIA_API_KEY": "fake-key"}):
-        with patch("pipeline.music_providers.lyria_provider.genai") as mock_genai:
-            mock_client = MagicMock()
-            mock_genai.Client.return_value = mock_client
-            mock_client.models.generate_content.return_value = mock_response
+    with patch("pipeline.music_providers.lyria_provider.genai") as mock_genai:
+        mock_client = MagicMock()
+        mock_genai.Client.return_value = mock_client
+        mock_client.models.generate_content.return_value = mock_response
 
-            from pipeline.music_providers.lyria_provider import LyriaProvider
-            provider = LyriaProvider()
-            audio_bytes, mime_type = provider.generate(
-                prompt="calm ambient background",
-                model="lyria-3-clip-preview",
-                is_vocal=False,
-            )
+        from pipeline.music_providers.lyria_provider import LyriaProvider
+        provider = LyriaProvider()
+        audio_bytes, mime_type = provider.generate(
+            prompt="calm ambient background",
+            model="lyria-3-clip-preview",
+            is_vocal=False,
+        )
 
     assert audio_bytes == b"FAKE_MP3_DATA"
     assert mime_type == "audio/mpeg"
