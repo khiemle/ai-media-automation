@@ -70,7 +70,7 @@ def delete_sfx(
 
 
 @router.get("/{sfx_id}/stream")
-def stream_sfx(sfx_id: int, db: Session = Depends(get_db), _user=Depends(require_editor_or_admin)):
+def stream_sfx(sfx_id: int, db: Session = Depends(get_db)):
     from console.backend.models.sfx_asset import SfxAsset
     row = db.get(SfxAsset, sfx_id)
     if not row:
