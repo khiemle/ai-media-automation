@@ -41,8 +41,8 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=True),
     )
     op.create_unique_constraint("uq_channel_plans_slug", "channel_plans", ["slug"])
-    op.create_index("ix_channel_plans_slug", "channel_plans", ["slug"])
 
 
 def downgrade() -> None:
+    op.drop_constraint("uq_channel_plans_slug", "channel_plans", type_="unique")
     op.drop_table("channel_plans")
