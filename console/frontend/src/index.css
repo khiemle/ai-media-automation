@@ -38,3 +38,24 @@ body {
 button, a, [role="button"] {
   transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease, opacity 120ms ease;
 }
+
+/* ── Markdown rendered content (.md-content) ── */
+.md-content { color: #e8e8f0; line-height: 1.65; font-size: 0.8125rem; }
+.md-content h1 { font-size: 1.1rem; font-weight: 700; color: #e8e8f0; margin: 1.25rem 0 0.5rem; padding-bottom: 0.4rem; border-bottom: 1px solid #2a2a32; }
+.md-content h2 { font-size: 0.95rem; font-weight: 600; color: #e8e8f0; margin: 1.1rem 0 0.4rem; padding-bottom: 0.3rem; border-bottom: 1px solid #2a2a32; }
+.md-content h3 { font-size: 0.875rem; font-weight: 600; color: #c4c4d8; margin: 0.9rem 0 0.35rem; }
+.md-content p  { margin: 0.5rem 0; }
+.md-content ul, .md-content ol { padding-left: 1.4rem; margin: 0.5rem 0; }
+.md-content li { margin: 0.2rem 0; }
+.md-content strong { color: #e8e8f0; font-weight: 600; }
+.md-content em { color: #c4c4d8; font-style: italic; }
+.md-content code { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 0.75rem; background: #0d0d0f; border: 1px solid #2a2a32; border-radius: 3px; padding: 0.1rem 0.35rem; color: #7c6af7; }
+.md-content pre { background: #0d0d0f; border: 1px solid #2a2a32; border-radius: 6px; padding: 0.75rem 1rem; overflow-x: auto; margin: 0.6rem 0; }
+.md-content pre code { background: none; border: none; padding: 0; color: #c4c4d8; }
+.md-content blockquote { border-left: 3px solid #7c6af7; margin: 0.6rem 0; padding: 0.4rem 0.75rem; background: #1c1c22; border-radius: 0 4px 4px 0; color: #9090a8; }
+.md-content hr { border: none; border-top: 1px solid #2a2a32; margin: 1rem 0; }
+.md-content a { color: #7c6af7; text-decoration: underline; }
+.md-content table { width: 100%; border-collapse: collapse; font-size: 0.75rem; margin: 0.6rem 0; }
+.md-content th { background: #1c1c22; color: #9090a8; font-weight: 600; text-align: left; padding: 0.4rem 0.65rem; border: 1px solid #2a2a32; }
+.md-content td { padding: 0.35rem 0.65rem; border: 1px solid #2a2a32; color: #c4c4d8; vertical-align: top; }
+.md-content tr:nth-child(even) td { background: #18181f; }

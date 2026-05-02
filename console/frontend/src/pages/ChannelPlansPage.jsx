@@ -1,7 +1,10 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
+import { marked } from 'marked'
 import { channelPlansApi, fetchApi } from '../api/client.js'
 import { Card, Button, Badge, Select, Toast, Spinner, EmptyState, Modal } from '../components/index.jsx'
 import AIAssistantPanel from '../components/AIAssistantPanel.jsx'
+
+marked.setOptions({ breaks: true, gfm: true })
 
 function PlanCard({ plan, onClick }) {
   return (
@@ -91,11 +94,13 @@ function DetailPanel({ plan: initialPlan, channels, onClose, onSaved }) {
   const [mdContent, setMdContent] = useState(initialPlan.md_content ?? '')
   const [channelId, setChannelId] = useState(String(initialPlan.channel_id ?? ''))
   const [activeTab, setActiveTab] = useState('plan')
+  const [editing, setEditing]     = useState(false)
   const [saving, setSaving]       = useState(false)
   const [saveError, setSaveError] = useState(null)
   const [toast, setToast]         = useState(null)
   const toastTimerRef             = useRef(null)
 
+  // Fetch full content if opened from list (md_content not yet loaded)
   useEffect(() => {
     if (!plan.md_content) {
       channelPlansApi.get(plan.id)
@@ -106,6 +111,11 @@ function DetailPanel({ plan: initialPlan, channels, onClose, onSaved }) {
 
   useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current) }, [])
 
+  const renderedHtml = useMemo(() => {
+    if (!mdContent) return ''
+    return marked.parse(mdContent)
+  }, [mdContent])
+
   const handleSave = async () => {
     setSaving(true); setSaveError(null)
     try {
@@ -115,6 +125,7 @@ function DetailPanel({ plan: initialPlan, channels, onClose, onSaved }) {
         channelId ? parseInt(channelId, 10) : null
       )
       setPlan(updated)
+      setEditing(false)
       setToast({ msg: 'Saved', type: 'success' })
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
       toastTimerRef.current = setTimeout(() => setToast(null), 2000)
@@ -126,10 +137,17 @@ function DetailPanel({ plan: initialPlan, channels, onClose, onSaved }) {
     }
   }
 
+  const handleCancelEdit = () => {
+    setMdContent(plan.md_content ?? '')
+    setChannelId(String(plan.channel_id ?? ''))
+    setSaveError(null)
+    setEditing(false)
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative w-[560px] h-full bg-[#16161a] border-l border-[#2a2a32] flex flex-col overflow-hidden">
+      <div className="relative w-[600px] h-full bg-[#16161a] border-l border-[#2a2a32] flex flex-col overflow-hidden">
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#2a2a32] gap-3">
@@ -140,7 +158,14 @@ function DetailPanel({ plan: initialPlan, channels, onClose, onSaved }) {
             )}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            <Button variant="primary" size="sm" loading={saving} onClick={handleSave}>Save</Button>
+            {editing ? (
+              <>
+                <Button variant="ghost" size="sm" onClick={handleCancelEdit} disabled={saving}>Cancel</Button>
+                <Button variant="primary" size="sm" loading={saving} onClick={handleSave}>Save</Button>
+              </>
+            ) : (
+              <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>Edit</Button>
+            )}
             <button onClick={onClose} className="text-[#9090a8] hover:text-[#e8e8f0] transition-colors">✕</button>
           </div>
         </div>
@@ -173,50 +198,68 @@ function DetailPanel({ plan: initialPlan, channels, onClose, onSaved }) {
         <div className="flex-1 overflow-y-auto">
           {activeTab === 'plan' && (
             <div className="flex flex-col gap-4 p-6">
-              {/* Metadata chips */}
-              <div className="flex flex-wrap gap-2">
-                {plan.focus && (
-                  <span className="text-[10px] font-mono bg-[#1c1c22] border border-[#2a2a32] px-2 py-0.5 rounded text-[#9090a8]">
-                    {plan.focus}
-                  </span>
-                )}
-                {plan.upload_frequency && (
-                  <span className="text-[10px] font-mono bg-[#1c1c22] border border-[#2a2a32] px-2 py-0.5 rounded text-[#9090a8]">
-                    {plan.upload_frequency}
-                  </span>
-                )}
-                {plan.rpm_estimate && (
-                  <span className="text-[10px] font-mono bg-[#1c1c22] border border-[#2a2a32] px-2 py-0.5 rounded text-[#34d399]">
-                    RPM {plan.rpm_estimate}
-                  </span>
+
+              {/* Channel link — always visible */}
+              <div className="flex flex-col gap-2 p-4 bg-[#1c1c22] border border-[#2a2a32] rounded-xl">
+                <div className="flex flex-wrap gap-2 mb-1">
+                  {plan.focus && (
+                    <span className="text-[10px] font-mono bg-[#0d0d0f] border border-[#2a2a32] px-2 py-0.5 rounded text-[#9090a8]">
+                      {plan.focus}
+                    </span>
+                  )}
+                  {plan.upload_frequency && (
+                    <span className="text-[10px] font-mono bg-[#0d0d0f] border border-[#2a2a32] px-2 py-0.5 rounded text-[#9090a8]">
+                      {plan.upload_frequency}
+                    </span>
+                  )}
+                  {plan.rpm_estimate && (
+                    <span className="text-[10px] font-mono bg-[#0d0d0f] border border-[#2a2a32] px-2 py-0.5 rounded text-[#34d399]">
+                      RPM {plan.rpm_estimate}
+                    </span>
+                  )}
+                </div>
+                <Select
+                  label="Linked YouTube Channel"
+                  value={channelId}
+                  onChange={e => setChannelId(e.target.value)}
+                >
+                  <option value="">— Not linked —</option>
+                  {channels.map(ch => (
+                    <option key={ch.id} value={String(ch.id)}>{ch.name}</option>
+                  ))}
+                </Select>
+                {channelId !== String(initialPlan.channel_id ?? '') && !editing && (
+                  <Button variant="primary" size="sm" loading={saving} onClick={handleSave}>
+                    Save channel link
+                  </Button>
                 )}
               </div>
 
-              {/* Channel link */}
-              <Select
-                label="Linked YouTube Channel (optional)"
-                value={channelId}
-                onChange={e => setChannelId(e.target.value)}
-              >
-                <option value="">— Not linked —</option>
-                {channels.map(ch => (
-                  <option key={ch.id} value={String(ch.id)}>{ch.name}</option>
-                ))}
-              </Select>
-
-              {/* MD editor */}
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-[#9090a8] font-medium">Markdown content</label>
-                <textarea
-                  value={mdContent}
-                  onChange={e => setMdContent(e.target.value)}
-                  className="bg-[#0d0d0f] border border-[#2a2a32] rounded-lg p-3 text-xs text-[#e8e8f0] font-mono leading-relaxed resize-none focus:outline-none focus:border-[#7c6af7] transition-colors"
-                  style={{ minHeight: '50vh' }}
-                  spellCheck={false}
-                />
-              </div>
-
-              {saveError && <p className="text-xs text-[#f87171]">{saveError}</p>}
+              {/* Markdown content */}
+              {editing ? (
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs text-[#9090a8] font-medium">Markdown content</label>
+                  <textarea
+                    value={mdContent}
+                    onChange={e => setMdContent(e.target.value)}
+                    className="bg-[#0d0d0f] border border-[#2a2a32] rounded-lg p-3 text-xs text-[#e8e8f0] font-mono leading-relaxed resize-none focus:outline-none focus:border-[#7c6af7] transition-colors"
+                    style={{ minHeight: '60vh' }}
+                    spellCheck={false}
+                  />
+                  {saveError && <p className="text-xs text-[#f87171]">{saveError}</p>}
+                </div>
+              ) : (
+                <div>
+                  {!mdContent ? (
+                    <div className="flex justify-center py-8"><Spinner /></div>
+                  ) : (
+                    <div
+                      className="md-content"
+                      dangerouslySetInnerHTML={{ __html: renderedHtml }}
+                    />
+                  )}
+                </div>
+              )}
             </div>
           )}
           {activeTab === 'ai' && (
