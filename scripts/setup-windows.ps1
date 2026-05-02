@@ -27,7 +27,7 @@ param(
 $ErrorActionPreference = "Stop"
 $ProgressPreference    = "SilentlyContinue"   # speeds up Invoke-WebRequest
 
-Write-Host "`n=== AI Media Automation — Windows Setup ===" -ForegroundColor Cyan
+Write-Host "`n=== AI Media Automation - Windows Setup ===" -ForegroundColor Cyan
 
 # ── 1. Verify prerequisites ──────────────────────────────────────────────────
 Write-Host "`n[1/6] Checking prerequisites..." -ForegroundColor Yellow
@@ -67,10 +67,10 @@ foreach ($dir in $dirs) {
 # ── 3. Clone the repository ──────────────────────────────────────────────────
 Write-Host "`n[3/6] Cloning repository..." -ForegroundColor Yellow
 if (Test-Path "$RepoPath\.git") {
-    Write-Host "  Already cloned at $RepoPath — skipping"
+    Write-Host "  Already cloned at $RepoPath - skipping"
 } else {
     gh repo clone $GithubRepo $RepoPath
-    Write-Host "  Cloned → $RepoPath"
+    Write-Host "  Cloned -> $RepoPath"
 }
 
 # ── 4. Authenticate Docker with GHCR ────────────────────────────────────────
@@ -82,7 +82,7 @@ Write-Host "  Docker authenticated with ghcr.io"
 Write-Host "`n[5/6] Setting up GitHub Actions runner..." -ForegroundColor Yellow
 Set-Location $RunnerPath
 
-if (-not (Test-Path "$RunnerPath\run.cmd")) {
+if (-not (Test-Path "$RunnerPath\svc.cmd")) {
     $zipUrl  = "https://github.com/actions/runner/releases/download/v$RunnerVersion/actions-runner-win-x64-$RunnerVersion.zip"
     $zipPath = "$RunnerPath\runner.zip"
     Write-Host "  Downloading runner v$RunnerVersion..."
@@ -99,11 +99,28 @@ $repoUrl = "https://github.com/$GithubRepo"
     --name  "windows-render" `
     --labels "self-hosted,windows,render" `
     --work  "$RunnerPath\_work" `
-    --unattended
+    --unattended `
+    --replace
 
-.\svc.cmd install
-.\svc.cmd start
-Write-Host "  Runner installed and started as Windows Service"
+$taskName = "GitHubActionsRunner-windows-render"
+
+$existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+if ($existingTask) {
+    Write-Host "  Task already exists, stopping..."
+    Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+    Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
+}
+
+$action   = New-ScheduledTaskAction -Execute "$RunnerPath\run.cmd" -WorkingDirectory $RunnerPath
+$trigger  = New-ScheduledTaskTrigger -AtStartup
+$settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([System.TimeSpan]::Zero) `
+                -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
+$principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
+Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger `
+    -Settings $settings -Principal $principal -Force | Out-Null
+
+Start-ScheduledTask -TaskName $taskName
+Write-Host "  Runner registered as scheduled task '$taskName' and started"
 
 # ── 6. Open firewall ports ───────────────────────────────────────────────────
 Write-Host "`n[6/6] Opening firewall ports..." -ForegroundColor Yellow
@@ -124,7 +141,7 @@ Write-Host "`n[6/6] Opening firewall ports..." -ForegroundColor Yellow
 Write-Host "`nVerifying GPU in Docker..." -ForegroundColor Yellow
 docker run --rm --gpus all nvidia/cuda:12.3.2-base-ubuntu22.04 nvidia-smi
 if ($LASTEXITCODE -ne 0) {
-    Write-Warning "GPU not visible to Docker. Check Docker Desktop → Settings → Resources → GPU."
+    Write-Warning "GPU not visible to Docker. Check Docker Desktop -> Settings -> Resources -> GPU."
 } else {
     Write-Host "  GPU OK"
 }
