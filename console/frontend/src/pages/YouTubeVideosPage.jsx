@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { youtubeVideosApi, musicApi, assetsApi, sfxApi } from '../api/client.js'
+import { youtubeVideosApi, musicApi, assetsApi, sfxApi, channelPlansApi } from '../api/client.js'
 import { Card, Badge, Button, Input, Select, Toast, Spinner, EmptyState, Modal } from '../components/index.jsx'
+import AIAssistantPanel from '../components/AIAssistantPanel.jsx'
 
 const STATUS_COLORS = {
   draft:     '#9090a8',
@@ -53,7 +54,8 @@ function VideoPreviewModal({ video, onClose }) {
   )
 }
 
-function CreationPanel({ template, onClose, onCreated }) {
+function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCreated }) {
+  const [selectedPlan, setSelectedPlan] = useState(channelPlan)
   const [form, setForm] = useState({
     theme: '',
     target_duration_h: template?.target_duration_h || 8,
@@ -72,6 +74,11 @@ function CreationPanel({ template, onClose, onCreated }) {
   const [sfxList,   setSfxList]     = useState([])
   const [loading, setLoading]       = useState(false)
   const [toast, setToast]           = useState(null)
+  const [autofilling, setAutofilling] = useState(false)
+  const [autofillError, setAutofillError] = useState(null)
+  const [autofillSuno, setAutofillSuno] = useState(null)
+  const [autofillRunway, setAutofillRunway] = useState(null)
+  const [autofilled, setAutofilled] = useState(false)
 
   const [sfxLayers, setSfxLayers] = useState({
     foreground: { asset_id: '', volume: 0.6 },
@@ -164,7 +171,7 @@ function CreationPanel({ template, onClose, onCreated }) {
   }, [])
 
   useEffect(() => {
-    if (form.theme && template) {
+    if (form.theme && template && !autofilled) {
       const h = form.isCustomDuration
         ? (parseFloat(form.customDuration) || 8)
         : form.target_duration_h
@@ -179,7 +186,38 @@ function CreationPanel({ template, onClose, onCreated }) {
           .replace('{duration}', durationDisplay),
       }))
     }
-  }, [form.theme, form.target_duration_h, form.customDuration, form.isCustomDuration])
+  }, [form.theme, form.target_duration_h, form.customDuration, form.isCustomDuration, autofilled])
+
+  const handleAutofill = async () => {
+    if (!selectedPlan || !form.theme) return
+    setAutofilling(true)
+    setAutofillError(null)
+    try {
+      const result = await channelPlansApi.aiAutofill(selectedPlan.id, form.theme)
+      setForm(f => ({
+        ...f,
+        seo_title:       result.title       || f.seo_title,
+        seo_description: result.description || f.seo_description,
+        seo_tags:        result.tags        || f.seo_tags,
+        ...(result.target_duration_h
+          ? (() => {
+              const preset = DURATION_PRESETS.find(p => p.value === result.target_duration_h)
+              return preset
+                ? { target_duration_h: result.target_duration_h, isCustomDuration: false }
+                : { customDuration: String(result.target_duration_h), isCustomDuration: true }
+            })()
+          : {}),
+      }))
+      if (result.suno_prompt) setAutofillSuno(result.suno_prompt)
+      if (result.runway_prompt) setAutofillRunway(result.runway_prompt)
+      setAutofilled(true)
+      showToast('AI autofill complete', 'success')
+    } catch (e) {
+      setAutofillError(e.message)
+    } finally {
+      setAutofilling(false)
+    }
+  }
 
   const handleSubmit = async () => {
     if (!form.theme) { showToast('Theme is required', 'error'); return }
@@ -226,8 +264,27 @@ function CreationPanel({ template, onClose, onCreated }) {
       <div className="relative w-[480px] h-full bg-[#16161a] border-l border-[#2a2a32] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#2a2a32]">
-          <h2 className="text-base font-semibold text-[#e8e8f0]">New {template?.label}</h2>
-          <button onClick={onClose} className="text-[#9090a8] hover:text-[#e8e8f0]">✕</button>
+          <div className="flex flex-col gap-0.5 min-w-0">
+            <h2 className="text-base font-semibold text-[#e8e8f0]">New {template?.label}</h2>
+            {selectedPlan && (
+              <span className="text-xs text-[#7c6af7] font-mono">{selectedPlan.name}</span>
+            )}
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {(selectedPlan || channelPlans.length > 0) && (
+              <Button
+                variant="accent"
+                size="sm"
+                loading={autofilling}
+                disabled={!selectedPlan || !form.theme?.trim()}
+                onClick={handleAutofill}
+                title={!selectedPlan ? 'Select a channel plan first' : !form.theme?.trim() ? 'Enter a theme first' : 'AI Autofill from channel plan'}
+              >
+                ✦ AI Autofill
+              </Button>
+            )}
+            <button onClick={onClose} className="text-[#9090a8] hover:text-[#e8e8f0]">✕</button>
+          </div>
         </div>
 
         {/* Toast — outside scroll area so it doesn't shift layout */}
@@ -237,6 +294,30 @@ function CreationPanel({ template, onClose, onCreated }) {
           </div>
         )}
         <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-6">
+          {autofillError && (
+            <div className="pt-2">
+              <p className="text-xs text-[#f87171]">{autofillError}</p>
+            </div>
+          )}
+
+          {/* Channel plan picker — shown when opened from header (no pre-selected plan) */}
+          {!channelPlan && channelPlans.length > 0 && (
+            <section>
+              <div className="text-xs font-bold text-[#5a5a70] tracking-widest mb-3">CHANNEL PLAN</div>
+              <Select
+                value={selectedPlan?.id ?? ''}
+                onChange={e => {
+                  const id = parseInt(e.target.value, 10)
+                  setSelectedPlan(channelPlans.find(p => p.id === id) || null)
+                }}
+              >
+                <option value="">— Select a channel plan (optional) —</option>
+                {channelPlans.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </Select>
+            </section>
+          )}
 
           {/* ① THEME & SEO */}
           <section>
@@ -294,6 +375,16 @@ function CreationPanel({ template, onClose, onCreated }) {
                 value={form.seo_title}
                 onChange={e => setForm(f => ({ ...f, seo_title: e.target.value }))}
               />
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-[#9090a8] font-medium">SEO Description</label>
+                <textarea
+                  value={form.seo_description || ''}
+                  onChange={e => setForm(f => ({ ...f, seo_description: e.target.value }))}
+                  placeholder="YouTube description..."
+                  rows={4}
+                  className="bg-[#16161a] border border-[#2a2a32] rounded-lg px-3 py-1.5 text-sm text-[#e8e8f0] placeholder:text-[#5a5a70] focus:outline-none focus:border-[#7c6af7] transition-colors resize-none"
+                />
+              </div>
               <Input
                 label="SEO Tags (comma-separated)"
                 value={form.seo_tags}
@@ -366,14 +457,16 @@ function CreationPanel({ template, onClose, onCreated }) {
                   </div>
                 </div>
               )}
-              {template?.suno_prompt_template && (
+              {(template?.suno_prompt_template || autofillSuno) && (
                 <div className="bg-[#0d0d0f] border border-[#2a2a32] rounded-lg p-3 relative">
-                  <div className="text-xs text-[#5a5a70] mb-1">Suno Prompt (reference)</div>
+                  <div className="text-xs text-[#5a5a70] mb-1">
+                    Suno Prompt {autofillSuno ? '(AI generated)' : '(reference)'}
+                  </div>
                   <p className="text-xs text-[#9090a8] pr-10 leading-relaxed">
-                    {template.suno_prompt_template}
+                    {autofillSuno || template.suno_prompt_template}
                   </p>
                   <button
-                    onClick={() => navigator.clipboard.writeText(template.suno_prompt_template)}
+                    onClick={() => navigator.clipboard.writeText(autofillSuno || template.suno_prompt_template)}
                     className="absolute top-2 right-2 text-xs text-[#7c6af7] hover:text-[#9d8df8] px-2 py-1 bg-[#16161a] rounded"
                   >
                     Copy
@@ -451,14 +544,16 @@ function CreationPanel({ template, onClose, onCreated }) {
                   </div>
                 </div>
               )}
-              {template?.runway_prompt_template && (
+              {(template?.runway_prompt_template || autofillRunway) && (
                 <div className="bg-[#0d0d0f] border border-[#2a2a32] rounded-lg p-3 relative">
-                  <div className="text-xs text-[#5a5a70] mb-1">Runway Prompt (reference)</div>
+                  <div className="text-xs text-[#5a5a70] mb-1">
+                    Runway Prompt {autofillRunway ? '(AI generated)' : '(reference)'}
+                  </div>
                   <p className="text-xs text-[#9090a8] pr-10 leading-relaxed">
-                    {template.runway_prompt_template}
+                    {autofillRunway || template.runway_prompt_template}
                   </p>
                   <button
-                    onClick={() => navigator.clipboard.writeText(template.runway_prompt_template)}
+                    onClick={() => navigator.clipboard.writeText(autofillRunway || template.runway_prompt_template)}
                     className="absolute top-2 right-2 text-xs text-[#7c6af7] hover:text-[#9d8df8] px-2 py-1 bg-[#16161a] rounded"
                   >
                     Copy
@@ -643,6 +738,10 @@ export default function YouTubeVideosPage() {
   const [makeShortVideo, setMakeShortVideo] = useState(null)
   const [previewVideo, setPreviewVideo] = useState(null)
   const [toast, setToast]                 = useState(null)
+  const [channelPlans, setChannelPlans]     = useState([])
+  const [accordionOpen, setAccordionOpen]   = useState(false)
+  const [expandedPlanId, setExpandedPlanId] = useState(null)
+  const [activeChannelPlan, setActiveChannelPlan] = useState(null)
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type })
@@ -662,6 +761,12 @@ export default function YouTubeVideosPage() {
       if (!signal.cancelled) setTemplates(tmpl)
     } catch (e) {
       if (!signal.cancelled) console.warn('Failed to load templates:', e)
+    }
+    try {
+      const plans = await channelPlansApi.list()
+      if (!signal.cancelled) setChannelPlans(plans)
+    } catch (e) {
+      if (!signal.cancelled) console.warn('Failed to load channel plans:', e)
     }
     if (!signal.cancelled) setLoading(false)
   }
@@ -703,12 +808,101 @@ export default function YouTubeVideosPage() {
           <p className="text-sm text-[#9090a8] mt-0.5">{videos.length} videos</p>
         </div>
         <div className="flex gap-2">
-          {templates.filter(t => t.output_format === 'landscape_long').map(t => (
-            <Button key={t.slug} variant="primary" onClick={() => setActiveTemplate(t)}>
-              + New {t.label}
-            </Button>
-          ))}
+          <Button
+            variant="primary"
+            onClick={() => {
+              const firstTemplate = templates.find(t => t.output_format === 'landscape_long')
+              if (!firstTemplate) { showToast('No landscape template configured', 'error'); return }
+              setActiveTemplate(firstTemplate)
+              setActiveChannelPlan(null)
+            }}
+          >
+            + New Video
+          </Button>
         </div>
+      </div>
+
+      {/* Channel Plans accordion */}
+      <div className="border border-[#2a2a32] rounded-xl overflow-hidden">
+        <button
+          onClick={() => setAccordionOpen(v => {
+            if (v) setExpandedPlanId(null)
+            return !v
+          })}
+          className="w-full flex items-center justify-between px-5 py-3 bg-[#1c1c22] hover:bg-[#222228] transition-colors"
+        >
+          <span className="text-sm font-semibold text-[#e8e8f0]">
+            Channel Plans <span className="text-[#5a5a70] font-normal">({channelPlans.length})</span>
+          </span>
+          <span className="text-[#9090a8] text-xs">{accordionOpen ? '▲' : '▼'}</span>
+        </button>
+
+        {accordionOpen && (
+          <div className="divide-y divide-[#2a2a32]">
+            {channelPlans.length === 0 ? (
+              <p className="px-5 py-4 text-xs text-[#5a5a70]">
+                No channel plans yet. Visit <strong className="text-[#7c6af7]">Channel Plans</strong> to import one.
+              </p>
+            ) : channelPlans.map(plan => (
+              <div key={plan.id} className="bg-[#16161a]">
+                <button
+                  onClick={() => setExpandedPlanId(id => id === plan.id ? null : plan.id)}
+                  className="w-full flex items-center gap-3 px-5 py-3 hover:bg-[#1c1c22] transition-colors text-left"
+                >
+                  <span className="text-sm font-medium text-[#e8e8f0] flex-1">{plan.name}</span>
+                  {plan.focus && (
+                    <span className="text-[10px] font-mono bg-[#1c1c22] border border-[#2a2a32] px-2 py-0.5 rounded text-[#9090a8] hidden sm:inline">
+                      {plan.focus.split(',')[0].trim()}
+                    </span>
+                  )}
+                  {plan.rpm_estimate && (
+                    <span className="text-[10px] font-mono text-[#34d399]">{plan.rpm_estimate}</span>
+                  )}
+                  <span className="text-[#9090a8] text-xs">{expandedPlanId === plan.id ? '▲' : '▼'}</span>
+                </button>
+
+                {expandedPlanId === plan.id && (
+                  <div className="px-5 pb-5 flex flex-col gap-4">
+                    <div className="flex flex-wrap gap-2">
+                      {plan.focus && (
+                        <span className="text-[10px] font-mono bg-[#1c1c22] border border-[#2a2a32] px-2 py-0.5 rounded text-[#9090a8]">
+                          {plan.focus}
+                        </span>
+                      )}
+                      {plan.upload_frequency && (
+                        <span className="text-[10px] font-mono bg-[#1c1c22] border border-[#2a2a32] px-2 py-0.5 rounded text-[#9090a8]">
+                          {plan.upload_frequency}
+                        </span>
+                      )}
+                      {plan.rpm_estimate && (
+                        <span className="text-[10px] font-mono bg-[#1c1c22] border border-[#2a2a32] px-2 py-0.5 rounded text-[#34d399]">
+                          RPM {plan.rpm_estimate}
+                        </span>
+                      )}
+                    </div>
+
+                    <AIAssistantPanel key={plan.id} planId={plan.id} />
+
+                    <div className="flex justify-end">
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => {
+                          const firstTemplate = templates.find(t => t.output_format === 'landscape_long')
+                          if (!firstTemplate) { showToast('No landscape template configured', 'error'); return }
+                          setActiveTemplate(firstTemplate)
+                          setActiveChannelPlan(plan)
+                        }}
+                      >
+                        + New Video for this channel
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Filters */}
@@ -796,8 +990,10 @@ export default function YouTubeVideosPage() {
       {activeTemplate && (
         <CreationPanel
           template={activeTemplate}
-          onClose={() => setActiveTemplate(null)}
-          onCreated={() => { setActiveTemplate(null); load() }}
+          channelPlan={activeChannelPlan}
+          channelPlans={activeChannelPlan ? [] : channelPlans}
+          onClose={() => { setActiveTemplate(null); setActiveChannelPlan(null) }}
+          onCreated={() => { setActiveTemplate(null); setActiveChannelPlan(null); load() }}
         />
       )}
 

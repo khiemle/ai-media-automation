@@ -1,14 +1,23 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { channelPlansApi } from '../api/client.js'
 import { Button, Input } from './index.jsx'
 
 function CopyButton({ text }) {
   const [copied, setCopied] = useState(false)
+  const timerRef = useRef(null)
+
   const handleCopy = () => {
     navigator.clipboard.writeText(text)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
+      .then(() => {
+        setCopied(true)
+        if (timerRef.current) clearTimeout(timerRef.current)
+        timerRef.current = setTimeout(() => setCopied(false), 1500)
+      })
+      .catch(() => {})
   }
+
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current) }, [])
+
   return (
     <button
       onClick={handleCopy}
@@ -184,6 +193,7 @@ export default function AIAssistantPanel({ planId }) {
           Ask
         </Button>
         {qaError && <p className="text-xs text-[#f87171]">{qaError}</p>}
+        {/* answer is prose — intentionally not font-mono unlike ResultBlock */}
         {answer && (
           <div className="bg-[#0d0d0f] border border-[#2a2a32] rounded-lg p-3">
             <div className="flex items-center justify-between mb-1.5">
