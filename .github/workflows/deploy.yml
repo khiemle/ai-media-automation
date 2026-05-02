@@ -72,6 +72,10 @@ jobs:
     runs-on: [self-hosted, windows, render]
 
     steps:
+      - name: Set PowerShell execution policy
+        shell: cmd
+        run: powershell -Command "Set-ExecutionPolicy RemoteSigned -Scope LocalMachine -Force"
+
       - uses: actions/checkout@v4
 
       # Write console/.env from secrets
