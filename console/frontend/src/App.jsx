@@ -16,6 +16,7 @@ import MusicPage from './pages/MusicPage.jsx'
 import VideoAssetsPage from './pages/VideoAssetsPage.jsx'
 import SFXPage from './pages/SFXPage.jsx'
 import YouTubeVideosPage from './pages/YouTubeVideosPage.jsx'
+import ChannelPlansPage from './pages/ChannelPlansPage.jsx'
 
 // ── Tab icons (inline SVG) ────────────────────────────────────────────────────
 const Icons = {
@@ -90,6 +91,15 @@ const Icons = {
       <polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02"/>
     </svg>
   ),
+  ChannelPlans: () => (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+      <polyline points="14 2 14 8 20 8"/>
+      <line x1="8" y1="13" x2="16" y2="13"/>
+      <line x1="8" y1="17" x2="16" y2="17"/>
+      <circle cx="10" cy="9" r="1"/>
+    </svg>
+  ),
 }
 
 // system is first — it's the default landing tab
@@ -106,6 +116,7 @@ const ALL_TABS = [
   { id: 'production',  label: 'Production',     Icon: Icons.Production,  roles: ['admin', 'editor'], section: 'short' },
   // YOUTUBE VIDEOS
   { id: 'youtube',     label: 'YouTube Videos', Icon: Icons.YouTube,     roles: ['admin', 'editor'], section: 'youtube' },
+  { id: 'channel-plans', label: 'Channel Plans', Icon: Icons.ChannelPlans, roles: ['admin', 'editor'], section: 'youtube' },
   // ADMIN
   { id: 'pipeline',    label: 'Pipeline',       Icon: Icons.Pipeline,    roles: ['admin', 'editor'], section: 'admin' },
   { id: 'uploads',     label: 'Uploads',        Icon: Icons.Uploads,     roles: ['admin', 'editor'], section: 'admin' },
@@ -210,6 +221,7 @@ export default function App() {
       case 'scripts':     return <ScriptsPage />
       case 'production':  return <ProductionPage />
       case 'youtube':     return <YouTubeVideosPage />
+      case 'channel-plans': return <ChannelPlansPage />
       case 'uploads':     return <UploadsPage />
       case 'pipeline':    return <PipelinePage />
       case 'llm':         return <LLMPage />
