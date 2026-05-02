@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { sfxApi } from '../api/client.js'
+import { sfxApi, autofillApi } from '../api/client.js'
 import { Card, Button, Input, Select, Modal, EmptyState, Toast } from '../components/index.jsx'
 
 const SOUND_TYPE_SUGGESTIONS = [
@@ -23,11 +23,36 @@ function ImportModal({ onClose, onImported }) {
   const [soundType, setSoundType] = useState('')
   const [source, setSource] = useState('import')
   const [loading, setLoading] = useState(false)
+  const [autofilling, setAutofilling] = useState(false)
   const [toast, setToast] = useState(null)
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type })
     setTimeout(() => setToast(null), 3000)
+  }
+
+  const handleAutofill = async () => {
+    if (!file) return
+    setAutofilling(true)
+    try {
+      const metadata = {
+        filename: file.name,
+        file_size_bytes: file.size,
+        mime_type: file.type,
+        duration_s: null,
+      }
+      const form_values = { title, sound_type: soundType }
+      const data = await autofillApi.suggest('sfx', metadata, form_values)
+      if (data.title      != null) setTitle(data.title)
+      if (data.sound_type != null) setSoundType(data.sound_type)
+    } catch (e) {
+      const msg = e.status === 429
+        ? 'AI quota reached — try again later'
+        : 'AI suggestion failed — fill in manually'
+      showToast(msg)
+    } finally {
+      setAutofilling(false)
+    }
   }
 
   const handleSubmit = async () => {
@@ -59,10 +84,12 @@ function ImportModal({ onClose, onImported }) {
       title="Import SFX"
       width="max-w-lg"
       footer={
-        <>
+        <div className="flex items-center gap-2 w-full">
+          <Button variant="ghost" disabled={!file || autofilling} loading={autofilling} onClick={handleAutofill}>✨ AI</Button>
+          <div className="flex-1" />
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
           <Button variant="primary" loading={loading} onClick={handleSubmit}>Import</Button>
-        </>
+        </div>
       }
     >
       {toast && <Toast message={toast.msg} type={toast.type} />}
