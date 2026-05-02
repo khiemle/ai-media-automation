@@ -17,6 +17,7 @@ env/
 .env
 *.env.local
 config/api_keys.json
+pipeline.env
 
 # Database
 *.db
