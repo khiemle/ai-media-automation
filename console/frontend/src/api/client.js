@@ -250,3 +250,58 @@ export const autofillApi = {
     body: JSON.stringify({ modal_type, metadata, form_values }),
   }),
 }
+
+// ── Channel Plans ──────────────────────────────────────────────────────────────
+export const channelPlansApi = {
+  list: () => fetchApi('/api/channel-plans'),
+
+  get: (id) => fetchApi(`/api/channel-plans/${id}`),
+
+  import: (file) => {
+    const form = new FormData()
+    form.append('file', file)
+    const headers = {}
+    const token = getToken()
+    if (token) headers['Authorization'] = `Bearer ${token}`
+    return fetch('/api/channel-plans/import', { method: 'POST', body: form, headers })
+      .then(async res => {
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ detail: res.statusText }))
+          throw new Error(err.detail || `HTTP ${res.status}`)
+        }
+        return res.json()
+      })
+  },
+
+  update: (id, mdContent, channelId = null) =>
+    fetchApi(`/api/channel-plans/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ md_content: mdContent, channel_id: channelId }),
+    }),
+
+  delete: (id) => fetchApi(`/api/channel-plans/${id}`, { method: 'DELETE' }),
+
+  aiSeo: (id, theme, context = '') =>
+    fetchApi(`/api/channel-plans/${id}/ai/seo`, {
+      method: 'POST',
+      body: JSON.stringify({ theme, context }),
+    }),
+
+  aiPrompts: (id, theme, context = '') =>
+    fetchApi(`/api/channel-plans/${id}/ai/prompts`, {
+      method: 'POST',
+      body: JSON.stringify({ theme, context }),
+    }),
+
+  aiAsk: (id, question) =>
+    fetchApi(`/api/channel-plans/${id}/ai/ask`, {
+      method: 'POST',
+      body: JSON.stringify({ question }),
+    }),
+
+  aiAutofill: (id, theme, context = '') =>
+    fetchApi(`/api/channel-plans/${id}/ai/autofill`, {
+      method: 'POST',
+      body: JSON.stringify({ theme, context }),
+    }),
+}
