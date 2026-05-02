@@ -299,7 +299,7 @@ export default function ChannelPlansPage() {
             <PlanCard
               key={plan.id}
               plan={plan}
-              onClick={() => channelPlansApi.get(plan.id).then(setActivePlan).catch(() => {})}
+              onClick={() => setActivePlan(plan)}
             />
           ))}
         </div>
