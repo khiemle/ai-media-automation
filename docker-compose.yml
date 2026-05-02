@@ -38,6 +38,8 @@ services:
       - ./config:/app/config:ro
       - render_output:/app/assets/output
       - ${MUSIC_PATH:-C:/render/assets/music}:/app/assets/music
+      - ${ASSET_DB_PATH:-C:/render/assets/video_db}:/app/assets/video_db
+      - sfx_data:/app/assets/sfx
 
   celery-worker:
     image: ghcr.io/khiemle/ai-media-automation/api:latest
@@ -86,6 +88,7 @@ services:
       - ${ASSET_DB_PATH:-C:/render/assets/video_db}:/app/assets/video_db
       - ${MODELS_PATH:-C:/render/models}:/app/models
       - ${MUSIC_PATH:-C:/render/assets/music}:/app/assets/music
+      - sfx_data:/app/assets/sfx
     deploy:
       resources:
         reservations:
@@ -105,3 +108,4 @@ services:
 volumes:
   postgres_data:
   render_output:
+  sfx_data:

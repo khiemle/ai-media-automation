@@ -145,6 +145,8 @@ jobs:
             "OUTPUT_PATH=/app/assets/output",
             "RENDER_OUTPUT_PATH=/app/assets/output",
             "ASSET_DB_PATH=/app/assets/video_db",
+            "ASSETS_PATH=/app/assets/video_db",
+            "SFX_PATH=/app/assets/sfx",
             "MODELS_PATH=/app/models",
             "MUSIC_PATH=/app/assets/music",
             "TTS_ENGINE=auto",
