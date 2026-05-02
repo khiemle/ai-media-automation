@@ -76,7 +76,7 @@ jobs:
 
       # Write console/.env from secrets
       - name: Write console/.env
-        shell: pwsh
+        shell: powershell
         run: |
           New-Item -ItemType Directory -Force -Path "console" | Out-Null
           @(
@@ -95,7 +95,7 @@ jobs:
 
       # Write config/api_keys.json from secrets
       - name: Write config/api_keys.json
-        shell: pwsh
+        shell: powershell
         run: |
           New-Item -ItemType Directory -Force -Path "config" | Out-Null
           $json = [ordered]@{
@@ -118,7 +118,7 @@ jobs:
 
       # Write pipeline.env from variables (non-sensitive) + secrets
       - name: Write pipeline.env
-        shell: pwsh
+        shell: powershell
         run: |
           @(
             "OUTPUT_PATH=${{ vars.OUTPUT_PATH }}",
@@ -134,23 +134,23 @@ jobs:
 
       # Write DB_PASSWORD for docker-compose postgres service
       - name: Write .env for compose
-        shell: pwsh
+        shell: powershell
         run: |
           "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" | Out-File -FilePath ".env" -Encoding utf8NoBOM
 
       # Pull latest images from GHCR
       - name: Pull images
-        shell: pwsh
+        shell: powershell
         run: docker compose pull
 
       # Start postgres and redis first so the migration container can connect
       - name: Start postgres and redis
-        shell: pwsh
+        shell: powershell
         run: docker compose up -d postgres redis
 
       # Wait until postgres is healthy before running migrations
       - name: Wait for postgres
-        shell: pwsh
+        shell: powershell
         run: |
           $retries = 15
           while ($retries -gt 0) {
@@ -163,7 +163,7 @@ jobs:
 
       # Run database migrations (one-off container)
       - name: Run migrations
-        shell: pwsh
+        shell: powershell
         run: |
           docker run --rm `
             --env-file console\.env `
@@ -173,5 +173,5 @@ jobs:
 
       # Restart all services
       - name: Start services
-        shell: pwsh
+        shell: powershell
         run: docker compose up -d --remove-orphans
