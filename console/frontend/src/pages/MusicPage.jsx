@@ -551,14 +551,12 @@ function ImportModal({ niches, onClose, onImported }) {
 
   return (
     <Modal open onClose={onClose} title="Import Music File" width="max-w-xl"
-      footer={
-        <div className="flex items-center gap-2 w-full">
-          <Button variant="ghost" disabled={!file || autofilling} loading={autofilling} onClick={handleAutofill}>✨ AI</Button>
-          <div className="flex-1" />
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button variant="primary" loading={uploading} onClick={handleImport}>Import</Button>
-        </div>
-      }
+      footer={<>
+        <Button variant="ghost" disabled={!file || autofilling} loading={autofilling} onClick={handleAutofill}>✨ AI</Button>
+        <div className="flex-1" />
+        <Button variant="ghost" onClick={onClose}>Cancel</Button>
+        <Button variant="primary" loading={uploading} onClick={handleImport}>Import</Button>
+      </>}
     >
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-1">

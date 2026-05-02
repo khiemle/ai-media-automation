@@ -83,14 +83,12 @@ function ImportModal({ onClose, onImported }) {
       onClose={onClose}
       title="Import SFX"
       width="max-w-lg"
-      footer={
-        <div className="flex items-center gap-2 w-full">
-          <Button variant="ghost" disabled={!file || autofilling} loading={autofilling} onClick={handleAutofill}>✨ AI</Button>
-          <div className="flex-1" />
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button variant="primary" loading={loading} onClick={handleSubmit}>Import</Button>
-        </div>
-      }
+      footer={<>
+        <Button variant="ghost" disabled={!file || autofilling} loading={autofilling} onClick={handleAutofill}>✨ AI</Button>
+        <div className="flex-1" />
+        <Button variant="ghost" onClick={onClose}>Cancel</Button>
+        <Button variant="primary" loading={loading} onClick={handleSubmit}>Import</Button>
+      </>}
     >
       {toast && <Toast message={toast.msg} type={toast.type} />}
       <div className="flex flex-col gap-4">
