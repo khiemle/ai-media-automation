@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { youtubeVideosApi, musicApi, assetsApi, sfxApi } from '../api/client.js'
+import { youtubeVideosApi, musicApi, assetsApi, sfxApi, channelPlansApi } from '../api/client.js'
 import { Card, Badge, Button, Input, Select, Toast, Spinner, EmptyState, Modal } from '../components/index.jsx'
+import AIAssistantPanel from '../components/AIAssistantPanel.jsx'
 
 const STATUS_COLORS = {
   draft:     '#9090a8',
@@ -643,6 +644,10 @@ export default function YouTubeVideosPage() {
   const [makeShortVideo, setMakeShortVideo] = useState(null)
   const [previewVideo, setPreviewVideo] = useState(null)
   const [toast, setToast]                 = useState(null)
+  const [channelPlans, setChannelPlans]     = useState([])
+  const [accordionOpen, setAccordionOpen]   = useState(false)
+  const [expandedPlanId, setExpandedPlanId] = useState(null)
+  const [activeChannelPlan, setActiveChannelPlan] = useState(null)
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type })
@@ -662,6 +667,12 @@ export default function YouTubeVideosPage() {
       if (!signal.cancelled) setTemplates(tmpl)
     } catch (e) {
       if (!signal.cancelled) console.warn('Failed to load templates:', e)
+    }
+    try {
+      const plans = await channelPlansApi.list()
+      if (!signal.cancelled) setChannelPlans(plans)
+    } catch (e) {
+      if (!signal.cancelled) console.warn('Failed to load channel plans:', e)
     }
     if (!signal.cancelled) setLoading(false)
   }
@@ -703,12 +714,98 @@ export default function YouTubeVideosPage() {
           <p className="text-sm text-[#9090a8] mt-0.5">{videos.length} videos</p>
         </div>
         <div className="flex gap-2">
-          {templates.filter(t => t.output_format === 'landscape_long').map(t => (
-            <Button key={t.slug} variant="primary" onClick={() => setActiveTemplate(t)}>
-              + New {t.label}
-            </Button>
-          ))}
+          <Button
+            variant="primary"
+            onClick={() => {
+              const firstTemplate = templates.find(t => t.output_format === 'landscape_long')
+              if (firstTemplate) {
+                setActiveTemplate(firstTemplate)
+                setActiveChannelPlan(null)
+              }
+            }}
+          >
+            + New Video
+          </Button>
         </div>
+      </div>
+
+      {/* Channel Plans accordion */}
+      <div className="border border-[#2a2a32] rounded-xl overflow-hidden">
+        <button
+          onClick={() => setAccordionOpen(v => !v)}
+          className="w-full flex items-center justify-between px-5 py-3 bg-[#1c1c22] hover:bg-[#222228] transition-colors"
+        >
+          <span className="text-sm font-semibold text-[#e8e8f0]">
+            Channel Plans <span className="text-[#5a5a70] font-normal">({channelPlans.length})</span>
+          </span>
+          <span className="text-[#9090a8] text-xs">{accordionOpen ? '▲' : '▼'}</span>
+        </button>
+
+        {accordionOpen && (
+          <div className="divide-y divide-[#2a2a32]">
+            {channelPlans.length === 0 ? (
+              <p className="px-5 py-4 text-xs text-[#5a5a70]">No channel plans yet.</p>
+            ) : channelPlans.map(plan => (
+              <div key={plan.id} className="bg-[#16161a]">
+                <button
+                  onClick={() => setExpandedPlanId(id => id === plan.id ? null : plan.id)}
+                  className="w-full flex items-center gap-3 px-5 py-3 hover:bg-[#1c1c22] transition-colors text-left"
+                >
+                  <span className="text-sm font-medium text-[#e8e8f0] flex-1">{plan.name}</span>
+                  {plan.focus && (
+                    <span className="text-[10px] font-mono bg-[#1c1c22] border border-[#2a2a32] px-2 py-0.5 rounded text-[#9090a8] hidden sm:inline">
+                      {plan.focus.split(',')[0].trim()}
+                    </span>
+                  )}
+                  {plan.rpm_estimate && (
+                    <span className="text-[10px] font-mono text-[#34d399]">{plan.rpm_estimate}</span>
+                  )}
+                  <span className="text-[#9090a8] text-xs">{expandedPlanId === plan.id ? '▲' : '▼'}</span>
+                </button>
+
+                {expandedPlanId === plan.id && (
+                  <div className="px-5 pb-5 flex flex-col gap-4">
+                    <div className="flex flex-wrap gap-2">
+                      {plan.focus && (
+                        <span className="text-[10px] font-mono bg-[#1c1c22] border border-[#2a2a32] px-2 py-0.5 rounded text-[#9090a8]">
+                          {plan.focus}
+                        </span>
+                      )}
+                      {plan.upload_frequency && (
+                        <span className="text-[10px] font-mono bg-[#1c1c22] border border-[#2a2a32] px-2 py-0.5 rounded text-[#9090a8]">
+                          {plan.upload_frequency}
+                        </span>
+                      )}
+                      {plan.rpm_estimate && (
+                        <span className="text-[10px] font-mono bg-[#1c1c22] border border-[#2a2a32] px-2 py-0.5 rounded text-[#34d399]">
+                          RPM {plan.rpm_estimate}
+                        </span>
+                      )}
+                    </div>
+
+                    <AIAssistantPanel planId={plan.id} />
+
+                    <div className="flex justify-end">
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => {
+                          const firstTemplate = templates.find(t => t.output_format === 'landscape_long')
+                          if (firstTemplate) {
+                            setActiveTemplate(firstTemplate)
+                            setActiveChannelPlan(plan)
+                          }
+                        }}
+                      >
+                        + New Video for this channel
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Filters */}
@@ -796,8 +893,9 @@ export default function YouTubeVideosPage() {
       {activeTemplate && (
         <CreationPanel
           template={activeTemplate}
-          onClose={() => setActiveTemplate(null)}
-          onCreated={() => { setActiveTemplate(null); load() }}
+          channelPlan={activeChannelPlan}
+          onClose={() => { setActiveTemplate(null); setActiveChannelPlan(null) }}
+          onCreated={() => { setActiveTemplate(null); setActiveChannelPlan(null); load() }}
         />
       )}
 
