@@ -142,6 +142,12 @@ def register_routers():
     except ImportError:
         pass
 
+    try:
+        from console.backend.routers import channel_plans
+        app.include_router(channel_plans.router, prefix="/api")
+    except ImportError:
+        pass
+
 
 register_routers()
 
