@@ -35,7 +35,7 @@ services:
       - postgres
       - redis
     volumes:
-      - ./config:/app/config:ro
+      - ./config:/app/config
       - ${OUTPUT_PATH:-C:/render/output}:/app/assets/output
       - ${MUSIC_PATH:-C:/render/assets/music}:/app/assets/music
       - ${ASSET_DB_PATH:-C:/render/assets/video_db}:/app/assets/video_db
@@ -54,7 +54,7 @@ services:
       - postgres
       - redis
     volumes:
-      - ./config:/app/config:ro
+      - ./config:/app/config
       - ${OUTPUT_PATH:-C:/render/output}:/app/assets/output
 
   celery-beat:

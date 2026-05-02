@@ -8,7 +8,7 @@ import requests as _requests
 
 from console.backend.celery_app import celery_app
 
-RUNWAY_OUTPUT_DIR = Path(os.environ.get("ASSETS_PATH", "./assets")) / "runway"
+RUNWAY_OUTPUT_DIR = Path(os.environ.get("ASSETS_PATH", "/app/assets/video_db")) / "runway"
 POLL_INTERVAL_S = 30
 TIMEOUT_S = 600  # 10 minutes
 

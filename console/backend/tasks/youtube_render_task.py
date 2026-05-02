@@ -10,7 +10,7 @@ from console.backend.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
 
-OUTPUT_DIR = Path(os.environ.get("RENDER_OUTPUT_PATH", "./renders/youtube"))
+OUTPUT_DIR = Path(os.environ.get("RENDER_OUTPUT_PATH", "/app/assets/output"))
 
 
 @celery_app.task(
