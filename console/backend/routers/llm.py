@@ -1,6 +1,8 @@
 import os
+from typing import Any, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from console.backend.auth import require_admin, require_editor_or_admin
@@ -91,4 +93,36 @@ def test_runway_connection(_user=Depends(require_admin)):
         return svc.test_connection()
     except Exception as exc:
         return {"ok": False, "error": f"Connection test failed: {exc}"}
+
+
+# ── Autofill ──────────────────────────────────────────────────────────────────
+
+class _AutofillMeta(BaseModel):
+    filename: str
+    file_size_bytes: int
+    mime_type: str
+    duration_s: Optional[float] = None
+
+
+class _AutofillRequest(BaseModel):
+    modal_type: Literal["music", "sfx", "asset"]
+    metadata: _AutofillMeta
+    form_values: dict[str, Any] = {}
+
+
+@router.post("/autofill")
+def autofill(body: _AutofillRequest, _user=Depends(require_editor_or_admin)):
+    from rag.llm_router import get_router
+    from console.backend.services.llm_service import AutofillPromptBuilder, AutofillResponseParser
+    try:
+        prompt = AutofillPromptBuilder().build(
+            body.modal_type, body.metadata.model_dump(), body.form_values
+        )
+        raw = get_router().generate(prompt, expect_json=True)
+        return AutofillResponseParser().parse(body.modal_type, raw)
+    except RuntimeError as exc:
+        msg = str(exc)
+        if "rate" in msg.lower() or "quota" in msg.lower() or "429" in msg:
+            raise HTTPException(status_code=429, detail="Gemini rate limit reached")
+        raise HTTPException(status_code=422, detail=f"AI suggestion failed: {msg}")
 

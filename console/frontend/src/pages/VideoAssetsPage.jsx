@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { assetsApi, nichesApi } from '../api/client.js'
+import { assetsApi, nichesApi, autofillApi } from '../api/client.js'
 import { useApi } from '../hooks/useApi.js'
 import { Card, Button, StatBox, Modal, Input, Select, Spinner, EmptyState, Toast } from '../components/index.jsx'
 
@@ -250,6 +250,7 @@ function ImportAssetModal({ onClose, onImported }) {
   const [keywords, setKeywords] = useState('')
   const [generationPrompt, setGenerationPrompt] = useState('')
   const [loading, setLoading] = useState(false)
+  const [autofilling, setAutofilling] = useState(false)
   const [toast, setToast] = useState(null)
 
   const showToast = (msg, type = 'error') => {
@@ -259,6 +260,31 @@ function ImportAssetModal({ onClose, onImported }) {
 
   const detectedType = file ? detectAssetType(file.name) : ''
   const isGenerative = source === 'midjourney' || source === 'runway'
+
+  const handleAutofill = async () => {
+    if (!file) return
+    setAutofilling(true)
+    try {
+      const metadata = {
+        filename: file.name,
+        file_size_bytes: file.size,
+        mime_type: file.type,
+        duration_s: null,
+      }
+      const form_values = { description, keywords, source }
+      const data = await autofillApi.suggest('asset', metadata, form_values)
+      if (data.description != null) setDescription(data.description)
+      if (data.keywords    != null) setKeywords(data.keywords.join(', '))
+      if (data.source      != null) setSource(data.source)
+    } catch (e) {
+      const msg = e.status === 429
+        ? 'AI quota reached — try again later'
+        : 'AI suggestion failed — fill in manually'
+      showToast(msg)
+    } finally {
+      setAutofilling(false)
+    }
+  }
 
   const handleSubmit = async () => {
     if (!file) { showToast('Please select a file'); return }
@@ -286,12 +312,12 @@ function ImportAssetModal({ onClose, onImported }) {
       onClose={onClose}
       title="Import Asset"
       width="max-w-lg"
-      footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button variant="primary" loading={loading} onClick={handleSubmit}>Import</Button>
-        </>
-      }
+      footer={<>
+        <Button variant="ghost" disabled={!file || autofilling} loading={autofilling} onClick={handleAutofill}>✨ AI</Button>
+        <div className="flex-1" />
+        <Button variant="ghost" onClick={onClose}>Cancel</Button>
+        <Button variant="primary" loading={loading} onClick={handleSubmit}>Import</Button>
+      </>}
     >
       {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
       <div className="flex flex-col gap-4">

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { musicApi, nichesApi, templatesApi } from '../api/client.js'
+import { musicApi, nichesApi, templatesApi, autofillApi } from '../api/client.js'
 import { useApi } from '../hooks/useApi.js'
 import { Card, Badge, Button, StatBox, Modal, Input, Select, Spinner, EmptyState, Toast } from '../components/index.jsx'
 
@@ -475,6 +475,7 @@ function ImportModal({ niches, onClose, onImported }) {
   const [volume,       setVolume]       = useState(0.15)
   const [qualityScore, setQualityScore] = useState(80)
   const [uploading,    setUploading]    = useState(false)
+  const [autofilling,  setAutofilling]  = useState(false)
   const [toast,        setToast]        = useState(null)
   const showToast = (msg, type='error') => { setToast({msg,type}); setTimeout(()=>setToast(null),3000) }
 
@@ -501,6 +502,38 @@ function ImportModal({ niches, onClose, onImported }) {
     }
   }
 
+  const handleAutofill = async () => {
+    if (!file) return
+    setAutofilling(true)
+    try {
+      const metadata = {
+        filename: file.name,
+        file_size_bytes: file.size,
+        mime_type: file.type,
+        duration_s: detectedDur,
+      }
+      const form_values = {
+        title, niches: selNiches, moods: selMoods, genres: selGenres,
+        volume, quality_score: qualityScore, is_vocal: isVocal,
+      }
+      const data = await autofillApi.suggest('music', metadata, form_values)
+      if (data.title         != null) setTitle(data.title)
+      if (data.niches        != null) setSelNiches(data.niches)
+      if (data.moods         != null) setSelMoods(data.moods)
+      if (data.genres        != null) setSelGenres(data.genres)
+      if (data.volume        != null) setVolume(data.volume)
+      if (data.quality_score != null) setQualityScore(data.quality_score)
+      if (data.is_vocal      != null) setIsVocal(data.is_vocal)
+    } catch (e) {
+      const msg = e.status === 429
+        ? 'AI quota reached — try again later'
+        : 'AI suggestion failed — fill in manually'
+      showToast(msg)
+    } finally {
+      setAutofilling(false)
+    }
+  }
+
   const handleImport = async () => {
     if (!file) { showToast('Choose a file first'); return }
     if (!title.trim()) { showToast('Title is required'); return }
@@ -518,7 +551,12 @@ function ImportModal({ niches, onClose, onImported }) {
 
   return (
     <Modal open onClose={onClose} title="Import Music File" width="max-w-xl"
-      footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button variant="primary" loading={uploading} onClick={handleImport}>Import</Button></>}
+      footer={<>
+        <Button variant="ghost" disabled={!file || autofilling} loading={autofilling} onClick={handleAutofill}>✨ AI</Button>
+        <div className="flex-1" />
+        <Button variant="ghost" onClick={onClose}>Cancel</Button>
+        <Button variant="primary" loading={uploading} onClick={handleImport}>Import</Button>
+      </>}
     >
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-1">

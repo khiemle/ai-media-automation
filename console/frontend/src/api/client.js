@@ -242,3 +242,11 @@ export const templatesApi = {
   list: () => fetchApi('/api/youtube-videos/templates'),
   musicTypes: () => fetchApi('/api/music/templates'),
 }
+
+// ── Autofill ─────────────────────────────────────────────────────────────────
+export const autofillApi = {
+  suggest: (modal_type, metadata, form_values) => fetchApi('/api/llm/autofill', {
+    method: 'POST',
+    body: JSON.stringify({ modal_type, metadata, form_values }),
+  }),
+}

@@ -47,3 +47,4 @@ models/kokoro/voices
 logs
 .worktrees/
 nohup.out
+renders
