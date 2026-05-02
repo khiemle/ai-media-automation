@@ -1,4 +1,5 @@
 version: "3.9"
+name: ai-media-automation
 
 # Docker Compose for Windows production deployment.
 # All services run on a single Windows machine with NVIDIA GTX 1660S.
