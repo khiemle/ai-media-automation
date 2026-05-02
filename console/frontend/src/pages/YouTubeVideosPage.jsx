@@ -54,7 +54,8 @@ function VideoPreviewModal({ video, onClose }) {
   )
 }
 
-function CreationPanel({ template, channelPlan, onClose, onCreated }) {
+function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCreated }) {
+  const [selectedPlan, setSelectedPlan] = useState(channelPlan)
   const [form, setForm] = useState({
     theme: '',
     target_duration_h: template?.target_duration_h || 8,
@@ -188,11 +189,11 @@ function CreationPanel({ template, channelPlan, onClose, onCreated }) {
   }, [form.theme, form.target_duration_h, form.customDuration, form.isCustomDuration, autofilled])
 
   const handleAutofill = async () => {
-    if (!channelPlan || !form.theme) return
+    if (!selectedPlan || !form.theme) return
     setAutofilling(true)
     setAutofillError(null)
     try {
-      const result = await channelPlansApi.aiAutofill(channelPlan.id, form.theme)
+      const result = await channelPlansApi.aiAutofill(selectedPlan.id, form.theme)
       setForm(f => ({
         ...f,
         seo_title:       result.title       || f.seo_title,
@@ -265,19 +266,19 @@ function CreationPanel({ template, channelPlan, onClose, onCreated }) {
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#2a2a32]">
           <div className="flex flex-col gap-0.5 min-w-0">
             <h2 className="text-base font-semibold text-[#e8e8f0]">New {template?.label}</h2>
-            {channelPlan && (
-              <span className="text-xs text-[#7c6af7] font-mono">{channelPlan.name}</span>
+            {selectedPlan && (
+              <span className="text-xs text-[#7c6af7] font-mono">{selectedPlan.name}</span>
             )}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            {channelPlan && (
+            {(selectedPlan || channelPlans.length > 0) && (
               <Button
                 variant="accent"
                 size="sm"
                 loading={autofilling}
-                disabled={!form.theme?.trim()}
+                disabled={!selectedPlan || !form.theme?.trim()}
                 onClick={handleAutofill}
-                title={form.theme?.trim() ? 'AI Autofill from channel plan' : 'Enter a theme first'}
+                title={!selectedPlan ? 'Select a channel plan first' : !form.theme?.trim() ? 'Enter a theme first' : 'AI Autofill from channel plan'}
               >
                 ✦ AI Autofill
               </Button>
@@ -297,6 +298,25 @@ function CreationPanel({ template, channelPlan, onClose, onCreated }) {
             <div className="pt-2">
               <p className="text-xs text-[#f87171]">{autofillError}</p>
             </div>
+          )}
+
+          {/* Channel plan picker — shown when opened from header (no pre-selected plan) */}
+          {!channelPlan && channelPlans.length > 0 && (
+            <section>
+              <div className="text-xs font-bold text-[#5a5a70] tracking-widest mb-3">CHANNEL PLAN</div>
+              <Select
+                value={selectedPlan?.id ?? ''}
+                onChange={e => {
+                  const id = parseInt(e.target.value, 10)
+                  setSelectedPlan(channelPlans.find(p => p.id === id) || null)
+                }}
+              >
+                <option value="">— Select a channel plan (optional) —</option>
+                {channelPlans.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </Select>
+            </section>
           )}
 
           {/* ① THEME & SEO */}
@@ -971,6 +991,7 @@ export default function YouTubeVideosPage() {
         <CreationPanel
           template={activeTemplate}
           channelPlan={activeChannelPlan}
+          channelPlans={activeChannelPlan ? [] : channelPlans}
           onClose={() => { setActiveTemplate(null); setActiveChannelPlan(null) }}
           onCreated={() => { setActiveTemplate(null); setActiveChannelPlan(null); load() }}
         />

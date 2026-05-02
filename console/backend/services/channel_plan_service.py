@@ -9,9 +9,20 @@ from datetime import datetime, timezone
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from console.backend.models.audit_log import AuditLog
 from console.backend.models.channel_plan import ChannelPlan
 
 logger = logging.getLogger(__name__)
+
+
+def _audit(db: Session, user_id: int | None, action: str, target_id: str, details: dict = None):
+    db.add(AuditLog(
+        user_id=user_id,
+        action=action,
+        target_type="channel_plan",
+        target_id=str(target_id),
+        details=details or {},
+    ))
 
 try:
     from google import genai
@@ -54,9 +65,6 @@ def extract_metadata(md_content: str, filename: str) -> dict:
     }
 
 
-_SENTINEL = object()
-
-
 class ChannelPlanService:
     def __init__(self, db: Session):
         self.db = db
@@ -69,7 +77,7 @@ class ChannelPlanService:
         plan = self._or_404(plan_id)
         return self._detail_dict(plan)
 
-    def import_plan(self, md_content: str, filename: str) -> dict:
+    def import_plan(self, md_content: str, filename: str, user_id: int | None = None) -> dict:
         meta = extract_metadata(md_content, filename)
         plan = ChannelPlan(
             name=meta["name"],
@@ -87,10 +95,12 @@ class ChannelPlanService:
             self.db.rollback()
             raise
         self.db.refresh(plan)
+        _audit(self.db, user_id, "import_channel_plan", plan.id, {"slug": plan.slug})
+        self.db.commit()
         logger.info("Imported channel plan %s (slug=%s)", plan.id, plan.slug)
         return self._detail_dict(plan)
 
-    def update_plan(self, plan_id: int, md_content: str, channel_id: int | None = _SENTINEL) -> dict:
+    def update_plan(self, plan_id: int, md_content: str, channel_id: int | None = None, user_id: int | None = None) -> dict:
         plan = self._or_404(plan_id)
         meta = extract_metadata(md_content, plan.md_filename or "")
         # slug is derived from filename and intentionally not updated here
@@ -100,15 +110,16 @@ class ChannelPlanService:
         plan.rpm_estimate     = meta["rpm_estimate"]
         plan.md_content       = md_content
         plan.updated_at       = datetime.now(timezone.utc)
-        if channel_id is not _SENTINEL:
-            plan.channel_id = channel_id
+        plan.channel_id       = channel_id
+        _audit(self.db, user_id, "update_channel_plan", plan_id)
         self.db.commit()
         self.db.refresh(plan)
         return self._detail_dict(plan)
 
-    def delete_plan(self, plan_id: int) -> None:
+    def delete_plan(self, plan_id: int, user_id: int | None = None) -> None:
         plan = self._or_404(plan_id)
         self.db.delete(plan)
+        _audit(self.db, user_id, "delete_channel_plan", plan_id, {"slug": plan.slug})
         self.db.commit()
         logger.info("Deleted channel plan %s", plan_id)
 

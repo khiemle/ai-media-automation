@@ -42,7 +42,7 @@ def list_plans(
 def import_plan(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    _user=Depends(require_editor_or_admin),
+    user=Depends(require_editor_or_admin),
 ):
     if not file.filename.endswith(".md"):
         raise HTTPException(status_code=400, detail="Only .md files are accepted")
@@ -57,7 +57,7 @@ def import_plan(
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Could not read file: {e}")
     try:
-        return ChannelPlanService(db).import_plan(content, file.filename)
+        return ChannelPlanService(db).import_plan(content, file.filename, user_id=user.id)
     except IntegrityError:
         raise HTTPException(status_code=409, detail="A plan with this slug already exists")
 
@@ -79,13 +79,10 @@ def update_plan(
     plan_id: int,
     body: UpdatePlanBody,
     db: Session = Depends(get_db),
-    _user=Depends(require_editor_or_admin),
+    user=Depends(require_editor_or_admin),
 ):
     try:
-        kwargs = {"md_content": body.md_content}
-        if "channel_id" in body.model_fields_set:
-            kwargs["channel_id"] = body.channel_id
-        return ChannelPlanService(db).update_plan(plan_id, **kwargs)
+        return ChannelPlanService(db).update_plan(plan_id, body.md_content, body.channel_id, user_id=user.id)
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -94,10 +91,10 @@ def update_plan(
 def delete_plan(
     plan_id: int,
     db: Session = Depends(get_db),
-    _user=Depends(require_admin),
+    user=Depends(require_admin),
 ):
     try:
-        ChannelPlanService(db).delete_plan(plan_id)
+        ChannelPlanService(db).delete_plan(plan_id, user_id=user.id)
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
