@@ -1,5 +1,6 @@
 import pytest
-from console.backend.services.channel_plan_service import ChannelPlanService, extract_metadata
+from unittest.mock import patch, MagicMock
+from console.backend.services.channel_plan_service import ChannelPlanService, ChannelPlanAIService, extract_metadata
 
 _ASMR_MD = """\
 # Channel Launch Plan — ASMR Sleep & Relax
@@ -106,3 +107,90 @@ def test_duplicate_slug_raises(db):
     svc.import_plan(_ASMR_MD, "Channel_Launch_Plan_ASMR.md")
     with pytest.raises(Exception):
         svc.import_plan(_ASMR_MD, "Channel_Launch_Plan_ASMR.md")
+
+# ── AI service ───────────────────────────────────────────────────────────────
+
+_FAKE_CFG = {
+    "gemini": {"script": {"api_key": "fake-key", "model": "gemini-2.0-flash"}}
+}
+
+def _gemini_response(text):
+    m = MagicMock()
+    m.text = text
+    return m
+
+
+def test_generate_seo_returns_parsed_dict():
+    svc = ChannelPlanAIService()
+    payload = '{"title": "Rain Sounds 8h", "description": "Relax with rain", "tags": "rain, sleep, asmr"}'
+
+    mock_client = MagicMock()
+    mock_client.models.generate_content.return_value = _gemini_response(payload)
+
+    with patch("config.api_config.get_config", return_value=_FAKE_CFG), \
+         patch("console.backend.services.channel_plan_service.genai") as mock_genai:
+        mock_genai.Client.return_value = mock_client
+        mock_genai.types.GenerateContentConfig.return_value = MagicMock()
+        result = svc.generate_seo("# Channel Plan\n", "Heavy Rain", "")
+
+    assert result["title"] == "Rain Sounds 8h"
+    assert result["description"] == "Relax with rain"
+    assert result["tags"] == "rain, sleep, asmr"
+
+
+def test_generate_prompts_returns_four_keys():
+    svc = ChannelPlanAIService()
+    payload = '{"suno": "s", "midjourney": "mj", "runway": "r", "thumbnail": "t"}'
+
+    mock_client = MagicMock()
+    mock_client.models.generate_content.return_value = _gemini_response(payload)
+
+    with patch("config.api_config.get_config", return_value=_FAKE_CFG), \
+         patch("console.backend.services.channel_plan_service.genai") as mock_genai:
+        mock_genai.Client.return_value = mock_client
+        mock_genai.types.GenerateContentConfig.return_value = MagicMock()
+        result = svc.generate_prompts("# Channel Plan\n", "Forest Stream", "")
+
+    for key in ("suno", "midjourney", "runway", "thumbnail"):
+        assert key in result
+
+
+def test_ask_question_wraps_plain_text():
+    svc = ChannelPlanAIService()
+    mock_client = MagicMock()
+    mock_client.models.generate_content.return_value = _gemini_response("Upload 3-4 videos per week.")
+
+    with patch("config.api_config.get_config", return_value=_FAKE_CFG), \
+         patch("console.backend.services.channel_plan_service.genai") as mock_genai:
+        mock_genai.Client.return_value = mock_client
+        mock_genai.types.GenerateContentConfig.return_value = MagicMock()
+        result = svc.ask_question("# Channel Plan\n", "What is the upload schedule?")
+
+    assert result == {"answer": "Upload 3-4 videos per week."}
+
+
+def test_autofill_returns_all_fields():
+    svc = ChannelPlanAIService()
+    payload = '{"title":"T","description":"D","tags":"t","suno_prompt":"s","runway_prompt":"r","target_duration_h":8}'
+
+    mock_client = MagicMock()
+    mock_client.models.generate_content.return_value = _gemini_response(payload)
+
+    with patch("config.api_config.get_config", return_value=_FAKE_CFG), \
+         patch("console.backend.services.channel_plan_service.genai") as mock_genai:
+        mock_genai.Client.return_value = mock_client
+        mock_genai.types.GenerateContentConfig.return_value = MagicMock()
+        result = svc.autofill("# Channel Plan\n", "Heavy Rain", "")
+
+    for key in ("title", "description", "tags", "suno_prompt", "runway_prompt", "target_duration_h"):
+        assert key in result
+    assert result["target_duration_h"] == 8
+
+
+def test_generate_seo_raises_on_missing_api_key():
+    svc = ChannelPlanAIService()
+    cfg_no_key = {"gemini": {"script": {"api_key": "", "model": ""}}}
+
+    with patch("config.api_config.get_config", return_value=cfg_no_key):
+        with pytest.raises(RuntimeError, match="API key"):
+            svc.generate_seo("# Plan\n", "theme", "")
