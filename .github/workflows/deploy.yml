@@ -143,6 +143,7 @@ jobs:
         run: |
           $lines = @(
             "OUTPUT_PATH=/app/assets/output",
+            "RENDER_OUTPUT_PATH=/app/assets/output",
             "ASSET_DB_PATH=/app/assets/video_db",
             "MODELS_PATH=/app/models",
             "MUSIC_PATH=/app/assets/music",
