@@ -54,7 +54,7 @@ function VideoPreviewModal({ video, onClose }) {
   )
 }
 
-function CreationPanel({ template, onClose, onCreated }) {
+function CreationPanel({ template, channelPlan, onClose, onCreated }) {
   const [form, setForm] = useState({
     theme: '',
     target_duration_h: template?.target_duration_h || 8,
@@ -718,10 +718,9 @@ export default function YouTubeVideosPage() {
             variant="primary"
             onClick={() => {
               const firstTemplate = templates.find(t => t.output_format === 'landscape_long')
-              if (firstTemplate) {
-                setActiveTemplate(firstTemplate)
-                setActiveChannelPlan(null)
-              }
+              if (!firstTemplate) { showToast('No landscape template configured', 'error'); return }
+              setActiveTemplate(firstTemplate)
+              setActiveChannelPlan(null)
             }}
           >
             + New Video
@@ -732,7 +731,10 @@ export default function YouTubeVideosPage() {
       {/* Channel Plans accordion */}
       <div className="border border-[#2a2a32] rounded-xl overflow-hidden">
         <button
-          onClick={() => setAccordionOpen(v => !v)}
+          onClick={() => setAccordionOpen(v => {
+            if (v) setExpandedPlanId(null)
+            return !v
+          })}
           className="w-full flex items-center justify-between px-5 py-3 bg-[#1c1c22] hover:bg-[#222228] transition-colors"
         >
           <span className="text-sm font-semibold text-[#e8e8f0]">
@@ -744,7 +746,9 @@ export default function YouTubeVideosPage() {
         {accordionOpen && (
           <div className="divide-y divide-[#2a2a32]">
             {channelPlans.length === 0 ? (
-              <p className="px-5 py-4 text-xs text-[#5a5a70]">No channel plans yet.</p>
+              <p className="px-5 py-4 text-xs text-[#5a5a70]">
+                No channel plans yet. Visit <strong className="text-[#7c6af7]">Channel Plans</strong> to import one.
+              </p>
             ) : channelPlans.map(plan => (
               <div key={plan.id} className="bg-[#16161a]">
                 <button
@@ -783,7 +787,7 @@ export default function YouTubeVideosPage() {
                       )}
                     </div>
 
-                    <AIAssistantPanel planId={plan.id} />
+                    <AIAssistantPanel key={plan.id} planId={plan.id} />
 
                     <div className="flex justify-end">
                       <Button
@@ -791,10 +795,9 @@ export default function YouTubeVideosPage() {
                         size="sm"
                         onClick={() => {
                           const firstTemplate = templates.find(t => t.output_format === 'landscape_long')
-                          if (firstTemplate) {
-                            setActiveTemplate(firstTemplate)
-                            setActiveChannelPlan(plan)
-                          }
+                          if (!firstTemplate) { showToast('No landscape template configured', 'error'); return }
+                          setActiveTemplate(firstTemplate)
+                          setActiveChannelPlan(plan)
                         }}
                       >
                         + New Video for this channel
