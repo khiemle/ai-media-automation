@@ -1,3 +1,6 @@
+"""ChannelPlanService — CRUD + metadata extraction for channel plan documents.
+ChannelPlanAIService — Gemini-powered AI features (SEO, prompts, Q&A, autofill).
+"""
 import json
 import logging
 import re
@@ -21,7 +24,15 @@ def extract_metadata(md_content: str, filename: str) -> dict:
     h1_match = re.search(
         r'^#\s+Channel Launch Plan\s+[—–-]+\s+(.+)$', md_content, re.MULTILINE
     )
-    name = h1_match.group(1).strip() if h1_match else filename
+    if h1_match:
+        name = h1_match.group(1).strip()
+    else:
+        name_fallback = filename
+        if name_fallback.startswith("Channel_Launch_Plan_"):
+            name_fallback = name_fallback[len("Channel_Launch_Plan_"):]
+        if name_fallback.endswith(".md"):
+            name_fallback = name_fallback[:-3]
+        name = name_fallback
 
     slug = filename
     if slug.startswith("Channel_Launch_Plan_"):
@@ -82,6 +93,7 @@ class ChannelPlanService:
     def update_plan(self, plan_id: int, md_content: str, channel_id: int | None = _SENTINEL) -> dict:
         plan = self._or_404(plan_id)
         meta = extract_metadata(md_content, plan.md_filename or "")
+        # slug is derived from filename and intentionally not updated here
         plan.name             = meta["name"]
         plan.focus            = meta["focus"]
         plan.upload_frequency = meta["upload_frequency"]

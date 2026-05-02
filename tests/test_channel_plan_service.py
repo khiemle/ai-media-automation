@@ -49,6 +49,11 @@ def test_extract_returns_none_for_missing_fields():
     assert result["upload_frequency"] is None
     assert result["rpm_estimate"] is None
 
+def test_extract_name_fallback_strips_prefix_and_extension():
+    no_h1 = "## Some other section\n"
+    result = extract_metadata(no_h1, "Channel_Launch_Plan_Lofi.md")
+    assert result["name"] == "Lofi"
+
 # ── CRUD ─────────────────────────────────────────────────────────────────────
 
 def test_import_plan_stores_all_fields(db):
