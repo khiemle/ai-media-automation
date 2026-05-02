@@ -83,7 +83,7 @@ jobs:
         shell: powershell
         run: |
           New-Item -ItemType Directory -Force -Path "console" | Out-Null
-          @(
+          $lines = @(
             "DATABASE_URL=postgresql://admin:${{ secrets.DB_PASSWORD }}@postgres:5432/ai_media",
             "REDIS_URL=redis://redis:6379/0",
             "JWT_SECRET=${{ secrets.JWT_SECRET }}",
@@ -95,7 +95,8 @@ jobs:
             "FRONTEND_ORIGIN=http://localhost:3000",
             "ENV=production",
             "RUNWAY_API_KEY=${{ secrets.RUNWAY_API_KEY }}"
-          ) | Out-File -FilePath "console\.env" -Encoding utf8NoBOM
+          )
+          [System.IO.File]::WriteAllLines("$PWD\console\.env", $lines, (New-Object System.Text.UTF8Encoding $false))
 
       # Write config/api_keys.json from secrets
       - name: Write config/api_keys.json
@@ -118,13 +119,14 @@ jobs:
             sunoapi = @{ api_key = "${{ secrets.SUNO_API_KEY }}" }
             pexels  = @{ api_key = "${{ secrets.PEXELS_API_KEY }}" }
           }
-          $json | ConvertTo-Json -Depth 5 | Out-File -FilePath "config\api_keys.json" -Encoding utf8NoBOM
+          $text = $json | ConvertTo-Json -Depth 5
+          [System.IO.File]::WriteAllText("$PWD\config\api_keys.json", $text, (New-Object System.Text.UTF8Encoding $false))
 
       # Write pipeline.env from variables (non-sensitive) + secrets
       - name: Write pipeline.env
         shell: powershell
         run: |
-          @(
+          $lines = @(
             "OUTPUT_PATH=${{ vars.OUTPUT_PATH }}",
             "ASSET_DB_PATH=${{ vars.ASSET_DB_PATH }}",
             "MODELS_PATH=${{ vars.MODELS_PATH }}",
@@ -134,13 +136,14 @@ jobs:
             "TIKTOK_BROWSER_HEADLESS=true",
             "TIKTOK_BROWSER_HEADFUL_RETRY_ON_EMPTY=true",
             "TIKTOK_SELENIUM_FALLBACK=true"
-          ) | Out-File -FilePath "pipeline.env" -Encoding utf8NoBOM
+          )
+          [System.IO.File]::WriteAllLines("$PWD\pipeline.env", $lines, (New-Object System.Text.UTF8Encoding $false))
 
       # Write DB_PASSWORD for docker-compose postgres service
       - name: Write .env for compose
         shell: powershell
         run: |
-          "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" | Out-File -FilePath ".env" -Encoding utf8NoBOM
+          [System.IO.File]::WriteAllText("$PWD\.env", "DB_PASSWORD=${{ secrets.DB_PASSWORD }}`n", (New-Object System.Text.UTF8Encoding $false))
 
       # Pull latest images from GHCR
       - name: Pull images
