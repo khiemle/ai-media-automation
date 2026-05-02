@@ -37,6 +37,7 @@ services:
     volumes:
       - ./config:/app/config:ro
       - render_output:/app/assets/output
+      - ${MUSIC_PATH:-C:/render/assets/music}:/app/assets/music
 
   celery-worker:
     image: ghcr.io/khiemle/ai-media-automation/api:latest

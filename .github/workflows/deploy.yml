@@ -142,10 +142,10 @@ jobs:
         shell: powershell
         run: |
           $lines = @(
-            "OUTPUT_PATH=${{ vars.OUTPUT_PATH }}",
-            "ASSET_DB_PATH=${{ vars.ASSET_DB_PATH }}",
-            "MODELS_PATH=${{ vars.MODELS_PATH }}",
-            "MUSIC_PATH=${{ vars.MUSIC_PATH }}",
+            "OUTPUT_PATH=/app/assets/output",
+            "ASSET_DB_PATH=/app/assets/video_db",
+            "MODELS_PATH=/app/models",
+            "MUSIC_PATH=/app/assets/music",
             "TTS_ENGINE=auto",
             "TIKTOK_SCRAPER_ENGINE=auto",
             "TIKTOK_BROWSER_HEADLESS=true",
@@ -154,11 +154,18 @@ jobs:
           )
           [System.IO.File]::WriteAllLines("$PWD\pipeline.env", $lines, (New-Object System.Text.UTF8Encoding $false))
 
-      # Write DB_PASSWORD for docker-compose postgres service
+      # Write root .env for docker-compose variable substitution (host paths for volumes)
       - name: Write .env for compose
         shell: powershell
         run: |
-          [System.IO.File]::WriteAllText("$PWD\.env", "DB_PASSWORD=${{ secrets.DB_PASSWORD }}`n", (New-Object System.Text.UTF8Encoding $false))
+          $lines = @(
+            "DB_PASSWORD=${{ secrets.DB_PASSWORD }}",
+            "MUSIC_PATH=${{ vars.MUSIC_PATH }}",
+            "ASSET_DB_PATH=${{ vars.ASSET_DB_PATH }}",
+            "MODELS_PATH=${{ vars.MODELS_PATH }}",
+            "OUTPUT_PATH=${{ vars.OUTPUT_PATH }}"
+          )
+          [System.IO.File]::WriteAllLines("$PWD\.env", $lines, (New-Object System.Text.UTF8Encoding $false))
 
       # Pull latest images from GHCR
       - name: Pull images
