@@ -73,6 +73,8 @@ function CreationPanel({ template, channelPlan, onClose, onCreated }) {
   const [sfxList,   setSfxList]     = useState([])
   const [loading, setLoading]       = useState(false)
   const [toast, setToast]           = useState(null)
+  const [autofilling, setAutofilling] = useState(false)
+  const [autofillError, setAutofillError] = useState(null)
 
   const [sfxLayers, setSfxLayers] = useState({
     foreground: { asset_id: '', volume: 0.6 },
@@ -182,6 +184,36 @@ function CreationPanel({ template, channelPlan, onClose, onCreated }) {
     }
   }, [form.theme, form.target_duration_h, form.customDuration, form.isCustomDuration])
 
+  const handleAutofill = async () => {
+    if (!channelPlan || !form.theme) return
+    setAutofilling(true)
+    setAutofillError(null)
+    try {
+      const result = await channelPlansApi.aiAutofill(channelPlan.id, form.theme)
+      setForm(f => ({
+        ...f,
+        seo_title:       result.title       || f.seo_title,
+        seo_description: result.description || f.seo_description,
+        seo_tags:        result.tags        || f.seo_tags,
+        ...(result.target_duration_h
+          ? (() => {
+              const preset = DURATION_PRESETS.find(p => p.value === result.target_duration_h)
+              return preset
+                ? { target_duration_h: result.target_duration_h, isCustomDuration: false }
+                : { customDuration: String(result.target_duration_h), isCustomDuration: true }
+            })()
+          : {}),
+      }))
+      if (result.suno_prompt) template._autofill_suno = result.suno_prompt
+      if (result.runway_prompt) template._autofill_runway = result.runway_prompt
+      showToast('AI autofill complete', 'success')
+    } catch (e) {
+      setAutofillError(e.message)
+    } finally {
+      setAutofilling(false)
+    }
+  }
+
   const handleSubmit = async () => {
     if (!form.theme) { showToast('Theme is required', 'error'); return }
     const duration = form.isCustomDuration
@@ -227,8 +259,27 @@ function CreationPanel({ template, channelPlan, onClose, onCreated }) {
       <div className="relative w-[480px] h-full bg-[#16161a] border-l border-[#2a2a32] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#2a2a32]">
-          <h2 className="text-base font-semibold text-[#e8e8f0]">New {template?.label}</h2>
-          <button onClick={onClose} className="text-[#9090a8] hover:text-[#e8e8f0]">✕</button>
+          <div className="flex flex-col gap-0.5 min-w-0">
+            <h2 className="text-base font-semibold text-[#e8e8f0]">New {template?.label}</h2>
+            {channelPlan && (
+              <span className="text-xs text-[#7c6af7] font-mono">{channelPlan.name}</span>
+            )}
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {channelPlan && (
+              <Button
+                variant="accent"
+                size="sm"
+                loading={autofilling}
+                disabled={!form.theme?.trim()}
+                onClick={handleAutofill}
+                title={form.theme?.trim() ? 'AI Autofill from channel plan' : 'Enter a theme first'}
+              >
+                ✦ AI Autofill
+              </Button>
+            )}
+            <button onClick={onClose} className="text-[#9090a8] hover:text-[#e8e8f0]">✕</button>
+          </div>
         </div>
 
         {/* Toast — outside scroll area so it doesn't shift layout */}
@@ -238,6 +289,11 @@ function CreationPanel({ template, channelPlan, onClose, onCreated }) {
           </div>
         )}
         <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-6">
+          {autofillError && (
+            <div className="pt-2">
+              <p className="text-xs text-[#f87171]">{autofillError}</p>
+            </div>
+          )}
 
           {/* ① THEME & SEO */}
           <section>
@@ -295,6 +351,16 @@ function CreationPanel({ template, channelPlan, onClose, onCreated }) {
                 value={form.seo_title}
                 onChange={e => setForm(f => ({ ...f, seo_title: e.target.value }))}
               />
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-[#9090a8] font-medium">SEO Description</label>
+                <textarea
+                  value={form.seo_description || ''}
+                  onChange={e => setForm(f => ({ ...f, seo_description: e.target.value }))}
+                  placeholder="YouTube description..."
+                  rows={4}
+                  className="bg-[#16161a] border border-[#2a2a32] rounded-lg px-3 py-1.5 text-sm text-[#e8e8f0] placeholder:text-[#5a5a70] focus:outline-none focus:border-[#7c6af7] transition-colors resize-none"
+                />
+              </div>
               <Input
                 label="SEO Tags (comma-separated)"
                 value={form.seo_tags}
@@ -367,14 +433,16 @@ function CreationPanel({ template, channelPlan, onClose, onCreated }) {
                   </div>
                 </div>
               )}
-              {template?.suno_prompt_template && (
+              {(template?.suno_prompt_template || template?._autofill_suno) && (
                 <div className="bg-[#0d0d0f] border border-[#2a2a32] rounded-lg p-3 relative">
-                  <div className="text-xs text-[#5a5a70] mb-1">Suno Prompt (reference)</div>
+                  <div className="text-xs text-[#5a5a70] mb-1">
+                    Suno Prompt {template?._autofill_suno ? '(AI generated)' : '(reference)'}
+                  </div>
                   <p className="text-xs text-[#9090a8] pr-10 leading-relaxed">
-                    {template.suno_prompt_template}
+                    {template._autofill_suno || template.suno_prompt_template}
                   </p>
                   <button
-                    onClick={() => navigator.clipboard.writeText(template.suno_prompt_template)}
+                    onClick={() => navigator.clipboard.writeText(template._autofill_suno || template.suno_prompt_template)}
                     className="absolute top-2 right-2 text-xs text-[#7c6af7] hover:text-[#9d8df8] px-2 py-1 bg-[#16161a] rounded"
                   >
                     Copy
@@ -452,14 +520,16 @@ function CreationPanel({ template, channelPlan, onClose, onCreated }) {
                   </div>
                 </div>
               )}
-              {template?.runway_prompt_template && (
+              {(template?.runway_prompt_template || template?._autofill_runway) && (
                 <div className="bg-[#0d0d0f] border border-[#2a2a32] rounded-lg p-3 relative">
-                  <div className="text-xs text-[#5a5a70] mb-1">Runway Prompt (reference)</div>
+                  <div className="text-xs text-[#5a5a70] mb-1">
+                    Runway Prompt {template?._autofill_runway ? '(AI generated)' : '(reference)'}
+                  </div>
                   <p className="text-xs text-[#9090a8] pr-10 leading-relaxed">
-                    {template.runway_prompt_template}
+                    {template._autofill_runway || template.runway_prompt_template}
                   </p>
                   <button
-                    onClick={() => navigator.clipboard.writeText(template.runway_prompt_template)}
+                    onClick={() => navigator.clipboard.writeText(template._autofill_runway || template.runway_prompt_template)}
                     className="absolute top-2 right-2 text-xs text-[#7c6af7] hover:text-[#9d8df8] px-2 py-1 bg-[#16161a] rounded"
                   >
                     Copy
