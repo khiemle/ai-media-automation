@@ -1,6 +1,7 @@
 """Channel Plans router — CRUD + Gemini AI endpoints."""
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from pydantic import BaseModel
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from console.backend.auth import require_admin, require_editor_or_admin
@@ -45,14 +46,20 @@ def import_plan(
 ):
     if not file.filename.endswith(".md"):
         raise HTTPException(status_code=400, detail="Only .md files are accepted")
+    _MAX_MD_SIZE = 1 * 1024 * 1024  # 1 MB
     try:
-        content = file.file.read().decode("utf-8")
+        raw = file.file.read(_MAX_MD_SIZE + 1)
+        if len(raw) > _MAX_MD_SIZE:
+            raise HTTPException(status_code=413, detail="File exceeds 1 MB limit")
+        content = raw.decode("utf-8")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Could not read file: {e}")
     try:
         return ChannelPlanService(db).import_plan(content, file.filename)
-    except Exception as e:
-        raise HTTPException(status_code=409, detail=str(e))
+    except IntegrityError:
+        raise HTTPException(status_code=409, detail="A plan with this slug already exists")
 
 
 @router.get("/{plan_id}")
@@ -75,9 +82,10 @@ def update_plan(
     _user=Depends(require_editor_or_admin),
 ):
     try:
-        return ChannelPlanService(db).update_plan(
-            plan_id, body.md_content, body.channel_id
-        )
+        kwargs = {"md_content": body.md_content}
+        if "channel_id" in body.model_fields_set:
+            kwargs["channel_id"] = body.channel_id
+        return ChannelPlanService(db).update_plan(plan_id, **kwargs)
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -103,10 +111,6 @@ def _get_md(plan_id: int, db: Session) -> str:
         raise HTTPException(status_code=404, detail=str(e))
 
 
-def _ai_error(e: Exception):
-    raise HTTPException(status_code=503, detail=f"AI generation failed: {e}")
-
-
 @router.post("/{plan_id}/ai/seo")
 def ai_seo(
     plan_id: int,
@@ -118,7 +122,7 @@ def ai_seo(
     try:
         return ChannelPlanAIService().generate_seo(md, body.theme, body.context)
     except Exception as e:
-        _ai_error(e)
+        raise HTTPException(status_code=503, detail=f"AI generation failed: {e}")
 
 
 @router.post("/{plan_id}/ai/prompts")
@@ -132,7 +136,7 @@ def ai_prompts(
     try:
         return ChannelPlanAIService().generate_prompts(md, body.theme, body.context)
     except Exception as e:
-        _ai_error(e)
+        raise HTTPException(status_code=503, detail=f"AI generation failed: {e}")
 
 
 @router.post("/{plan_id}/ai/ask")
@@ -146,7 +150,7 @@ def ai_ask(
     try:
         return ChannelPlanAIService().ask_question(md, body.question)
     except Exception as e:
-        _ai_error(e)
+        raise HTTPException(status_code=503, detail=f"AI generation failed: {e}")
 
 
 @router.post("/{plan_id}/ai/autofill")
@@ -160,4 +164,4 @@ def ai_autofill(
     try:
         return ChannelPlanAIService().autofill(md, body.theme, body.context)
     except Exception as e:
-        _ai_error(e)
+        raise HTTPException(status_code=503, detail=f"AI generation failed: {e}")
