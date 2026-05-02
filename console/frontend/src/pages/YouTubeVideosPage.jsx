@@ -75,6 +75,9 @@ function CreationPanel({ template, channelPlan, onClose, onCreated }) {
   const [toast, setToast]           = useState(null)
   const [autofilling, setAutofilling] = useState(false)
   const [autofillError, setAutofillError] = useState(null)
+  const [autofillSuno, setAutofillSuno] = useState(null)
+  const [autofillRunway, setAutofillRunway] = useState(null)
+  const [autofilled, setAutofilled] = useState(false)
 
   const [sfxLayers, setSfxLayers] = useState({
     foreground: { asset_id: '', volume: 0.6 },
@@ -167,7 +170,7 @@ function CreationPanel({ template, channelPlan, onClose, onCreated }) {
   }, [])
 
   useEffect(() => {
-    if (form.theme && template) {
+    if (form.theme && template && !autofilled) {
       const h = form.isCustomDuration
         ? (parseFloat(form.customDuration) || 8)
         : form.target_duration_h
@@ -182,7 +185,7 @@ function CreationPanel({ template, channelPlan, onClose, onCreated }) {
           .replace('{duration}', durationDisplay),
       }))
     }
-  }, [form.theme, form.target_duration_h, form.customDuration, form.isCustomDuration])
+  }, [form.theme, form.target_duration_h, form.customDuration, form.isCustomDuration, autofilled])
 
   const handleAutofill = async () => {
     if (!channelPlan || !form.theme) return
@@ -204,8 +207,9 @@ function CreationPanel({ template, channelPlan, onClose, onCreated }) {
             })()
           : {}),
       }))
-      if (result.suno_prompt) template._autofill_suno = result.suno_prompt
-      if (result.runway_prompt) template._autofill_runway = result.runway_prompt
+      if (result.suno_prompt) setAutofillSuno(result.suno_prompt)
+      if (result.runway_prompt) setAutofillRunway(result.runway_prompt)
+      setAutofilled(true)
       showToast('AI autofill complete', 'success')
     } catch (e) {
       setAutofillError(e.message)
@@ -433,16 +437,16 @@ function CreationPanel({ template, channelPlan, onClose, onCreated }) {
                   </div>
                 </div>
               )}
-              {(template?.suno_prompt_template || template?._autofill_suno) && (
+              {(template?.suno_prompt_template || autofillSuno) && (
                 <div className="bg-[#0d0d0f] border border-[#2a2a32] rounded-lg p-3 relative">
                   <div className="text-xs text-[#5a5a70] mb-1">
-                    Suno Prompt {template?._autofill_suno ? '(AI generated)' : '(reference)'}
+                    Suno Prompt {autofillSuno ? '(AI generated)' : '(reference)'}
                   </div>
                   <p className="text-xs text-[#9090a8] pr-10 leading-relaxed">
-                    {template._autofill_suno || template.suno_prompt_template}
+                    {autofillSuno || template.suno_prompt_template}
                   </p>
                   <button
-                    onClick={() => navigator.clipboard.writeText(template._autofill_suno || template.suno_prompt_template)}
+                    onClick={() => navigator.clipboard.writeText(autofillSuno || template.suno_prompt_template)}
                     className="absolute top-2 right-2 text-xs text-[#7c6af7] hover:text-[#9d8df8] px-2 py-1 bg-[#16161a] rounded"
                   >
                     Copy
@@ -520,16 +524,16 @@ function CreationPanel({ template, channelPlan, onClose, onCreated }) {
                   </div>
                 </div>
               )}
-              {(template?.runway_prompt_template || template?._autofill_runway) && (
+              {(template?.runway_prompt_template || autofillRunway) && (
                 <div className="bg-[#0d0d0f] border border-[#2a2a32] rounded-lg p-3 relative">
                   <div className="text-xs text-[#5a5a70] mb-1">
-                    Runway Prompt {template?._autofill_runway ? '(AI generated)' : '(reference)'}
+                    Runway Prompt {autofillRunway ? '(AI generated)' : '(reference)'}
                   </div>
                   <p className="text-xs text-[#9090a8] pr-10 leading-relaxed">
-                    {template._autofill_runway || template.runway_prompt_template}
+                    {autofillRunway || template.runway_prompt_template}
                   </p>
                   <button
-                    onClick={() => navigator.clipboard.writeText(template._autofill_runway || template.runway_prompt_template)}
+                    onClick={() => navigator.clipboard.writeText(autofillRunway || template.runway_prompt_template)}
                     className="absolute top-2 right-2 text-xs text-[#7c6af7] hover:text-[#9d8df8] px-2 py-1 bg-[#16161a] rounded"
                   >
                     Copy
