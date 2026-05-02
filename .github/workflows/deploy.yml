@@ -28,7 +28,7 @@ jobs:
           context: .
           file: Dockerfile.api
           push: true
-          tags: ghcr.io/khiemle/ai-media-automation/api:latest
+          tags: ghcr.io/${{ github.repository_owner }}/ai-media-automation/api:latest
 
   build-render:
     runs-on: ubuntu-latest
@@ -46,7 +46,7 @@ jobs:
           context: .
           file: Dockerfile.render
           push: true
-          tags: ghcr.io/khiemle/ai-media-automation/render:latest
+          tags: ghcr.io/${{ github.repository_owner }}/ai-media-automation/render:latest
 
   build-frontend:
     runs-on: ubuntu-latest
@@ -64,7 +64,7 @@ jobs:
           context: .
           file: Dockerfile.frontend
           push: true
-          tags: ghcr.io/khiemle/ai-media-automation/frontend:latest
+          tags: ghcr.io/${{ github.repository_owner }}/ai-media-automation/frontend:latest
 
   # ── Deploy on Windows self-hosted runner ────────────────────────────────
   deploy:
@@ -79,18 +79,18 @@ jobs:
         shell: pwsh
         run: |
           $content = @"
-          DATABASE_URL=postgresql://admin:${{ secrets.DB_PASSWORD }}@postgres:5432/ai_media
-          REDIS_URL=redis://redis:6379/0
-          JWT_SECRET=${{ secrets.JWT_SECRET }}
-          JWT_ALGORITHM=HS256
-          JWT_EXPIRE_MINUTES=1440
-          FERNET_KEY=${{ secrets.FERNET_KEY }}
-          CORE_PIPELINE_PATH=/app
-          CONSOLE_PORT=8080
-          FRONTEND_ORIGIN=http://localhost:3000
-          ENV=production
-          RUNWAY_API_KEY=${{ secrets.RUNWAY_API_KEY }}
-          "@
+DATABASE_URL=postgresql://admin:${{ secrets.DB_PASSWORD }}@postgres:5432/ai_media
+REDIS_URL=redis://redis:6379/0
+JWT_SECRET=${{ secrets.JWT_SECRET }}
+JWT_ALGORITHM=HS256
+JWT_EXPIRE_MINUTES=1440
+FERNET_KEY=${{ secrets.FERNET_KEY }}
+CORE_PIPELINE_PATH=/app
+CONSOLE_PORT=8080
+FRONTEND_ORIGIN=http://localhost:3000
+ENV=production
+RUNWAY_API_KEY=${{ secrets.RUNWAY_API_KEY }}
+"@
           New-Item -ItemType Directory -Force -Path "console" | Out-Null
           $content | Out-File -FilePath "console\.env" -Encoding utf8NoBOM
 
@@ -99,23 +99,23 @@ jobs:
         shell: pwsh
         run: |
           $json = @"
-          {
-            "gemini": {
-              "script": { "api_key": "${{ secrets.GEMINI_SCRIPT_API_KEY }}", "model": "gemini-2.5-flash" },
-              "media":  { "api_key": "${{ secrets.GEMINI_MEDIA_API_KEY }}",  "model": "veo-3.1-lite-generate-preview" },
-              "music":  { "api_key": "${{ secrets.GEMINI_MEDIA_API_KEY }}",  "model": "lyria-3-clip-preview" }
-            },
-            "elevenlabs": {
-              "api_key":     "${{ secrets.ELEVENLABS_API_KEY }}",
-              "voice_id_en": "${{ secrets.ELEVENLABS_VOICE_ID_EN }}",
-              "voice_id_vi": "${{ secrets.ELEVENLABS_VOICE_ID_VI }}",
-              "model":       "eleven_flash_v2_5"
-            },
-            "suno":    { "api_key": "${{ secrets.SUNO_API_KEY }}", "model": "V4_5" },
-            "sunoapi": { "api_key": "${{ secrets.SUNO_API_KEY }}" },
-            "pexels":  { "api_key": "${{ secrets.PEXELS_API_KEY }}" }
-          }
-          "@
+{
+  "gemini": {
+    "script": { "api_key": "${{ secrets.GEMINI_SCRIPT_API_KEY }}", "model": "gemini-2.5-flash" },
+    "media":  { "api_key": "${{ secrets.GEMINI_MEDIA_API_KEY }}",  "model": "veo-3.1-lite-generate-preview" },
+    "music":  { "api_key": "${{ secrets.GEMINI_MEDIA_API_KEY }}",  "model": "lyria-3-clip-preview" }
+  },
+  "elevenlabs": {
+    "api_key":     "${{ secrets.ELEVENLABS_API_KEY }}",
+    "voice_id_en": "${{ secrets.ELEVENLABS_VOICE_ID_EN }}",
+    "voice_id_vi": "${{ secrets.ELEVENLABS_VOICE_ID_VI }}",
+    "model":       "eleven_flash_v2_5"
+  },
+  "suno":    { "api_key": "${{ secrets.SUNO_API_KEY }}", "model": "V4_5" },
+  "sunoapi": { "api_key": "${{ secrets.SUNO_API_KEY }}" },
+  "pexels":  { "api_key": "${{ secrets.PEXELS_API_KEY }}" }
+}
+"@
           New-Item -ItemType Directory -Force -Path "config" | Out-Null
           $json | Out-File -FilePath "config\api_keys.json" -Encoding utf8NoBOM
 
@@ -124,16 +124,16 @@ jobs:
         shell: pwsh
         run: |
           $content = @"
-          OUTPUT_PATH=${{ vars.OUTPUT_PATH }}
-          ASSET_DB_PATH=${{ vars.ASSET_DB_PATH }}
-          MODELS_PATH=${{ vars.MODELS_PATH }}
-          MUSIC_PATH=${{ vars.MUSIC_PATH }}
-          TTS_ENGINE=auto
-          TIKTOK_SCRAPER_ENGINE=auto
-          TIKTOK_BROWSER_HEADLESS=true
-          TIKTOK_BROWSER_HEADFUL_RETRY_ON_EMPTY=true
-          TIKTOK_SELENIUM_FALLBACK=true
-          "@
+OUTPUT_PATH=${{ vars.OUTPUT_PATH }}
+ASSET_DB_PATH=${{ vars.ASSET_DB_PATH }}
+MODELS_PATH=${{ vars.MODELS_PATH }}
+MUSIC_PATH=${{ vars.MUSIC_PATH }}
+TTS_ENGINE=auto
+TIKTOK_SCRAPER_ENGINE=auto
+TIKTOK_BROWSER_HEADLESS=true
+TIKTOK_BROWSER_HEADFUL_RETRY_ON_EMPTY=true
+TIKTOK_SELENIUM_FALLBACK=true
+"@
           $content | Out-File -FilePath "pipeline.env" -Encoding utf8NoBOM
 
       # Write DB_PASSWORD for docker-compose postgres service
@@ -147,7 +147,25 @@ jobs:
         shell: pwsh
         run: docker compose pull
 
-      # Run database migrations (one-off container, runs before services restart)
+      # Start postgres and redis first so the migration container can connect
+      - name: Start postgres and redis
+        shell: pwsh
+        run: docker compose up -d postgres redis
+
+      # Wait until postgres is healthy before running migrations
+      - name: Wait for postgres
+        shell: pwsh
+        run: |
+          $retries = 15
+          while ($retries -gt 0) {
+            $result = docker compose exec -T postgres pg_isready -U admin 2>&1
+            if ($LASTEXITCODE -eq 0) { break }
+            Start-Sleep -Seconds 2
+            $retries--
+          }
+          if ($retries -eq 0) { throw "Postgres did not become ready in time" }
+
+      # Run database migrations (one-off container)
       - name: Run migrations
         shell: pwsh
         run: |

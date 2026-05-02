@@ -21,7 +21,7 @@ param(
     [string]$RepoPath    = "C:\ai-media",
     [string]$RenderRoot  = "C:\render",
     [string]$RunnerPath  = "C:\actions-runner",
-    [string]$RunnerVersion = "2.316.1"
+    [string]$RunnerVersion = "2.325.0"
 )
 
 $ErrorActionPreference = "Stop"

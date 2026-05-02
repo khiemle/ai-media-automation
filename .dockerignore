@@ -1,0 +1,31 @@
+# Git
+.git/
+.worktrees/
+
+# Node
+node_modules/
+console/frontend/node_modules/
+console/frontend/dist/
+console/frontend/.vite/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Large binary assets (not needed in container)
+models/
+/assets/
+renders/
+
+# Secrets (never in image)
+.env
+console/.env
+pipeline.env
+config/api_keys.json
+
+# Dev/IDE
+.vscode/
+.idea/
+.DS_Store
