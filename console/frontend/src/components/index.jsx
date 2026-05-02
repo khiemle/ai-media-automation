@@ -1,7 +1,10 @@
 // ─── Card ─────────────────────────────────────────────────────────────────────
-export function Card({ title, actions, children, className = '' }) {
+export function Card({ title, actions, children, className = '', onClick }) {
   return (
-    <div className={`bg-[#1c1c22] border border-[#2a2a32] rounded-xl overflow-hidden ${className}`}>
+    <div
+      className={`bg-[#1c1c22] border border-[#2a2a32] rounded-xl overflow-hidden ${className}`}
+      onClick={onClick}
+    >
       {(title || actions) && (
         <div className="flex items-center justify-between px-5 py-3 border-b border-[#2a2a32]">
           {title && <span className="text-sm font-semibold text-[#e8e8f0] tracking-wide">{title}</span>}
