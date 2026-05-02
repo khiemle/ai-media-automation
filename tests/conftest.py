@@ -12,7 +12,7 @@ TEST_DB_URL = os.environ.get(
 @pytest.fixture(scope="session")
 def engine():
     from console.backend.database import Base
-    from console.backend.models import sfx_asset, video_template, youtube_video, video_asset, pipeline_job  # noqa: ensure tables registered
+    from console.backend.models import sfx_asset, video_template, youtube_video, video_asset, pipeline_job, channel_plan  # noqa: ensure tables registered
     eng = create_engine(TEST_DB_URL)
     Base.metadata.create_all(eng)
     yield eng
