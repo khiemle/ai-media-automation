@@ -148,16 +148,18 @@ def render_landscape(video, output_path: Path, db) -> None:
 
     cmd += ["-t", str(duration_s)]
 
+    # Use ultrafast for long-form looping videos (hours) — slow would take days
+    preset = "ultrafast" if duration_s > 600 else "slow"
     if is_image:
-        cmd += ["-c:v", "libx264", "-preset", "slow", "-tune", "stillimage", "-crf", "18"]
+        cmd += ["-c:v", "libx264", "-preset", preset, "-tune", "stillimage", "-crf", "23"]
     else:
-        cmd += ["-c:v", "libx264", "-preset", "slow", "-crf", "18"]
+        cmd += ["-c:v", "libx264", "-preset", preset, "-crf", "23"]
 
     cmd += ["-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-movflags", "+faststart",
             str(output_path)]
 
     logger.info("ffmpeg landscape cmd: %s", " ".join(cmd))
-    _run_ffmpeg(cmd, duration_s * 4)
+    _run_ffmpeg(cmd, duration_s * 2)
 
 
 def render_portrait_short(video, template, output_path: Path, db) -> None:
