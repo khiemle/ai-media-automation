@@ -78,8 +78,9 @@ jobs:
       - name: Write console/.env
         shell: pwsh
         run: |
+          $dbPass = "${{ secrets.DB_PASSWORD }}" -replace '@', '%40'
           $content = @"
-DATABASE_URL=postgresql://admin:${{ secrets.DB_PASSWORD }}@postgres:5432/ai_media
+DATABASE_URL=postgresql://admin:$dbPass@postgres:5432/ai_media
 REDIS_URL=redis://redis:6379/0
 JWT_SECRET=${{ secrets.JWT_SECRET }}
 JWT_ALGORITHM=HS256
