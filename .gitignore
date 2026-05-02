@@ -42,10 +42,10 @@ console/frontend/.vite/
 
 # Claude Code
 .claude/
-assets
+/assets
 models/kokoro/kokoro.onnx
 models/kokoro/voices
-logs
+/logs
 .worktrees/
 nohup.out
 renders
