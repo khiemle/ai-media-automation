@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { channelPlansApi, fetchApi } from '../api/client.js'
-import { Card, Button, Badge, Input, Select, Toast, Spinner, EmptyState, Modal } from '../components/index.jsx'
+import { Card, Button, Badge, Select, Toast, Spinner, EmptyState, Modal } from '../components/index.jsx'
 import AIAssistantPanel from '../components/AIAssistantPanel.jsx'
 
 function PlanCard({ plan, onClick }) {
@@ -94,6 +94,7 @@ function DetailPanel({ plan: initialPlan, channels, onClose, onSaved }) {
   const [saving, setSaving]       = useState(false)
   const [saveError, setSaveError] = useState(null)
   const [toast, setToast]         = useState(null)
+  const toastTimerRef             = useRef(null)
 
   useEffect(() => {
     if (!plan.md_content) {
@@ -102,6 +103,8 @@ function DetailPanel({ plan: initialPlan, channels, onClose, onSaved }) {
         .catch(() => {})
     }
   }, [plan.id])
+
+  useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current) }, [])
 
   const handleSave = async () => {
     setSaving(true); setSaveError(null)
@@ -113,7 +116,8 @@ function DetailPanel({ plan: initialPlan, channels, onClose, onSaved }) {
       )
       setPlan(updated)
       setToast({ msg: 'Saved', type: 'success' })
-      setTimeout(() => setToast(null), 2000)
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
+      toastTimerRef.current = setTimeout(() => setToast(null), 2000)
       onSaved(updated)
     } catch (e) {
       setSaveError(e.message)
@@ -261,7 +265,7 @@ export default function ChannelPlansPage() {
     setShowImport(false)
     showToast(`"${plan.name}" imported`, 'success')
     load()
-    channelPlansApi.get(plan.id).then(full => setActivePlan(full)).catch(() => {})
+    setActivePlan(plan)
   }
 
   const handleSaved = (updated) => {
