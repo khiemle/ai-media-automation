@@ -151,8 +151,10 @@ def test_generate_prompts_returns_four_keys():
         mock_genai.types.GenerateContentConfig.return_value = MagicMock()
         result = svc.generate_prompts("# Channel Plan\n", "Forest Stream", "")
 
-    for key in ("suno", "midjourney", "runway", "thumbnail"):
-        assert key in result
+    assert result["suno"] == "s"
+    assert result["midjourney"] == "mj"
+    assert result["runway"] == "r"
+    assert result["thumbnail"] == "t"
 
 
 def test_ask_question_wraps_plain_text():
@@ -194,3 +196,16 @@ def test_generate_seo_raises_on_missing_api_key():
     with patch("config.api_config.get_config", return_value=cfg_no_key):
         with pytest.raises(RuntimeError, match="API key"):
             svc.generate_seo("# Plan\n", "theme", "")
+
+
+def test_generate_seo_handles_fenced_json_response():
+    svc = ChannelPlanAIService()
+    fenced = '```json\n{"title": "Rain 8h", "description": "Relax", "tags": "rain"}\n```'
+    mock_client = MagicMock()
+    mock_client.models.generate_content.return_value = _gemini_response(fenced)
+    with patch("config.api_config.get_config", return_value=_FAKE_CFG), \
+         patch("console.backend.services.channel_plan_service.genai") as mock_genai:
+        mock_genai.Client.return_value = mock_client
+        mock_genai.types.GenerateContentConfig.return_value = MagicMock()
+        result = svc.generate_seo("# Plan\n", "Rain", "")
+    assert result["title"] == "Rain 8h"
