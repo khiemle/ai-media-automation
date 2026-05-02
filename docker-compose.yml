@@ -1,0 +1,105 @@
+version: "3.9"
+
+# Docker Compose for Windows production deployment.
+# All services run on a single Windows machine with NVIDIA GTX 1660S.
+# Images are pulled from GHCR — run "docker compose pull" to update.
+
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ai_media
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+  api:
+    image: ghcr.io/khiemle/ai-media-automation/api:latest
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    env_file:
+      - ./console/.env
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./config:/app/config:ro
+      - render_output:/app/assets/output
+
+  celery-worker:
+    image: ghcr.io/khiemle/ai-media-automation/api:latest
+    restart: unless-stopped
+    command: >
+      celery -A console.backend.celery_app worker
+      -Q scrape_q,script_q,upload_q
+      --concurrency=4 --loglevel=info
+    env_file:
+      - ./console/.env
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./config:/app/config:ro
+      - render_output:/app/assets/output
+
+  celery-beat:
+    image: ghcr.io/khiemle/ai-media-automation/api:latest
+    restart: unless-stopped
+    command: >
+      celery -A console.backend.celery_app beat
+      --loglevel=info
+    env_file:
+      - ./console/.env
+    depends_on:
+      - redis
+
+  celery-render:
+    image: ghcr.io/khiemle/ai-media-automation/render:latest
+    restart: unless-stopped
+    command: >
+      celery -A console.backend.celery_app worker
+      -Q render_q
+      --concurrency=2 --loglevel=info
+    env_file:
+      - ./console/.env
+      - ./pipeline.env
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./config:/app/config:ro
+      - render_output:/app/assets/output
+      - ${ASSET_DB_PATH:-C:/render/assets/video_db}:/app/assets/video_db
+      - ${MODELS_PATH:-C:/render/models}:/app/models
+      - ${MUSIC_PATH:-C:/render/assets/music}:/app/assets/music
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  frontend:
+    image: ghcr.io/khiemle/ai-media-automation/frontend:latest
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
+  render_output:
