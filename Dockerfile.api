@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Python deps
+COPY requirements.pipeline.txt /app/requirements.pipeline.txt
 COPY console/requirements.txt /app/console/requirements.txt
 RUN pip install --no-cache-dir -r console/requirements.txt
 
