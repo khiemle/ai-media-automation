@@ -17,7 +17,11 @@ from console.backend.models.video_template import VideoTemplate  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
-OUTPUT_DIR = Path(os.environ.get("RENDER_OUTPUT_PATH", "/app/assets/output"))
+OUTPUT_DIR = Path(
+    os.environ.get("RENDER_OUTPUT_PATH")
+    or os.environ.get("OUTPUT_PATH")
+    or "./assets/output"
+)
 
 
 def _update_chunk_status(db, youtube_video_id: int, chunk_idx: int, patch: dict) -> None:
