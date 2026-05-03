@@ -159,6 +159,12 @@ try:
 except ImportError:
     pass
 
+try:
+    from console.backend.ws.youtube_render_ws import router as youtube_render_ws_router
+    app.include_router(youtube_render_ws_router)
+except ImportError:
+    pass
+
 # ─── Health Check ─────────────────────────────────────────────────────────────
 
 @app.get("/api/health", tags=["health"])

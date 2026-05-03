@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Float, ForeignKey, Integer, String, Text, DateTime, func
+from sqlalchemy import Boolean, Float, ForeignKey, Integer, String, Text, DateTime, func
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -29,7 +29,7 @@ class YoutubeVideo(Base):
     seo_tags: Mapped[list[str] | None] = mapped_column(ARRAY(String), nullable=True)
     target_duration_h: Mapped[float | None] = mapped_column(Float, nullable=True)
     output_quality: Mapped[str] = mapped_column(String(10), default="1080p", server_default="1080p")
-    status: Mapped[str] = mapped_column(String(20), default="draft", server_default="draft")
+    status: Mapped[str] = mapped_column(String(40), default="draft", server_default="draft")
     output_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     celery_task_id: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
@@ -43,3 +43,14 @@ class YoutubeVideo(Base):
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
     )
+
+    # ASMR/soundscape extension (added by migration 013)
+    music_track_ids:     Mapped[list[int]] = mapped_column(ARRAY(Integer), default=list, server_default="{}")
+    sfx_pool:            Mapped[list[dict] | None] = mapped_column(JSONB, default=list, server_default="[]")
+    sfx_density_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    sfx_seed:            Mapped[int | None] = mapped_column(Integer, nullable=True)
+    black_from_seconds:  Mapped[int | None] = mapped_column(Integer, nullable=True)
+    skip_previews:       Mapped[bool] = mapped_column(Boolean, default=True, server_default="true", nullable=False)
+    render_parts:        Mapped[list[dict] | None] = mapped_column(JSONB, default=list, server_default="[]")
+    audio_preview_path:  Mapped[str | None] = mapped_column(String(500), nullable=True)
+    video_preview_path:  Mapped[str | None] = mapped_column(String(500), nullable=True)
