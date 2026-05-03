@@ -35,6 +35,20 @@ def _update_chunk_status(db, youtube_video_id: int, chunk_idx: int, patch: dict)
     db.commit()
 
 
+def _publish_youtube_render_event(youtube_video_id: int, payload: dict | None = None) -> None:
+    """Publish a render event to the per-video Redis channel for WS clients.
+    The payload itself is a hint; the WS handler will re-snapshot via DB anyway."""
+    try:
+        from console.backend.services.pipeline_service import _get_redis
+        import json
+        _get_redis().publish(
+            f"render:youtube:{youtube_video_id}",
+            json.dumps(payload or {"type": "tick"}),
+        )
+    except Exception:
+        pass  # best-effort; never fail a render because pubsub is down
+
+
 @celery_app.task(
     bind=True,
     name="tasks.render_youtube_video",
@@ -67,6 +81,7 @@ def render_youtube_video_task(self, youtube_video_id: int):
 
         video.status = "rendering"
         db.commit()
+        _publish_youtube_render_event(youtube_video_id)
 
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         output_path = OUTPUT_DIR / f"youtube_{youtube_video_id}_v{int(time.time())}.mp4"
@@ -77,6 +92,7 @@ def render_youtube_video_task(self, youtube_video_id: int):
         video.status = "done"
         video.output_path = str(output_path)
         db.commit()
+        _publish_youtube_render_event(youtube_video_id)
 
         logger.info("YoutubeVideo %s rendered to %s", youtube_video_id, output_path)
         return {"status": "done", "output_path": str(output_path)}
@@ -87,6 +103,7 @@ def render_youtube_video_task(self, youtube_video_id: int):
             try:
                 video.status = "failed"
                 db.commit()
+                _publish_youtube_render_event(youtube_video_id)
             except Exception as db_exc:
                 db.rollback()
                 logger.error(
@@ -125,6 +142,7 @@ def render_youtube_audio_preview_task(self, youtube_video_id: int):
 
         video.status = "audio_preview_rendering"
         db.commit()
+        _publish_youtube_render_event(youtube_video_id)
 
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         out_dir = OUTPUT_DIR / f"youtube_{youtube_video_id}"
@@ -139,6 +157,7 @@ def render_youtube_audio_preview_task(self, youtube_video_id: int):
         video.audio_preview_path = str(out_path)
         video.status = "audio_preview_ready"
         db.commit()
+        _publish_youtube_render_event(youtube_video_id)
 
         logger.info("YoutubeVideo %s audio preview ready: %s", youtube_video_id, out_path)
         return {"status": "ready", "path": str(out_path)}
@@ -148,6 +167,7 @@ def render_youtube_audio_preview_task(self, youtube_video_id: int):
             try:
                 video.status = "queued"  # roll back to queued so editor can retry
                 db.commit()
+                _publish_youtube_render_event(youtube_video_id)
             except Exception:
                 db.rollback()
         raise self.retry(exc=exc)
@@ -177,6 +197,7 @@ def render_youtube_video_preview_task(self, youtube_video_id: int):
 
         video.status = "video_preview_rendering"
         db.commit()
+        _publish_youtube_render_event(youtube_video_id)
 
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         out_dir = OUTPUT_DIR / f"youtube_{youtube_video_id}"
@@ -191,6 +212,7 @@ def render_youtube_video_preview_task(self, youtube_video_id: int):
         video.video_preview_path = str(out_path)
         video.status = "video_preview_ready"
         db.commit()
+        _publish_youtube_render_event(youtube_video_id)
 
         logger.info("YoutubeVideo %s video preview ready: %s", youtube_video_id, out_path)
         return {"status": "ready", "path": str(out_path)}
@@ -200,6 +222,7 @@ def render_youtube_video_preview_task(self, youtube_video_id: int):
             try:
                 video.status = "audio_preview_ready"  # back one gate
                 db.commit()
+                _publish_youtube_render_event(youtube_video_id)
             except Exception:
                 db.rollback()
         raise self.retry(exc=exc)
@@ -240,6 +263,7 @@ def render_youtube_chunk_task(self, youtube_video_id: int, chunk_idx: int, start
             "status": "running",
             "started_at": datetime.now(timezone.utc).isoformat(),
         })
+        _publish_youtube_render_event(youtube_video_id)
 
         # Per-chunk subdirectory so parallel chunks don't collide on temp files
         chunk_dir = OUTPUT_DIR / f"youtube_{youtube_video_id}" / f"chunk_{chunk_idx}"
@@ -254,6 +278,7 @@ def render_youtube_chunk_task(self, youtube_video_id: int, chunk_idx: int, start
             "file_path": str(chunk_path),
             "completed_at": datetime.now(timezone.utc).isoformat(),
         })
+        _publish_youtube_render_event(youtube_video_id)
 
         logger.info("YoutubeVideo %s chunk %s done: %s", youtube_video_id, chunk_idx, chunk_path)
         return {"chunk_idx": chunk_idx, "path": str(chunk_path)}
@@ -264,6 +289,7 @@ def render_youtube_chunk_task(self, youtube_video_id: int, chunk_idx: int, start
                 "status": "failed",
                 "error": str(exc)[:500],
             })
+            _publish_youtube_render_event(youtube_video_id)
         except Exception:
             pass
         raise self.retry(exc=exc)
@@ -308,6 +334,7 @@ def concat_youtube_chunks_task(self, _chunk_results, youtube_video_id: int):
         video.output_path = str(final_path)
         video.status = "done"
         db.commit()
+        _publish_youtube_render_event(youtube_video_id)
 
         logger.info("YoutubeVideo %s concat done: %s", youtube_video_id, final_path)
         return {"status": "done", "output_path": str(final_path)}
@@ -317,6 +344,7 @@ def concat_youtube_chunks_task(self, _chunk_results, youtube_video_id: int):
             try:
                 video.status = "video_preview_ready"  # back to last gate
                 db.commit()
+                _publish_youtube_render_event(youtube_video_id)
             except Exception:
                 db.rollback()
         raise
@@ -370,6 +398,7 @@ def render_youtube_chunked_orchestrator_task(self, youtube_video_id: int):
         flag_modified(video, "render_parts")
         video.status = "rendering"
         db.commit()
+        _publish_youtube_render_event(youtube_video_id)
 
         logger.info("YoutubeVideo %s planned %s chunks of ~%ss each", youtube_video_id, n_chunks, chunk_size)
 
@@ -390,6 +419,7 @@ def render_youtube_chunked_orchestrator_task(self, youtube_video_id: int):
             try:
                 video.status = "video_preview_ready"
                 db.commit()
+                _publish_youtube_render_event(youtube_video_id)
             except Exception:
                 db.rollback()
         raise

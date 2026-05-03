@@ -21,7 +21,12 @@ class YoutubeVideoCreate(BaseModel):
     template_id: int
     theme: str | None = None
     music_track_id: int | None = None
+    music_track_ids: list[int] | None = None
     sfx_overrides: dict | None = None
+    sfx_pool: list[dict] | None = None
+    sfx_density_seconds: int | None = None
+    black_from_seconds: int | None = None
+    skip_previews: bool | None = None
     visual_asset_id: int | None = None
     target_duration_h: float | None = None
     output_quality: str = "1080p"
@@ -35,7 +40,12 @@ class YoutubeVideoUpdate(BaseModel):
     title: str | None = None
     theme: str | None = None
     music_track_id: int | None = None
+    music_track_ids: list[int] | None = None
     sfx_overrides: dict | None = None
+    sfx_pool: list[dict] | None = None
+    sfx_density_seconds: int | None = None
+    black_from_seconds: int | None = None
+    skip_previews: bool | None = None
     visual_asset_id: int | None = None
     target_duration_h: float | None = None
     output_quality: str | None = None
@@ -116,11 +126,9 @@ def update_video(
     user=Depends(require_editor_or_admin),
 ):
     try:
-        return YoutubeVideoService(db).update_video(
-            video_id,
-            {k: v for k, v in body.model_dump().items() if v is not None},
-            user_id=user.id,
-        )
+        # Only forward fields the caller actually provided (preserves explicit None)
+        provided = {k: getattr(body, k) for k in body.model_fields_set}
+        return YoutubeVideoService(db).update_video(video_id, provided, user_id=user.id)
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
@@ -255,4 +263,120 @@ def start_upload(
         if "already exists" in msg:
             raise HTTPException(status_code=409, detail=msg)
         raise HTTPException(status_code=400, detail=msg)
+
+
+# ── ASMR / Soundscape render lifecycle ────────────────────────────────────────
+
+
+def _dispatch(svc_method, video_id: int, user_id: int):
+    try:
+        return svc_method(video_id, user_id)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/{video_id}/render/audio-preview")
+def render_audio_preview(
+    video_id: int, db: Session = Depends(get_db), user=Depends(require_editor_or_admin),
+):
+    task_id = _dispatch(YoutubeVideoService(db).start_audio_preview, video_id, user.id)
+    return {"task_id": task_id, "video_id": video_id}
+
+
+@router.post("/{video_id}/render/audio-preview/approve")
+def approve_audio_preview(
+    video_id: int, db: Session = Depends(get_db), user=Depends(require_editor_or_admin),
+):
+    return _dispatch(YoutubeVideoService(db).approve_audio_preview, video_id, user.id)
+
+
+@router.post("/{video_id}/render/audio-preview/reject")
+def reject_audio_preview(
+    video_id: int, db: Session = Depends(get_db), user=Depends(require_editor_or_admin),
+):
+    return _dispatch(YoutubeVideoService(db).reject_audio_preview, video_id, user.id)
+
+
+@router.post("/{video_id}/render/video-preview")
+def render_video_preview(
+    video_id: int, db: Session = Depends(get_db), user=Depends(require_editor_or_admin),
+):
+    task_id = _dispatch(YoutubeVideoService(db).start_video_preview, video_id, user.id)
+    return {"task_id": task_id, "video_id": video_id}
+
+
+@router.post("/{video_id}/render/video-preview/approve")
+def approve_video_preview(
+    video_id: int, db: Session = Depends(get_db), user=Depends(require_editor_or_admin),
+):
+    return _dispatch(YoutubeVideoService(db).approve_video_preview, video_id, user.id)
+
+
+@router.post("/{video_id}/render/video-preview/reject")
+def reject_video_preview(
+    video_id: int, db: Session = Depends(get_db), user=Depends(require_editor_or_admin),
+):
+    return _dispatch(YoutubeVideoService(db).reject_video_preview, video_id, user.id)
+
+
+@router.post("/{video_id}/render/final")
+def render_final_chunked(
+    video_id: int, db: Session = Depends(get_db), user=Depends(require_editor_or_admin),
+):
+    task_id = _dispatch(YoutubeVideoService(db).start_chunked_render, video_id, user.id)
+    return {"task_id": task_id, "video_id": video_id}
+
+
+@router.post("/{video_id}/render/cancel")
+def cancel_render(
+    video_id: int, db: Session = Depends(get_db), user=Depends(require_editor_or_admin),
+):
+    return _dispatch(YoutubeVideoService(db).cancel_chunked_render, video_id, user.id)
+
+
+@router.post("/{video_id}/render/resume")
+def resume_render(
+    video_id: int, db: Session = Depends(get_db), user=Depends(require_editor_or_admin),
+):
+    task_id = _dispatch(YoutubeVideoService(db).resume_chunked_render, video_id, user.id)
+    return {"task_id": task_id, "video_id": video_id}
+
+
+@router.get("/{video_id}/render/state")
+def get_render_state(
+    video_id: int, db: Session = Depends(get_db), _user=Depends(require_editor_or_admin),
+):
+    try:
+        return YoutubeVideoService(db).get_render_state(video_id)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+# ── Preview file serving (no auth — browsers can't send Bearer to media element loads) ──
+
+
+@router.get("/{video_id}/preview/audio")
+def get_audio_preview_file(video_id: int, db: Session = Depends(get_db)):
+    """Serve the audio preview WAV. No auth — gated by knowing video_id, matching stream_video precedent."""
+    from console.backend.models.youtube_video import YoutubeVideo
+    video = db.get(YoutubeVideo, video_id)
+    if not video or not video.audio_preview_path:
+        raise HTTPException(status_code=404, detail="No audio preview")
+    if not Path(video.audio_preview_path).is_file():
+        raise HTTPException(status_code=404, detail="Audio preview file not found on disk")
+    return FileResponse(video.audio_preview_path, media_type="audio/wav")
+
+
+@router.get("/{video_id}/preview/video")
+def get_video_preview_file(video_id: int, db: Session = Depends(get_db)):
+    """Serve the video preview MP4. No auth — gated by knowing video_id, matching stream_video precedent."""
+    from console.backend.models.youtube_video import YoutubeVideo
+    video = db.get(YoutubeVideo, video_id)
+    if not video or not video.video_preview_path:
+        raise HTTPException(status_code=404, detail="No video preview")
+    if not Path(video.video_preview_path).is_file():
+        raise HTTPException(status_code=404, detail="Video preview file not found on disk")
+    return FileResponse(video.video_preview_path, media_type="video/mp4")
 
