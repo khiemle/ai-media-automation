@@ -8,6 +8,13 @@ from pathlib import Path
 
 from console.backend.celery_app import celery_app
 
+# Import models at module load so SQLAlchemy resolves the YoutubeVideo →
+# VideoTemplate FK before any task flushes a YoutubeVideo update.
+# Without this, ANY task that does db.commit() on a YoutubeVideo would hit
+# NoReferencedTableError because video_templates isn't in the metadata yet.
+from console.backend.models.youtube_video import YoutubeVideo  # noqa: F401
+from console.backend.models.video_template import VideoTemplate  # noqa: F401
+
 logger = logging.getLogger(__name__)
 
 OUTPUT_DIR = Path(os.environ.get("RENDER_OUTPUT_PATH", "/app/assets/output"))
