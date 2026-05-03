@@ -1,0 +1,35 @@
+{
+  "expectations": [
+    {
+      "text": "Did NOT silently output a Suno prompt that satisfies the literal words while violating the function constraints",
+      "passed": true,
+      "evidence": "No Style of Music string emitted; response stays entirely in conflict-clarification mode."
+    },
+    {
+      "text": "Surfaced the energetic-vs-meditation conflict and asked which intent wins",
+      "passed": true,
+      "evidence": "Conflict #1 explicitly: 'Energetic implies energy, arousal, and forward motion. Meditation usually means slowing the nervous system down. These pull in opposite directions.' Then offered three reframings."
+    },
+    {
+      "text": "Pushed back on 'powerful' / 'bold' for a relaxation context (or explained the wake-the-brain trade-off)",
+      "passed": true,
+      "evidence": "Conflict #2: 'Relaxation music almost never wants powerful because power language tends to engage the amygdala and wake the brain.' Suggested 'grounded', 'presence', 'presence with uplift' as alternatives."
+    },
+    {
+      "text": "Flagged kalimba's plucky transients OR the 80 BPM tempo as a concern for the meditation function",
+      "passed": true,
+      "evidence": "Conflict #3: 'Kalimba's plucky transients (those little picks) are beautiful but work against both meditation and deep relaxation. At 80 BPM (which is high for meditation\u2014typical is 60\u201372), the kalimba's attack becomes even more activating.' \u2014 flagged BOTH."
+    },
+    {
+      "text": "Suggested an alternative reframe (study/focus, or a gentler 'grounded' meditation interpretation)",
+      "passed": true,
+      "evidence": "Suggested 'study or movement practice' as alternative function fits, plus 'grounded', 'presence', 'sustained and resonant' as reframes for the powerful/bold language."
+    }
+  ],
+  "summary": {
+    "passed": 5,
+    "failed": 0,
+    "total": 5,
+    "pass_rate": 1.0
+  }
+}

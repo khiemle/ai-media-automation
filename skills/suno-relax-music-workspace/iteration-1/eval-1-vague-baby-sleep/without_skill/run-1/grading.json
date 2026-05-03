@@ -1,0 +1,30 @@
+{
+  "expectations": [
+    {
+      "text": "Did NOT output a final Suno Style of Music string (no premature prompt)",
+      "passed": false,
+      "evidence": "After the clarifying questions, the response provides a complete starting prompt: 'Create a gentle, soothing lullaby for babies. Soft ambient soundscape with warm piano...' \u2014 this is a final prompt despite being labeled a 'starting' one."
+    },
+    {
+      "text": "Asked at least one clarifying question about the function (length, baby age, channel context, or reference tracks)",
+      "passed": true,
+      "evidence": "Asked about duration, instruments, mood, tempo. Did NOT ask about baby age or channel context."
+    },
+    {
+      "text": "Offered the Quickstart vs from-scratch fork from Phase 1, OR pre-filtered preset suggestions to baby-relevant ones",
+      "passed": false,
+      "evidence": "No fork structure, no preset offer."
+    },
+    {
+      "text": "Avoided medicalised verbs (heal, cure, treat) in any output framing",
+      "passed": true,
+      "evidence": "Used 'soothing', 'comforting', 'calming' \u2014 no medicalised language."
+    }
+  ],
+  "summary": {
+    "passed": 2,
+    "failed": 2,
+    "total": 4,
+    "pass_rate": 0.5
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "skill_name": "suno-relax-music",
+  "evals": [
+    {
+      "id": 1,
+      "name": "vague-baby-sleep",
+      "prompt": "i want to make some sleep music for my baby on youtube. can you help me with a suno prompt?",
+      "expected_output": "Skill should NOT jump to a prompt. It must ask clarifying questions: is this a 3-min lullaby or an 8-hour bed? Baby age? Is there a recurring channel (so future tracks should match a series sound)? Should produce 2-3 candidate approaches before finalising — likely candidates include (a) felt-piano lullaby with subtle music-box hint, (b) pure pad drone for 8-hour loop, (c) hybrid. Final output must include all four Suno fields plus exclude-styles plus QC bullets, and avoid medicalised language.",
+      "files": [],
+      "assertions": []
+    },
+    {
+      "id": 2,
+      "name": "specific-reiki-528hz",
+      "prompt": "Help me make a 60-minute Reiki track for my wellness YouTube channel. I want crystal singing bowls, something around 528 Hz, very calming.",
+      "expected_output": "Skill can move fast through brainstorm because most decisions are made (function = reiki_session, primary = crystal singing bowls, key/freq = 528 Hz). Should still surface: harmonic bed choice (choir pad vs drone synth — and warn about choir vocal-leak risk), textural layer (singing bowl shimmer? Tibetan strikes?), reverb (cathedral vs infinite tail). Should reach Phase 4 with 2-3 candidates that meaningfully differ. Final output must use Preset C as a strong starting point but customised. Must include the 528 Hz framing as inspiration/intent (not a delivered spec) per the wellness-claim guardrail. Must include extension strategy (12-15 extensions to reach 60 min).",
+      "files": [],
+      "assertions": []
+    },
+    {
+      "id": 3,
+      "name": "conflicting-energetic-meditation",
+      "prompt": "I want energetic meditation music with a powerful feel, kalimba and big string section, F Lydian mode, 80 BPM. Make it bold.",
+      "expected_output": "Skill must surface the conflicts in Phase 2 — 'energetic meditation' and 'powerful' both fight against the function. Must ask the user which intent wins (relaxation vs energy) and explain WHY: powerful and energetic dynamics wake the brain, defeating the meditation goal. If user wants energetic, suggest reframing as 'study/focus' instead of meditation. Must also flag that kalimba is plucky/transient and works against deep meditation. Should not silently produce a prompt that satisfies the literal words but violates the function constraints. Final output should reflect a resolved version, not the contradictory original.",
+      "files": [],
+      "assertions": []
+    }
+  ]
+}

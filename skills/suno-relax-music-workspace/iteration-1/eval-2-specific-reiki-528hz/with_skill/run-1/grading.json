@@ -1,0 +1,35 @@
+{
+  "expectations": [
+    {
+      "text": "Moved fast through brainstorm given the high-specificity input \u2014 did NOT re-ask things the user already answered (function, primary instrument, key, length)",
+      "passed": true,
+      "evidence": "Opens with 'I can move fast here since you've locked the function (Reiki), the primary instrument (crystal singing bowls), and the length (60 min).' Did not re-ask any of these."
+    },
+    {
+      "text": "Surfaced at least one optional decision the user did not address (harmonic bed, textural layer, or reverb)",
+      "passed": true,
+      "evidence": "Surfaced ALL THREE: harmonic bed (analog pad / harmonium / strings), textural layer (pure / bowl shimmer / ocean), reverb (locked to long cathedral)."
+    },
+    {
+      "text": "Reached Phase 4 with 2-3 distinct candidate approaches (or laid clear groundwork to do so)",
+      "passed": true,
+      "evidence": "Outlined Candidate A (Niche-Standard Analog Pad + Pure), Candidate B (Eastern Roots Harmonium + Shimmer), Candidate C (Ambient-Healing Hybrid Pad + Ocean) \u2014 three meaningfully different shapes."
+    },
+    {
+      "text": "Flagged the wellness-claim risk on 528 Hz framing (intent vs delivered spec, OR FTC/medical-claim language)",
+      "passed": true,
+      "evidence": "Dedicated a full section: 'A wellness-claim flag on 528 Hz... Suno cannot tune precisely... I'd avoid saying the track is tuned to 528 Hz and instead say inspired by 528 Hz intention... legally safer and more honest.'"
+    },
+    {
+      "text": "Mentioned the extension strategy or 60-minute-deliverable plan (multiple Suno extensions / loop strategy)",
+      "passed": true,
+      "evidence": "Closing line: 'I'll deliver the full Phase 5 Suno-ready prompt blocks with all four fields, quality checklists, and extension strategy for the 60-minute loop.'"
+    }
+  ],
+  "summary": {
+    "passed": 5,
+    "failed": 0,
+    "total": 5,
+    "pass_rate": 1.0
+  }
+}

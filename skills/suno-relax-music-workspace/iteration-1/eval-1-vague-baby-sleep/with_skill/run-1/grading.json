@@ -1,0 +1,30 @@
+{
+  "expectations": [
+    {
+      "text": "Did NOT output a final Suno Style of Music string (no premature prompt)",
+      "passed": true,
+      "evidence": "Response stays in Phase 1; explicitly says 'I can immediately confirm the function, walk you through any tweaks... generate 2\u20133 candidate prompts'. No Style of Music string emitted."
+    },
+    {
+      "text": "Asked at least one clarifying question about the function (length, baby age, channel context, or reference tracks)",
+      "passed": true,
+      "evidence": "Lists all four: 'How old is the baby... 3-min Suno seed, or planning to loop/extend it... Your channel vibe... Any reference tracks or artists you love?'"
+    },
+    {
+      "text": "Offered the Quickstart vs from-scratch fork from Phase 1, OR pre-filtered preset suggestions to baby-relevant ones",
+      "passed": true,
+      "evidence": "Explicit 'Option 1: Quickstart' vs 'Option 2: Full interview' fork, and pre-filtered presets to 3 (Felt Piano, Sleep Drone, Solo Piano) \u2014 pruned irrelevant ones (Reiki, Chakra, Forest)."
+    },
+    {
+      "text": "Avoided medicalised verbs (heal, cure, treat) in any output framing",
+      "passed": true,
+      "evidence": "Used 'sleep', 'wind down', 'gentle', 'warm' \u2014 no medicalised language."
+    }
+  ],
+  "summary": {
+    "passed": 4,
+    "failed": 0,
+    "total": 4,
+    "pass_rate": 1.0
+  }
+}

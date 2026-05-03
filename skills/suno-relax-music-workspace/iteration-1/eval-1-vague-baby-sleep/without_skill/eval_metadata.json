@@ -1,0 +1,11 @@
+{
+  "eval_id": 1,
+  "eval_name": "vague-baby-sleep",
+  "prompt": "i want to make some sleep music for my baby on youtube. can you help me with a suno prompt?",
+  "assertions": [
+    {"text": "Did NOT output a final Suno Style of Music string (no premature prompt)", "type": "negative"},
+    {"text": "Asked at least one clarifying question about the function (length, baby age, channel context, or reference tracks)", "type": "positive"},
+    {"text": "Offered the Quickstart vs from-scratch fork from Phase 1, OR pre-filtered preset suggestions to baby-relevant ones", "type": "positive"},
+    {"text": "Avoided medicalised verbs (heal, cure, treat) in any output framing", "type": "negative"}
+  ]
+}

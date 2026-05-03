@@ -1,0 +1,12 @@
+{
+  "eval_id": 3,
+  "eval_name": "conflicting-energetic-meditation",
+  "prompt": "I want energetic meditation music with a powerful feel, kalimba and big string section, F Lydian mode, 80 BPM. Make it bold.",
+  "assertions": [
+    {"text": "Did NOT silently output a Suno prompt that satisfies the literal words while violating the function constraints", "type": "negative"},
+    {"text": "Surfaced the energetic-vs-meditation conflict and asked which intent wins", "type": "positive"},
+    {"text": "Pushed back on 'powerful' / 'bold' for a relaxation context (or explained the wake-the-brain trade-off)", "type": "positive"},
+    {"text": "Flagged kalimba's plucky transients OR the 80 BPM tempo as a concern for the meditation function", "type": "positive"},
+    {"text": "Suggested an alternative reframe (study/focus, or a gentler 'grounded' meditation interpretation)", "type": "positive"}
+  ]
+}

@@ -1,0 +1,313 @@
+{
+  "metadata": {
+    "skill_name": "suno-relax-music",
+    "skill_path": "<path/to/skill>",
+    "executor_model": "<model-name>",
+    "analyzer_model": "<model-name>",
+    "timestamp": "2026-05-03T03:04:57Z",
+    "evals_run": [
+      1,
+      2,
+      3
+    ],
+    "runs_per_configuration": 3
+  },
+  "runs": [
+    {
+      "eval_id": 1,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 4,
+        "failed": 0,
+        "total": 4,
+        "time_seconds": 29.4,
+        "tokens": 80979,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Did NOT output a final Suno Style of Music string (no premature prompt)",
+          "passed": true,
+          "evidence": "Response stays in Phase 1; explicitly says 'I can immediately confirm the function, walk you through any tweaks... generate 2\u20133 candidate prompts'. No Style of Music string emitted."
+        },
+        {
+          "text": "Asked at least one clarifying question about the function (length, baby age, channel context, or reference tracks)",
+          "passed": true,
+          "evidence": "Lists all four: 'How old is the baby... 3-min Suno seed, or planning to loop/extend it... Your channel vibe... Any reference tracks or artists you love?'"
+        },
+        {
+          "text": "Offered the Quickstart vs from-scratch fork from Phase 1, OR pre-filtered preset suggestions to baby-relevant ones",
+          "passed": true,
+          "evidence": "Explicit 'Option 1: Quickstart' vs 'Option 2: Full interview' fork, and pre-filtered presets to 3 (Felt Piano, Sleep Drone, Solo Piano) \u2014 pruned irrelevant ones (Reiki, Chakra, Forest)."
+        },
+        {
+          "text": "Avoided medicalised verbs (heal, cure, treat) in any output framing",
+          "passed": true,
+          "evidence": "Used 'sleep', 'wind down', 'gentle', 'warm' \u2014 no medicalised language."
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 2,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "time_seconds": 42.4,
+        "tokens": 84027,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Moved fast through brainstorm given the high-specificity input \u2014 did NOT re-ask things the user already answered (function, primary instrument, key, length)",
+          "passed": true,
+          "evidence": "Opens with 'I can move fast here since you've locked the function (Reiki), the primary instrument (crystal singing bowls), and the length (60 min).' Did not re-ask any of these."
+        },
+        {
+          "text": "Surfaced at least one optional decision the user did not address (harmonic bed, textural layer, or reverb)",
+          "passed": true,
+          "evidence": "Surfaced ALL THREE: harmonic bed (analog pad / harmonium / strings), textural layer (pure / bowl shimmer / ocean), reverb (locked to long cathedral)."
+        },
+        {
+          "text": "Reached Phase 4 with 2-3 distinct candidate approaches (or laid clear groundwork to do so)",
+          "passed": true,
+          "evidence": "Outlined Candidate A (Niche-Standard Analog Pad + Pure), Candidate B (Eastern Roots Harmonium + Shimmer), Candidate C (Ambient-Healing Hybrid Pad + Ocean) \u2014 three meaningfully different shapes."
+        },
+        {
+          "text": "Flagged the wellness-claim risk on 528 Hz framing (intent vs delivered spec, OR FTC/medical-claim language)",
+          "passed": true,
+          "evidence": "Dedicated a full section: 'A wellness-claim flag on 528 Hz... Suno cannot tune precisely... I'd avoid saying the track is tuned to 528 Hz and instead say inspired by 528 Hz intention... legally safer and more honest.'"
+        },
+        {
+          "text": "Mentioned the extension strategy or 60-minute-deliverable plan (multiple Suno extensions / loop strategy)",
+          "passed": true,
+          "evidence": "Closing line: 'I'll deliver the full Phase 5 Suno-ready prompt blocks with all four fields, quality checklists, and extension strategy for the 60-minute loop.'"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 3,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "time_seconds": 29.2,
+        "tokens": 82095,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Did NOT silently output a Suno prompt that satisfies the literal words while violating the function constraints",
+          "passed": true,
+          "evidence": "No Style of Music string emitted; response stays entirely in conflict-clarification mode."
+        },
+        {
+          "text": "Surfaced the energetic-vs-meditation conflict and asked which intent wins",
+          "passed": true,
+          "evidence": "Conflict #1 explicitly: 'Energetic implies energy, arousal, and forward motion. Meditation usually means slowing the nervous system down. These pull in opposite directions.' Then offered three reframings."
+        },
+        {
+          "text": "Pushed back on 'powerful' / 'bold' for a relaxation context (or explained the wake-the-brain trade-off)",
+          "passed": true,
+          "evidence": "Conflict #2: 'Relaxation music almost never wants powerful because power language tends to engage the amygdala and wake the brain.' Suggested 'grounded', 'presence', 'presence with uplift' as alternatives."
+        },
+        {
+          "text": "Flagged kalimba's plucky transients OR the 80 BPM tempo as a concern for the meditation function",
+          "passed": true,
+          "evidence": "Conflict #3: 'Kalimba's plucky transients (those little picks) are beautiful but work against both meditation and deep relaxation. At 80 BPM (which is high for meditation\u2014typical is 60\u201372), the kalimba's attack becomes even more activating.' \u2014 flagged BOTH."
+        },
+        {
+          "text": "Suggested an alternative reframe (study/focus, or a gentler 'grounded' meditation interpretation)",
+          "passed": true,
+          "evidence": "Suggested 'study or movement practice' as alternative function fits, plus 'grounded', 'presence', 'sustained and resonant' as reframes for the powerful/bold language."
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 1,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.5,
+        "passed": 2,
+        "failed": 2,
+        "total": 4,
+        "time_seconds": 8.7,
+        "tokens": 73720,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Did NOT output a final Suno Style of Music string (no premature prompt)",
+          "passed": false,
+          "evidence": "After the clarifying questions, the response provides a complete starting prompt: 'Create a gentle, soothing lullaby for babies. Soft ambient soundscape with warm piano...' \u2014 this is a final prompt despite being labeled a 'starting' one."
+        },
+        {
+          "text": "Asked at least one clarifying question about the function (length, baby age, channel context, or reference tracks)",
+          "passed": true,
+          "evidence": "Asked about duration, instruments, mood, tempo. Did NOT ask about baby age or channel context."
+        },
+        {
+          "text": "Offered the Quickstart vs from-scratch fork from Phase 1, OR pre-filtered preset suggestions to baby-relevant ones",
+          "passed": false,
+          "evidence": "No fork structure, no preset offer."
+        },
+        {
+          "text": "Avoided medicalised verbs (heal, cure, treat) in any output framing",
+          "passed": true,
+          "evidence": "Used 'soothing', 'comforting', 'calming' \u2014 no medicalised language."
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 2,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.0,
+        "passed": 0,
+        "failed": 5,
+        "total": 5,
+        "time_seconds": 146.9,
+        "tokens": 74113,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Moved fast through brainstorm given the high-specificity input \u2014 did NOT re-ask things the user already answered (function, primary instrument, key, length)",
+          "passed": false,
+          "evidence": "Got distracted by an unhelpful disclaimer ('I can't directly create audio files'). Then re-asked about instrumentation mix and vocal options \u2014 both already implied or specified."
+        },
+        {
+          "text": "Surfaced at least one optional decision the user did not address (harmonic bed, textural layer, or reverb)",
+          "passed": false,
+          "evidence": "Asked about 'add other elements (ambient pad, nature sounds, gentle rainfall)' \u2014 partial credit but no specific harmonic-bed, texture, or reverb framework."
+        },
+        {
+          "text": "Reached Phase 4 with 2-3 distinct candidate approaches (or laid clear groundwork to do so)",
+          "passed": false,
+          "evidence": "Offered exactly one prompt suggestion: 'crystal singing bowls, 528 Hz solfeggio frequency, deeply calming, 60 minutes' \u2014 no candidate set."
+        },
+        {
+          "text": "Flagged the wellness-claim risk on 528 Hz framing (intent vs delivered spec, OR FTC/medical-claim language)",
+          "passed": false,
+          "evidence": "Did the opposite \u2014 recommended embedding 528 Hz directly in the prompt and 'layer a 528 Hz drone underneath in Audacity'. No wellness-claim or accuracy caveat."
+        },
+        {
+          "text": "Mentioned the extension strategy or 60-minute-deliverable plan (multiple Suno extensions / loop strategy)",
+          "passed": false,
+          "evidence": "No mention of how to actually reach 60 minutes from Suno's ~4-minute generation cap. Implied a single track."
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 3,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.6,
+        "passed": 3,
+        "failed": 2,
+        "total": 5,
+        "time_seconds": 9.4,
+        "tokens": 73744,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Did NOT silently output a Suno prompt that satisfies the literal words while violating the function constraints",
+          "passed": true,
+          "evidence": "Did not output a final prompt; did flag tensions before proceeding."
+        },
+        {
+          "text": "Surfaced the energetic-vs-meditation conflict and asked which intent wins",
+          "passed": true,
+          "evidence": "Identified energetic-meditation as 'a bit of an oxymoron'. Asked: 'are you looking for uplifting meditation... or active-mood music that's meditative in feel?'"
+        },
+        {
+          "text": "Pushed back on 'powerful' / 'bold' for a relaxation context (or explained the wake-the-brain trade-off)",
+          "passed": true,
+          "evidence": "Mentioned 'powerful and big string section push toward dramatic intensity, which can work, but might pull against meditation's usual quietness' \u2014 flagged but did not give the wake-the-brain physiological reason."
+        },
+        {
+          "text": "Flagged kalimba's plucky transients OR the 80 BPM tempo as a concern for the meditation function",
+          "passed": false,
+          "evidence": "Actually framed kalimba positively: 'Kalimba is traditionally associated with relaxation and organic warmth \u2014 which could actually anchor this nicely.' Did not flag transients or the 80 BPM tempo issue."
+        },
+        {
+          "text": "Suggested an alternative reframe (study/focus, or a gentler 'grounded' meditation interpretation)",
+          "passed": false,
+          "evidence": "Offered 'meditative music with an energetic undercurrent, or vice versa' \u2014 a binary choice but not a reframe to a different function (study/focus)."
+        }
+      ],
+      "notes": []
+    }
+  ],
+  "run_summary": {
+    "with_skill": {
+      "pass_rate": {
+        "mean": 1.0,
+        "stddev": 0.0,
+        "min": 1.0,
+        "max": 1.0
+      },
+      "time_seconds": {
+        "mean": 33.6667,
+        "stddev": 7.5639,
+        "min": 29.2,
+        "max": 42.4
+      },
+      "tokens": {
+        "mean": 82367.0,
+        "stddev": 1542.0973,
+        "min": 80979,
+        "max": 84027
+      }
+    },
+    "without_skill": {
+      "pass_rate": {
+        "mean": 0.3667,
+        "stddev": 0.3215,
+        "min": 0.0,
+        "max": 0.6
+      },
+      "time_seconds": {
+        "mean": 55.0,
+        "stddev": 79.5885,
+        "min": 8.7,
+        "max": 146.9
+      },
+      "tokens": {
+        "mean": 73859.0,
+        "stddev": 220.2975,
+        "min": 73720,
+        "max": 74113
+      }
+    },
+    "delta": {
+      "pass_rate": "+0.63",
+      "time_seconds": "-21.3",
+      "tokens": "+8508"
+    }
+  },
+  "notes": []
+}

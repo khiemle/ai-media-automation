@@ -1,0 +1,35 @@
+{
+  "expectations": [
+    {
+      "text": "Did NOT silently output a Suno prompt that satisfies the literal words while violating the function constraints",
+      "passed": true,
+      "evidence": "Did not output a final prompt; did flag tensions before proceeding."
+    },
+    {
+      "text": "Surfaced the energetic-vs-meditation conflict and asked which intent wins",
+      "passed": true,
+      "evidence": "Identified energetic-meditation as 'a bit of an oxymoron'. Asked: 'are you looking for uplifting meditation... or active-mood music that's meditative in feel?'"
+    },
+    {
+      "text": "Pushed back on 'powerful' / 'bold' for a relaxation context (or explained the wake-the-brain trade-off)",
+      "passed": true,
+      "evidence": "Mentioned 'powerful and big string section push toward dramatic intensity, which can work, but might pull against meditation's usual quietness' \u2014 flagged but did not give the wake-the-brain physiological reason."
+    },
+    {
+      "text": "Flagged kalimba's plucky transients OR the 80 BPM tempo as a concern for the meditation function",
+      "passed": false,
+      "evidence": "Actually framed kalimba positively: 'Kalimba is traditionally associated with relaxation and organic warmth \u2014 which could actually anchor this nicely.' Did not flag transients or the 80 BPM tempo issue."
+    },
+    {
+      "text": "Suggested an alternative reframe (study/focus, or a gentler 'grounded' meditation interpretation)",
+      "passed": false,
+      "evidence": "Offered 'meditative music with an energetic undercurrent, or vice versa' \u2014 a binary choice but not a reframe to a different function (study/focus)."
+    }
+  ],
+  "summary": {
+    "passed": 3,
+    "failed": 2,
+    "total": 5,
+    "pass_rate": 0.6
+  }
+}
