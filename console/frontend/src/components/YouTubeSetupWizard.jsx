@@ -2,8 +2,14 @@ import { useState, useEffect, useRef } from 'react'
 import { Modal, Input, Button, Toast } from './index.jsx'
 import { fetchApi } from '../api/client.js'
 
-// The backend callback URL. Port 8080 is the FastAPI server (not the Vite dev server).
-const CALLBACK_URI = `${window.location.protocol}//${window.location.hostname}:8080/api/credentials/youtube/callback`
+// The backend callback URL.
+// Hardcoded to http://localhost:8080 for both dev and production: the OAuth flow
+// must be completed FROM the host server's browser (Windows production host),
+// so the redirect URI is always localhost from that machine's perspective.
+// Don't derive from window.location — accessing the console from another machine
+// on the LAN would send Google a non-localhost redirect URI that the OAuth client
+// is not configured for.
+const CALLBACK_URI = "http://localhost:8080/api/credentials/youtube/callback"
 
 const STEPS = [
   {
