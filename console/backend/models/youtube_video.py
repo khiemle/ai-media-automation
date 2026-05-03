@@ -29,7 +29,7 @@ class YoutubeVideo(Base):
     seo_tags: Mapped[list[str] | None] = mapped_column(ARRAY(String), nullable=True)
     target_duration_h: Mapped[float | None] = mapped_column(Float, nullable=True)
     output_quality: Mapped[str] = mapped_column(String(10), default="1080p", server_default="1080p")
-    status: Mapped[str] = mapped_column(String(20), default="draft", server_default="draft")
+    status: Mapped[str] = mapped_column(String(40), default="draft", server_default="draft")
     output_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     celery_task_id: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
