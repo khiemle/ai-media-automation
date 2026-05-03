@@ -4,13 +4,23 @@ from pathlib import Path
 
 
 def _make_video(sfx_overrides=None, visual_asset_id=None, music_track_id=None,
-                target_duration_h=3.0, output_quality="1080p"):
+                target_duration_h=3.0, output_quality="1080p",
+                music_track_ids=None, sfx_pool=None,
+                sfx_density_seconds=None, sfx_seed=None,
+                black_from_seconds=None):
     v = MagicMock()
     v.visual_asset_id = visual_asset_id
     v.music_track_id = music_track_id
     v.sfx_overrides = sfx_overrides
     v.target_duration_h = target_duration_h
     v.output_quality = output_quality
+    # ASMR/soundscape extension attrs — default to empty / None so existing
+    # tests don't accidentally trigger multi-music / SFX-pool / blackout paths.
+    v.music_track_ids = music_track_ids if music_track_ids is not None else []
+    v.sfx_pool = sfx_pool if sfx_pool is not None else []
+    v.sfx_density_seconds = sfx_density_seconds
+    v.sfx_seed = sfx_seed
+    v.black_from_seconds = black_from_seconds
     return v
 
 
