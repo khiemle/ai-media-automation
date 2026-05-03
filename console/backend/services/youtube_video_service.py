@@ -66,6 +66,15 @@ def _video_to_dict(
         "seo_tags": v.seo_tags,
         "celery_task_id": v.celery_task_id,
         "output_path": v.output_path,
+        "music_track_ids":     list(v.music_track_ids or []),
+        "sfx_pool":            v.sfx_pool or [],
+        "sfx_density_seconds": v.sfx_density_seconds,
+        "sfx_seed":            v.sfx_seed,
+        "black_from_seconds":  v.black_from_seconds,
+        "skip_previews":       bool(v.skip_previews) if v.skip_previews is not None else True,
+        "render_parts":        v.render_parts or [],
+        "audio_preview_path":  v.audio_preview_path,
+        "video_preview_path":  v.video_preview_path,
         "uploads": uploads if uploads is not None else [],
         "created_at": v.created_at.isoformat() if v.created_at else None,
         "updated_at": v.updated_at.isoformat() if v.updated_at else None,
@@ -190,14 +199,24 @@ class YoutubeVideoService:
         if not template:
             raise ValueError(f"Template {template_id} not found")
 
+        # Default skip_previews=False for asmr/soundscape templates (preview flow opt-in by default)
+        skip_previews = data.get("skip_previews")
+        if skip_previews is None:
+            skip_previews = template.slug not in ("asmr", "soundscape")
+
         video = YoutubeVideo(
             title=data["title"],
             template_id=template_id,
             theme=data.get("theme"),
             music_track_id=data.get("music_track_id"),
+            music_track_ids=data.get("music_track_ids") or [],
             visual_asset_id=data.get("visual_asset_id"),
             parent_youtube_video_id=data.get("parent_youtube_video_id"),
             sfx_overrides=data.get("sfx_overrides"),
+            sfx_pool=data.get("sfx_pool") or [],
+            sfx_density_seconds=data.get("sfx_density_seconds"),
+            black_from_seconds=data.get("black_from_seconds"),
+            skip_previews=skip_previews,
             target_duration_h=data.get("target_duration_h"),
             output_quality=data.get("output_quality", "1080p"),
             seo_title=data.get("seo_title"),
@@ -223,8 +242,9 @@ class YoutubeVideoService:
             raise KeyError(f"YoutubeVideo {video_id} not found")
 
         editable_fields = [
-            "title", "theme", "music_track_id", "visual_asset_id",
-            "sfx_overrides", "target_duration_h", "output_quality",
+            "title", "theme", "music_track_id", "music_track_ids", "visual_asset_id",
+            "sfx_overrides", "sfx_pool", "sfx_density_seconds", "black_from_seconds",
+            "skip_previews", "target_duration_h", "output_quality",
             "seo_title", "seo_description", "seo_tags",
         ]
         changed = {f: data[f] for f in editable_fields if f in data}
@@ -281,7 +301,7 @@ class YoutubeVideoService:
             raise
 
     def dispatch_render(self, video_id: int) -> str:
-        """Queue the correct render task based on template.output_format. Returns Celery task_id."""
+        """Queue the correct render task based on template + skip_previews. Returns Celery task_id."""
         v = self.db.get(YoutubeVideo, video_id)
         if not v:
             raise KeyError(f"YoutubeVideo {video_id} not found")
@@ -290,12 +310,21 @@ class YoutubeVideoService:
         if not template:
             raise ValueError(f"VideoTemplate {v.template_id} not found")
 
-        if template.output_format == "portrait_short":
+        # Route asmr/soundscape with previews enabled → audio preview gate
+        if template.slug in ("asmr", "soundscape") and not v.skip_previews:
+            from console.backend.tasks.youtube_render_task import render_youtube_audio_preview_task
+            task = render_youtube_audio_preview_task.delay(video_id)
+        elif template.output_format == "portrait_short":
             from console.backend.tasks.youtube_short_render_task import render_youtube_short_task
             task = render_youtube_short_task.delay(video_id)
         else:
-            from console.backend.tasks.youtube_render_task import render_youtube_video_task
-            task = render_youtube_video_task.delay(video_id)
+            # asmr/soundscape with skip_previews=True → chunked orchestrator (still gets chunked render benefit)
+            if template.slug in ("asmr", "soundscape"):
+                from console.backend.tasks.youtube_render_task import render_youtube_chunked_orchestrator_task
+                task = render_youtube_chunked_orchestrator_task.delay(video_id)
+            else:
+                from console.backend.tasks.youtube_render_task import render_youtube_video_task
+                task = render_youtube_video_task.delay(video_id)
 
         v.celery_task_id = task.id
         self.db.commit()
@@ -341,3 +370,134 @@ class YoutubeVideoService:
             raise
 
         return {"task_id": task.id, "upload_id": upload.id, "status": "queued"}
+
+    # ── ASMR / Soundscape render lifecycle ───────────────────────────────────
+
+    def _load_video_or_404(self, video_id: int) -> YoutubeVideo:
+        v = self.db.get(YoutubeVideo, video_id)
+        if not v:
+            raise KeyError(f"YoutubeVideo {video_id} not found")
+        return v
+
+    def _revoke_active_render_jobs(self, video_id: int) -> None:
+        """Revoke any in-flight Celery render task for this video."""
+        from console.backend.celery_app import celery_app
+        v = self.db.get(YoutubeVideo, video_id)
+        if v and v.celery_task_id:
+            try:
+                celery_app.control.revoke(v.celery_task_id, terminate=True)
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning("Failed to revoke task %s: %s", v.celery_task_id, e)
+
+    def start_audio_preview(self, video_id: int, user_id: int | None = None) -> str:
+        from console.backend.tasks.youtube_render_task import render_youtube_audio_preview_task
+        v = self._load_video_or_404(video_id)
+        if v.status not in ("draft", "queued", "audio_preview_ready", "video_preview_ready"):
+            raise ValueError(f"Cannot start audio preview from status '{v.status}'")
+        v.status = "audio_preview_rendering"
+        _audit(self.db, user_id, "start_audio_preview", "youtube_video", str(video_id))
+        self.db.commit()
+        task = render_youtube_audio_preview_task.delay(video_id)
+        v.celery_task_id = task.id
+        self.db.commit()
+        return task.id
+
+    def approve_audio_preview(self, video_id: int, user_id: int | None = None) -> dict:
+        v = self._load_video_or_404(video_id)
+        if v.status != "audio_preview_ready":
+            raise ValueError(f"Cannot approve from status '{v.status}'")
+        _audit(self.db, user_id, "approve_audio_preview", "youtube_video", str(video_id))
+        self.db.commit()
+        return {"status": v.status}
+
+    def reject_audio_preview(self, video_id: int, user_id: int | None = None) -> dict:
+        v = self._load_video_or_404(video_id)
+        if v.status != "audio_preview_ready":
+            raise ValueError(f"Cannot reject from status '{v.status}'")
+        v.status = "queued"
+        v.audio_preview_path = None
+        _audit(self.db, user_id, "reject_audio_preview", "youtube_video", str(video_id))
+        self.db.commit()
+        return {"status": v.status}
+
+    def start_video_preview(self, video_id: int, user_id: int | None = None) -> str:
+        from console.backend.tasks.youtube_render_task import render_youtube_video_preview_task
+        v = self._load_video_or_404(video_id)
+        if v.status not in ("audio_preview_ready", "video_preview_ready"):
+            raise ValueError(f"Cannot start video preview from status '{v.status}'")
+        v.status = "video_preview_rendering"
+        _audit(self.db, user_id, "start_video_preview", "youtube_video", str(video_id))
+        self.db.commit()
+        task = render_youtube_video_preview_task.delay(video_id)
+        v.celery_task_id = task.id
+        self.db.commit()
+        return task.id
+
+    def approve_video_preview(self, video_id: int, user_id: int | None = None) -> dict:
+        v = self._load_video_or_404(video_id)
+        if v.status != "video_preview_ready":
+            raise ValueError(f"Cannot approve from status '{v.status}'")
+        _audit(self.db, user_id, "approve_video_preview", "youtube_video", str(video_id))
+        self.db.commit()
+        return {"status": v.status}
+
+    def reject_video_preview(self, video_id: int, user_id: int | None = None) -> dict:
+        v = self._load_video_or_404(video_id)
+        if v.status != "video_preview_ready":
+            raise ValueError(f"Cannot reject from status '{v.status}'")
+        v.status = "audio_preview_ready"
+        v.video_preview_path = None
+        _audit(self.db, user_id, "reject_video_preview", "youtube_video", str(video_id))
+        self.db.commit()
+        return {"status": v.status}
+
+    def start_chunked_render(self, video_id: int, user_id: int | None = None) -> str:
+        from console.backend.tasks.youtube_render_task import render_youtube_chunked_orchestrator_task
+        v = self._load_video_or_404(video_id)
+        valid_from = ("video_preview_ready", "queued", "draft") if v.skip_previews else ("video_preview_ready",)
+        if v.status not in valid_from:
+            raise ValueError(f"Cannot start final render from status '{v.status}'")
+        v.status = "rendering"
+        _audit(self.db, user_id, "start_chunked_render", "youtube_video", str(video_id))
+        self.db.commit()
+        task = render_youtube_chunked_orchestrator_task.delay(video_id)
+        v.celery_task_id = task.id
+        self.db.commit()
+        return task.id
+
+    def resume_chunked_render(self, video_id: int, user_id: int | None = None) -> str:
+        from console.backend.tasks.youtube_render_task import render_youtube_chunked_orchestrator_task
+        from sqlalchemy.orm.attributes import flag_modified
+        v = self._load_video_or_404(video_id)
+        if not v.render_parts:
+            raise ValueError("No prior render to resume")
+        # Revoke in-flight tasks before re-dispatching
+        self._revoke_active_render_jobs(video_id)
+        # Reset failed/running parts to pending
+        parts = list(v.render_parts)
+        for p in parts:
+            if p.get("status") in ("failed", "running"):
+                p["status"] = "pending"
+                p["error"] = None
+        v.render_parts = parts
+        flag_modified(v, "render_parts")
+        v.status = "rendering"
+        _audit(self.db, user_id, "resume_chunked_render", "youtube_video", str(video_id))
+        self.db.commit()
+        task = render_youtube_chunked_orchestrator_task.delay(video_id)
+        v.celery_task_id = task.id
+        self.db.commit()
+        return task.id
+
+    def cancel_chunked_render(self, video_id: int, user_id: int | None = None) -> dict:
+        v = self._load_video_or_404(video_id)
+        self._revoke_active_render_jobs(video_id)
+        v.status = "video_preview_ready" if v.video_preview_path else "queued"
+        _audit(self.db, user_id, "cancel_chunked_render", "youtube_video", str(video_id))
+        self.db.commit()
+        return {"status": v.status}
+
+    def get_render_state(self, video_id: int) -> dict:
+        from console.backend.services.youtube_render_state import get_render_state
+        return get_render_state(self.db, video_id)
