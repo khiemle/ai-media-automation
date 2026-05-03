@@ -2,6 +2,45 @@ import { useState, useEffect } from 'react'
 import { youtubeVideosApi, musicApi, assetsApi, sfxApi, channelPlansApi } from '../api/client.js'
 import { Card, Badge, Button, Input, Select, Toast, Spinner, EmptyState, Modal } from '../components/index.jsx'
 import AIAssistantPanel from '../components/AIAssistantPanel.jsx'
+import MusicPlaylistEditor from '../components/MusicPlaylistEditor.jsx'
+import SfxPoolEditor from '../components/SfxPoolEditor.jsx'
+import RenderStatePanel from '../components/RenderStatePanel.jsx'
+import PreviewApprovalGate from '../components/PreviewApprovalGate.jsx'
+import { useRenderWebSocket } from '../hooks/useRenderWebSocket.js'
+
+const ACTIVE_RENDER_STATES = new Set([
+  'audio_preview_rendering',
+  'video_preview_rendering',
+  'rendering',
+  'audio_preview_ready',
+  'video_preview_ready',
+])
+
+function ActiveRenderCard({ video, onUpdate }) {
+  const { state: wsState } = useRenderWebSocket(video.id)
+  const liveStatus = wsState?.status || video.status
+  if (liveStatus === 'audio_preview_ready') {
+    return (
+      <PreviewApprovalGate
+        videoId={video.id}
+        kind="audio"
+        mediaPath={wsState?.audio_preview_path || video.audio_preview_path}
+        onAction={onUpdate}
+      />
+    )
+  }
+  if (liveStatus === 'video_preview_ready') {
+    return (
+      <PreviewApprovalGate
+        videoId={video.id}
+        kind="video"
+        mediaPath={wsState?.video_preview_path || video.video_preview_path}
+        onAction={onUpdate}
+      />
+    )
+  }
+  return <RenderStatePanel videoId={video.id} state={wsState} onAction={onUpdate} />
+}
 
 const STATUS_COLORS = {
   draft:     '#9090a8',
@@ -86,6 +125,14 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
     background: { asset_id: '', volume: 0.1 },
   })
 
+  // ASMR / Soundscape extras
+  const [musicTrackIds, setMusicTrackIds]       = useState([])
+  const [sfxPool, setSfxPool]                   = useState([])     // [{asset_id, volume}]
+  const [sfxDensity, setSfxDensity]             = useState(60)
+  const [blackFromSeconds, setBlackFromSeconds] = useState('')
+  const [skipPreviews, setSkipPreviews]         = useState(false)
+  const isAsmrLike = ['asmr', 'soundscape'].includes(template?.slug)
+
   const [showMusicUpload, setShowMusicUpload] = useState(false)
   const [musicUploadFile, setMusicUploadFile] = useState(null)
   const [musicUploadTitle, setMusicUploadTitle] = useState('')
@@ -117,7 +164,11 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
         quality_score: 80,
       })
       setMusicList(prev => [...prev, newTrack])
-      setForm(f => ({ ...f, music_track_id: String(newTrack.id) }))
+      if (isAsmrLike) {
+        setMusicTrackIds(prev => [...prev, newTrack.id])
+      } else {
+        setForm(f => ({ ...f, music_track_id: String(newTrack.id) }))
+      }
       setShowMusicUpload(false)
       setMusicUploadFile(null)
       setMusicUploadTitle('')
@@ -248,6 +299,13 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
           ? form.seo_tags.split(',').map(t => t.trim()).filter(Boolean)
           : [],
         output_quality: form.output_quality,
+        ...(isAsmrLike ? {
+          music_track_ids: musicTrackIds,
+          sfx_pool: sfxPool,
+          sfx_density_seconds: sfxPool.length > 0 ? sfxDensity : null,
+          black_from_seconds: blackFromSeconds ? parseInt(blackFromSeconds, 10) : null,
+          skip_previews: skipPreviews,
+        } : {}),
       })
       onCreated()
       onClose()
@@ -411,16 +469,25 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
               </button>
             </div>
             <div className="flex flex-col gap-3">
-              <Select
-                label="Music Track"
-                value={form.music_track_id || ''}
-                onChange={e => setForm(f => ({ ...f, music_track_id: e.target.value || null }))}
-              >
-                <option value="">— Select from library —</option>
-                {musicList.map(m => (
-                  <option key={m.id} value={m.id}>{m.title} ({m.provider})</option>
-                ))}
-              </Select>
+              {isAsmrLike ? (
+                <div className="flex flex-col gap-1">
+                  <div className="text-xs text-[#9090a8] font-medium">
+                    Music Playlist <span className="text-[#5a5a70]">(reorder with ↑↓ — looped in order)</span>
+                  </div>
+                  <MusicPlaylistEditor trackIds={musicTrackIds} onChange={setMusicTrackIds} />
+                </div>
+              ) : (
+                <Select
+                  label="Music Track"
+                  value={form.music_track_id || ''}
+                  onChange={e => setForm(f => ({ ...f, music_track_id: e.target.value || null }))}
+                >
+                  <option value="">— Select from library —</option>
+                  {musicList.map(m => (
+                    <option key={m.id} value={m.id}>{m.title} ({m.provider})</option>
+                  ))}
+                </Select>
+              )}
               {showMusicUpload && (
                 <div className="flex flex-col gap-2 bg-[#0d0d0f] border border-[#2a2a32] rounded-lg p-3">
                   <div className="text-xs text-[#5a5a70] font-medium">Upload Music Track</div>
@@ -616,6 +683,37 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
               })}
             </div>
           </section>
+
+          {/* ④b RANDOM SFX POOL + EXTRAS — asmr/soundscape only */}
+          {isAsmrLike && (
+            <section>
+              <div className="text-xs font-bold text-[#5a5a70] tracking-widest mb-3">④b RANDOM SFX POOL</div>
+              <SfxPoolEditor
+                pool={sfxPool}
+                densitySeconds={sfxDensity}
+                onChange={({ pool, densitySeconds }) => { setSfxPool(pool); setSfxDensity(densitySeconds) }}
+              />
+              <div className="mt-4 flex flex-col gap-3">
+                <Input
+                  label="Black-out from (seconds — visual fades to black, audio continues)"
+                  type="number"
+                  min="0"
+                  value={blackFromSeconds}
+                  onChange={e => setBlackFromSeconds(e.target.value)}
+                  placeholder="leave blank for no blackout"
+                />
+                <label className="flex items-center gap-2 text-xs text-[#9090a8]">
+                  <input
+                    type="checkbox"
+                    checked={skipPreviews}
+                    onChange={e => setSkipPreviews(e.target.checked)}
+                    className="accent-[#7c6af7]"
+                  />
+                  Skip preview gates (render straight to final, still chunked)
+                </label>
+              </div>
+            </section>
+          )}
 
           {/* ⑤ RENDER */}
           <section>
@@ -934,6 +1032,7 @@ export default function YouTubeVideosPage() {
         <div className="flex flex-col gap-3">
           {videos.map(v => {
             const tmpl = templates.find(t => t.id === v.template_id)
+            const isActive = ACTIVE_RENDER_STATES.has(v.status)
             return (
               <Card key={v.id} className="px-5 py-4">
                 <div className="flex items-start justify-between gap-4">
@@ -980,6 +1079,11 @@ export default function YouTubeVideosPage() {
                     </button>
                   </div>
                 </div>
+                {isActive && (
+                  <div className="mt-4">
+                    <ActiveRenderCard video={v} onUpdate={load} />
+                  </div>
+                )}
               </Card>
             )
           })}

@@ -235,6 +235,20 @@ export const youtubeVideosApi = {
     method: 'POST',
     body: JSON.stringify({ channel_id: channelId }),
   }),
+
+  // ── ASMR / Soundscape render lifecycle ──
+  getRenderState: (id) => fetchApi(`/api/youtube-videos/${id}/render/state`),
+  startAudioPreview: (id) => fetchApi(`/api/youtube-videos/${id}/render/audio-preview`, { method: 'POST' }),
+  approveAudioPreview: (id) => fetchApi(`/api/youtube-videos/${id}/render/audio-preview/approve`, { method: 'POST' }),
+  rejectAudioPreview: (id) => fetchApi(`/api/youtube-videos/${id}/render/audio-preview/reject`, { method: 'POST' }),
+  startVideoPreview: (id) => fetchApi(`/api/youtube-videos/${id}/render/video-preview`, { method: 'POST' }),
+  approveVideoPreview: (id) => fetchApi(`/api/youtube-videos/${id}/render/video-preview/approve`, { method: 'POST' }),
+  rejectVideoPreview: (id) => fetchApi(`/api/youtube-videos/${id}/render/video-preview/reject`, { method: 'POST' }),
+  startFinal: (id) => fetchApi(`/api/youtube-videos/${id}/render/final`, { method: 'POST' }),
+  resume: (id) => fetchApi(`/api/youtube-videos/${id}/render/resume`, { method: 'POST' }),
+  cancel: (id) => fetchApi(`/api/youtube-videos/${id}/render/cancel`, { method: 'POST' }),
+  audioPreviewUrl: (id) => `/api/youtube-videos/${id}/preview/audio`,
+  videoPreviewUrl: (id) => `/api/youtube-videos/${id}/preview/video`,
 }
 
 // ── Templates ───────────────────────────────────────────────────────────────────
