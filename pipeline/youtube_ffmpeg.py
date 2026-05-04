@@ -206,7 +206,7 @@ def _probe_duration(path: str) -> float:
             capture_output=True, text=True, timeout=15,
         )
         return float(result.stdout.strip())
-    except (ValueError, AttributeError, subprocess.TimeoutExpired):
+    except (ValueError, subprocess.TimeoutExpired):
         return 0.0
 
 
