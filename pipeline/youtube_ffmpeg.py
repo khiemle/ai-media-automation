@@ -210,6 +210,18 @@ def _probe_duration(path: str) -> float:
         return 0.0
 
 
+def _nvenc_available() -> bool:
+    """Check if h264_nvenc (NVIDIA GPU encoder) is available in ffmpeg."""
+    try:
+        result = subprocess.run(
+            ["ffmpeg", "-hide_banner", "-encoders"],
+            capture_output=True, text=True, timeout=10,
+        )
+        return "h264_nvenc" in (result.stdout or "")
+    except Exception:
+        return False
+
+
 def _build_music_playlist_wav(video, db, target_duration_s: int, output_dir: Path, start_s: float = 0.0) -> str | None:
     """Render the multi-track music playlist to a single temp WAV, with crossfade and loop.
 
@@ -539,11 +551,14 @@ def render_landscape(
     # Preset is keyed off FULL video duration (not chunk size) so all chunks of
     # the same video share encoder params. Otherwise a 500s tail chunk would
     # pick "slow" while earlier chunks used "ultrafast", breaking -c copy concat.
-    preset = "ultrafast" if full_duration_s > 600 else "slow"
-    if is_image:
-        cmd += ["-c:v", "libx264", "-preset", preset, "-tune", "stillimage", "-crf", "23"]
+    if _nvenc_available():
+        cmd += ["-c:v", "h264_nvenc", "-preset", "p1", "-rc", "vbr", "-cq", "23"]
     else:
-        cmd += ["-c:v", "libx264", "-preset", preset, "-crf", "23"]
+        preset = "ultrafast" if full_duration_s > 600 else "slow"
+        if is_image:
+            cmd += ["-c:v", "libx264", "-preset", preset, "-tune", "stillimage", "-crf", "23"]
+        else:
+            cmd += ["-c:v", "libx264", "-preset", preset, "-crf", "23"]
     cmd += ["-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-movflags", "+faststart",
             str(output_path)]
 

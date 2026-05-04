@@ -427,3 +427,45 @@ def test_render_landscape_sfx_layer_no_ss_when_start_s_is_zero(tmp_path):
 
     cmd = mock_run.call_args[0][0]
     assert "-ss" not in cmd
+
+
+# ── _nvenc_available ───────────────────────────────────────────────────────────
+
+def test_nvenc_available_returns_true_when_h264_nvenc_in_ffmpeg_output():
+    from pipeline.youtube_ffmpeg import _nvenc_available
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stdout=" V..... h264_nvenc           NVIDIA NVENC H.264", stderr="")
+        assert _nvenc_available() is True
+
+
+def test_nvenc_available_returns_false_when_h264_nvenc_not_in_output():
+    from pipeline.youtube_ffmpeg import _nvenc_available
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stdout=" V..... libx264              libx264 H.264", stderr="")
+        assert _nvenc_available() is False
+
+
+def test_render_landscape_uses_h264_nvenc_when_nvenc_available(tmp_path):
+    output = tmp_path / "out.mp4"
+    with patch("shutil.which", return_value="/usr/bin/ffmpeg"), \
+         patch("pipeline.youtube_ffmpeg._nvenc_available", return_value=True), \
+         patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stderr="")
+        from pipeline.youtube_ffmpeg import render_landscape
+        render_landscape(_make_video(), output, MagicMock())
+    cmd = " ".join(mock_run.call_args[0][0])
+    assert "h264_nvenc" in cmd
+    assert "libx264" not in cmd
+
+
+def test_render_landscape_uses_libx264_when_nvenc_not_available(tmp_path):
+    output = tmp_path / "out.mp4"
+    with patch("shutil.which", return_value="/usr/bin/ffmpeg"), \
+         patch("pipeline.youtube_ffmpeg._nvenc_available", return_value=False), \
+         patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stderr="")
+        from pipeline.youtube_ffmpeg import render_landscape
+        render_landscape(_make_video(), output, MagicMock())
+    cmd = " ".join(mock_run.call_args[0][0])
+    assert "libx264" in cmd
+    assert "h264_nvenc" not in cmd
