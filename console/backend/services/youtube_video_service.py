@@ -117,6 +117,8 @@ def _template_to_dict(t: VideoTemplate) -> dict[str, Any]:
 
 
 class YoutubeVideoService:
+    EDITABLE_STATUSES = {"draft", "failed", "audio_preview_ready", "video_preview_ready"}
+
     def __init__(self, db: Session):
         self.db = db
 
@@ -241,24 +243,115 @@ class YoutubeVideoService:
             raise
         return _video_to_dict(video)
 
+    def _validate_visual_playlist(self, data: dict) -> list[float] | None:
+        """Validate visual playlist fields. Returns the normalized durations array if rewritten, else None.
+
+        Raises ValueError on invalid combinations.
+        """
+        if "visual_asset_ids" not in data:
+            return None
+        asset_ids = data.get("visual_asset_ids") or []
+        if not asset_ids:
+            return None
+
+        from console.backend.models.video_asset import VideoAsset
+        rows = self.db.query(VideoAsset).filter(VideoAsset.id.in_(asset_ids)).all()
+        rows_by_id = {r.id: r for r in rows}
+        for aid in asset_ids:
+            if aid not in rows_by_id:
+                raise ValueError(f"visual_asset_ids includes unknown asset {aid}")
+
+        durations = list(data.get("visual_clip_durations_s") or [])
+        if durations and len(durations) != len(asset_ids):
+            raise ValueError(
+                f"visual_clip_durations_s length ({len(durations)}) "
+                f"must match visual_asset_ids length ({len(asset_ids)})"
+            )
+        if not durations:
+            durations = [0.0] * len(asset_ids)
+
+        loop_mode = data.get("visual_loop_mode") or "concat_loop"
+        if loop_mode not in ("concat_loop", "per_clip"):
+            raise ValueError(f"visual_loop_mode must be 'concat_loop' or 'per_clip', got {loop_mode!r}")
+
+        # Per-mode duration rules
+        for i, aid in enumerate(asset_ids):
+            asset = rows_by_id[aid]
+            is_still = asset.asset_type == "still_image"
+            if loop_mode == "concat_loop":
+                if is_still and durations[i] <= 0:
+                    durations[i] = 3.0
+            else:  # per_clip
+                if is_still and durations[i] <= 0:
+                    durations[i] = 3.0
+                elif not is_still and durations[i] <= 0:
+                    raise ValueError(
+                        f"per_clip mode requires duration > 0 for video at index {i} (asset {aid})"
+                    )
+        return durations
+
+    def _discard_render_artifacts(self, v: YoutubeVideo) -> list[str]:
+        """Delete preview + output files from disk; null the path columns. Return list of discarded paths."""
+        from pathlib import Path
+
+        discarded: list[str] = []
+        for attr in ("audio_preview_path", "video_preview_path", "output_path"):
+            path_str = getattr(v, attr, None)
+            if path_str:
+                p = Path(path_str)
+                if p.is_file():
+                    try:
+                        p.unlink()
+                        discarded.append(path_str)
+                    except OSError:
+                        pass  # best-effort; we still null the column
+                setattr(v, attr, None)
+        return discarded
+
     def update_video(self, video_id: int, data: dict, user_id: int | None = None) -> dict:
-        """Update editable fields on a YouTube video project."""
+        """Edit fields on a YouTube video and reset to draft, discarding any preview/output artifacts."""
         v = self.db.get(YoutubeVideo, video_id)
         if not v:
             raise KeyError(f"YoutubeVideo {video_id} not found")
+        if v.status not in self.EDITABLE_STATUSES:
+            raise ValueError(
+                f"Video in status {v.status!r} cannot be edited "
+                f"(allowed: {sorted(self.EDITABLE_STATUSES)})"
+            )
+
+        # Validate visual playlist BEFORE any writes
+        playlist_validation = self._validate_visual_playlist(data)
 
         editable_fields = [
             "title", "theme", "music_track_id", "music_track_ids", "visual_asset_id",
             "sfx_overrides", "sfx_pool", "sfx_density_seconds", "black_from_seconds",
             "skip_previews", "target_duration_h", "output_quality",
             "seo_title", "seo_description", "seo_tags",
+            "visual_asset_ids", "visual_clip_durations_s", "visual_loop_mode",
         ]
         changed = {f: data[f] for f in editable_fields if f in data}
+
+        # Apply normalized durations array if validation rewrote it
+        if playlist_validation is not None:
+            changed["visual_clip_durations_s"] = playlist_validation
+
         for field, value in changed.items():
             setattr(v, field, value)
 
+        # Reset to draft + discard orphaned artifacts
+        discarded = self._discard_render_artifacts(v)
+        v.status = "draft"
+        v.celery_task_id = None
+
         try:
-            _audit(self.db, user_id, "update_video", "youtube_video", str(video_id), changed)
+            _audit(
+                self.db,
+                user_id,
+                "video_edit_reset",
+                "youtube_video",
+                str(video_id),
+                {"changed_fields": sorted(changed.keys()), "discarded_artifacts": discarded},
+            )
             self.db.commit()
             self.db.refresh(v)
         except Exception:
