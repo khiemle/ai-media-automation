@@ -102,9 +102,18 @@ _run_ffmpeg(cmd, max(120, target_dur * 2))
 
 **Why not `-ss` on music/sfx WAVs?** `music_wav` and `sfx_wav` are pre-rendered to exactly `target_dur` seconds for the chunk. They start at t=0 by design. `sfx_layers` (3-layer overrides) are looped ambient tracks with no positional meaning — correct as-is.
 
-### 3. Upgrade to GPU encoder (`h264_nvenc`)
+### 3. Encoder selection — GPU on Windows prod, CPU on Mac dev
 
-The celery-render container already has the NVIDIA driver reservation (`nvidia`, count=1) for the GTX 1660S. `libx264` is pure CPU; `h264_nvenc` offloads encoding to the GPU and is 5–15× faster at equivalent quality.
+**Environment difference:**
+
+| Environment | Machine | GPU | Encoder to use |
+|---|---|---|---|
+| Production (Docker) | Windows, GTX 1660S | ✅ NVIDIA nvenc confirmed available | `h264_nvenc` |
+| Dev | Mac (M-series or Intel) | ❌ No NVIDIA GPU | `libx264` |
+
+`h264_nvenc` is 5–15× faster than `libx264` at equivalent quality and is already present in the render container (`h264_nvenc` confirmed in `ffmpeg -encoders` output, GPU visible via `nvidia-smi`). On Mac, nvenc is never available so the fallback to `libx264` is automatic.
+
+The selection must be **runtime**, not compile-time, so the same code works on both machines without any environment variable or config change.
 
 Add an encoder-selection helper:
 
@@ -121,9 +130,11 @@ Replace the encoder block in `render_landscape`:
 
 ```python
 if _nvenc_available():
+    # GPU path: Windows prod with GTX 1660S
     # h264_nvenc: p1=fastest preset, vbr+cq≈crf, no tune:stillimage needed
     cmd += ["-c:v", "h264_nvenc", "-preset", "p1", "-rc", "vbr", "-cq", "23"]
 else:
+    # CPU path: Mac dev machine (no NVIDIA GPU)
     preset = "ultrafast" if full_duration_s > 600 else "slow"
     if is_image:
         cmd += ["-c:v", "libx264", "-preset", preset, "-tune", "stillimage", "-crf", "23"]
@@ -131,7 +142,7 @@ else:
         cmd += ["-c:v", "libx264", "-preset", preset, "-crf", "23"]
 ```
 
-> **Note:** All chunks of the same video must use identical codec/preset. Since `_nvenc_available()` is a process-level constant (driver either works or it doesn't), this is consistent across the chord.
+> **Note on chunk consistency:** All chunks of the same video must use identical codec/preset so the final `concat -c copy` is seamless. Since `_nvenc_available()` is a process-level constant (driver is either present or not for the entire worker process), this is guaranteed to be consistent across all chunks of the same video — every worker on the same machine picks the same encoder.
 
 ### 4. Update timeout calculation
 
