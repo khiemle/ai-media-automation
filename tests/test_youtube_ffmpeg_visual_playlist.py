@@ -44,7 +44,8 @@ def test_resolve_visual_playlist_drops_assets_with_missing_files(tmp_path):
 
 def test_build_visual_segment_uses_native_length_for_videos_in_concat_loop(monkeypatch, tmp_path):
     """In concat_loop mode, video items with duration=0 should use -i without -t (native length)."""
-    a = MagicMock(); a.file_path = str(tmp_path / "v.mp4"); a.asset_type = "video_clip"
+    asset_path_str = str(tmp_path / "v.mp4")
+    a = MagicMock(); a.file_path = asset_path_str; a.asset_type = "video_clip"
     (tmp_path / "v.mp4").write_bytes(b"fake")
 
     captured = {"all_cmds": []}
@@ -67,6 +68,11 @@ def test_build_visual_segment_uses_native_length_for_videos_in_concat_loop(monke
     # Sanity: ffmpeg should be invoked with the input path and produce an mp4 in output_dir
     assert "v.mp4" in all_cmds
     assert str(out).endswith(".mp4")
+    # The first ffmpeg call is the per-item normalize step; assert it has NO -t flag
+    # (native-length means we let the input play to its end, no time cap)
+    item_cmd = captured["all_cmds"][0]
+    assert "-t" not in item_cmd, f"per-item cmd unexpectedly has -t: {item_cmd}"
+    assert asset_path_str in item_cmd
 
 
 def test_build_visual_segment_per_clip_mode_uses_per_item_duration(monkeypatch, tmp_path):
@@ -89,8 +95,64 @@ def test_build_visual_segment_per_clip_mode_uses_per_item_duration(monkeypatch, 
         w=1920, h=1080, target_dur_s=60,
         output_dir=tmp_path,
     )
-    # Join all captured ffmpeg calls to check per-item durations appeared in any call
-    all_cmds = " ".join(" ".join(c) for c in captured["all_cmds"])
-    # Both per-item durations should appear in the filter graph
-    assert "10" in all_cmds
-    assert "3" in all_cmds
+    # First call = first item (video, 10s slot, with -stream_loop for filling the slot)
+    item1_cmd = captured["all_cmds"][0]
+    assert "-stream_loop" in item1_cmd
+    assert "-t" in item1_cmd
+    assert "10.0" in item1_cmd  # exact float repr matches the duration we passed
+
+    # Second call = second item (image, 3s, with -loop 1)
+    item2_cmd = captured["all_cmds"][1]
+    assert "-loop" in item2_cmd
+    assert "1" in item2_cmd
+    assert "-t" in item2_cmd
+    assert "3.0" in item2_cmd
+
+
+def test_render_landscape_skips_ss_when_using_playlist_segment(monkeypatch, tmp_path):
+    """Chunked render with a playlist segment must NOT apply -ss start_s — that would
+    seek past the pre-cut segment's end. Regression test for the chunked-render bug.
+    """
+    from unittest.mock import MagicMock
+
+    # Stub out the playlist resolver and segment builder so they return a fake segment
+    fake_segment = tmp_path / "vseg.mp4"
+    fake_segment.write_bytes(b"x")
+
+    monkeypatch.setattr(
+        "pipeline.youtube_ffmpeg.resolve_visual_playlist",
+        lambda video, db: [MagicMock()],
+    )
+    monkeypatch.setattr(
+        "pipeline.youtube_ffmpeg._build_visual_segment",
+        lambda **kwargs: fake_segment,
+    )
+    # Stub audio resolvers so they don't try to query the DB
+    monkeypatch.setattr("pipeline.youtube_ffmpeg.resolve_visual", lambda v, db: None)
+    monkeypatch.setattr("pipeline.youtube_ffmpeg.resolve_sfx_layers", lambda v, db: [])
+    monkeypatch.setattr("pipeline.youtube_ffmpeg._build_music_playlist_wav", lambda *a, **k: None)
+    monkeypatch.setattr("pipeline.youtube_ffmpeg._build_sfx_pool_wav", lambda *a, **k: None)
+
+    captured = {}
+    def fake_run(cmd, timeout):
+        captured["cmd"] = cmd
+    monkeypatch.setattr("pipeline.youtube_ffmpeg._run_ffmpeg", fake_run)
+
+    video = MagicMock()
+    video.target_duration_h = 1.0
+    video.output_quality = "1080p"
+    video.visual_asset_ids = [1]
+    video.visual_clip_durations_s = [0.0]
+    video.visual_loop_mode = "concat_loop"
+    video.black_from_seconds = None
+
+    from pipeline.youtube_ffmpeg import render_landscape
+    render_landscape(video, tmp_path / "chunk.mp4", db=MagicMock(), start_s=900.0, end_s=1200.0)
+
+    cmd = captured["cmd"]
+    # The fake segment is exactly target_dur (300s); -ss 900 would seek past its end
+    assert "-ss" not in cmd, f"render_landscape applied -ss with playlist segment: {cmd}"
+    # But -t MUST still bound the output to the chunk duration
+    assert "-t" in cmd
+    t_idx = cmd.index("-t")
+    assert cmd[t_idx + 1] == "300"

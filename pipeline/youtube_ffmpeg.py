@@ -497,8 +497,13 @@ def render_landscape(
         else:
             cmd += ["-vf", base_vf]
 
-    # Window: -ss after inputs (output-side seek to apply to filter graph output)
-    if start_s > 0:
+    # Window: -ss only for single-asset looping path; playlist segments are already pre-cut
+    # to target_dur, so applying -ss would seek past their end and produce empty output.
+    # NOTE: this means each chunk's playlist starts from item 0 (not continuous across
+    # chunks) — acceptable for ambient/loop content. To restore continuity across chunks
+    # would require passing start_s into _build_visual_segment and using input-side seek
+    # on the looped concat.
+    if start_s > 0 and playlist_segment_path is None:
         cmd += ["-ss", str(int(start_s))]
     cmd += ["-t", str(target_dur)]
 
