@@ -46,6 +46,24 @@ def _update_chunk_status(db, youtube_video_id: int, chunk_idx: int, patch: dict)
     db.commit()
 
 
+def _is_superseded(self, video) -> bool:
+    """True if a newer dispatch has overwritten celery_task_id since this task was queued.
+
+    Guards against the user clicking "render" twice (or a Celery retry overlapping a
+    fresh dispatch). Without this, two ffmpeg processes could write to the same output
+    file simultaneously and produce a corrupted MP4 with two `moov` atoms.
+    """
+    expected = video.celery_task_id
+    actual = getattr(self.request, "id", None)
+    if expected and actual and expected != actual:
+        logger.info(
+            "Task %s for video %s superseded by %s; aborting",
+            actual, video.id, expected,
+        )
+        return True
+    return False
+
+
 def _publish_youtube_render_event(youtube_video_id: int, payload: dict | None = None) -> None:
     """Publish a render event to the per-video Redis channel for WS clients.
     The payload itself is a hint; the WS handler will re-snapshot via DB anyway."""
@@ -145,6 +163,8 @@ def render_youtube_audio_preview_task(self, youtube_video_id: int):
         video = db.get(YoutubeVideo, youtube_video_id)
         if not video:
             return {"status": "failed", "reason": "video not found"}
+        if _is_superseded(self, video):
+            return {"status": "superseded"}
 
         # Auto-seed sfx_seed if missing
         if video.sfx_seed is None:
@@ -205,6 +225,8 @@ def render_youtube_video_preview_task(self, youtube_video_id: int):
         video = db.get(YoutubeVideo, youtube_video_id)
         if not video:
             return {"status": "failed", "reason": "video not found"}
+        if _is_superseded(self, video):
+            return {"status": "superseded"}
 
         video.status = "video_preview_rendering"
         db.commit()
@@ -383,6 +405,8 @@ def render_youtube_chunked_orchestrator_task(self, youtube_video_id: int):
         video = db.get(YoutubeVideo, youtube_video_id)
         if not video:
             return {"status": "failed", "reason": "video not found"}
+        if _is_superseded(self, video):
+            return {"status": "superseded"}
 
         if video.sfx_seed is None:
             video.sfx_seed = random.randint(1, 2**31 - 1)

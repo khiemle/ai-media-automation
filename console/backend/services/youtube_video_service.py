@@ -2,6 +2,7 @@
 """Service for managing YouTube long-form video projects."""
 from __future__ import annotations
 
+import uuid
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -483,6 +484,20 @@ class YoutubeVideoService:
             raise KeyError(f"YoutubeVideo {video_id} not found")
         return v
 
+    def _dispatch_render_task(self, task, v: YoutubeVideo, args: list) -> str:
+        """Stamp celery_task_id on the video BEFORE dispatching, so the task can verify
+        at start time that it hasn't been superseded by a newer dispatch.
+
+        Without this, the worker could pick up a stale retried task while a fresh
+        user-initiated task is also in flight, and both would write to the same
+        output file simultaneously — producing a corrupted MP4.
+        """
+        new_task_id = str(uuid.uuid4())
+        v.celery_task_id = new_task_id
+        self.db.commit()
+        task.apply_async(args=args, task_id=new_task_id)
+        return new_task_id
+
     def _revoke_active_render_jobs(self, video_id: int) -> None:
         """Revoke any in-flight Celery render task for this video."""
         from console.backend.celery_app import celery_app
@@ -501,11 +516,7 @@ class YoutubeVideoService:
             raise ValueError(f"Cannot start audio preview from status '{v.status}'")
         v.status = "audio_preview_rendering"
         _audit(self.db, user_id, "start_audio_preview", "youtube_video", str(video_id))
-        self.db.commit()
-        task = render_youtube_audio_preview_task.delay(video_id)
-        v.celery_task_id = task.id
-        self.db.commit()
-        return task.id
+        return self._dispatch_render_task(render_youtube_audio_preview_task, v, [video_id])
 
     def approve_audio_preview(self, video_id: int, user_id: int | None = None) -> dict:
         v = self._load_video_or_404(video_id)
@@ -532,11 +543,7 @@ class YoutubeVideoService:
             raise ValueError(f"Cannot start video preview from status '{v.status}'")
         v.status = "video_preview_rendering"
         _audit(self.db, user_id, "start_video_preview", "youtube_video", str(video_id))
-        self.db.commit()
-        task = render_youtube_video_preview_task.delay(video_id)
-        v.celery_task_id = task.id
-        self.db.commit()
-        return task.id
+        return self._dispatch_render_task(render_youtube_video_preview_task, v, [video_id])
 
     def approve_video_preview(self, video_id: int, user_id: int | None = None) -> dict:
         v = self._load_video_or_404(video_id)
@@ -564,11 +571,7 @@ class YoutubeVideoService:
             raise ValueError(f"Cannot start final render from status '{v.status}'")
         v.status = "rendering"
         _audit(self.db, user_id, "start_chunked_render", "youtube_video", str(video_id))
-        self.db.commit()
-        task = render_youtube_chunked_orchestrator_task.delay(video_id)
-        v.celery_task_id = task.id
-        self.db.commit()
-        return task.id
+        return self._dispatch_render_task(render_youtube_chunked_orchestrator_task, v, [video_id])
 
     def resume_chunked_render(self, video_id: int, user_id: int | None = None) -> str:
         from console.backend.tasks.youtube_render_task import render_youtube_chunked_orchestrator_task
@@ -588,11 +591,7 @@ class YoutubeVideoService:
         flag_modified(v, "render_parts")
         v.status = "rendering"
         _audit(self.db, user_id, "resume_chunked_render", "youtube_video", str(video_id))
-        self.db.commit()
-        task = render_youtube_chunked_orchestrator_task.delay(video_id)
-        v.celery_task_id = task.id
-        self.db.commit()
-        return task.id
+        return self._dispatch_render_task(render_youtube_chunked_orchestrator_task, v, [video_id])
 
     def cancel_chunked_render(self, video_id: int, user_id: int | None = None) -> dict:
         v = self._load_video_or_404(video_id)
