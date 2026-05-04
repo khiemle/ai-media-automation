@@ -326,6 +326,14 @@ def render_youtube_chunk_task(self, youtube_video_id: int, chunk_idx: int, start
     except Exception as exc:
         logger.exception("YoutubeVideo %s chunk %s failed: %s", youtube_video_id, chunk_idx, exc)
         try:
+            # Don't overwrite "cancelled" status or retry if video was cancelled
+            current_video = db.get(YoutubeVideo, youtube_video_id)
+            if current_video and current_video.status == "failed":
+                logger.info(
+                    "YoutubeVideo %s chunk %s aborted — video is cancelled/failed",
+                    youtube_video_id, chunk_idx,
+                )
+                return {"status": "skipped", "reason": "video cancelled"}
             _update_chunk_status(db, youtube_video_id, chunk_idx, {
                 "status": "failed",
                 "error": str(exc)[:500],
@@ -391,9 +399,11 @@ def concat_youtube_chunks_task(self, _chunk_results, youtube_video_id: int):
         logger.exception("YoutubeVideo %s concat failed: %s", youtube_video_id, exc)
         if video is not None:
             try:
-                video.status = "video_preview_ready"  # back to last gate
-                db.commit()
-                _publish_youtube_render_event(youtube_video_id)
+                db.refresh(video)
+                if video.status != "failed":  # don't undo a cancel
+                    video.status = "video_preview_ready"  # back to last gate
+                    db.commit()
+                    _publish_youtube_render_event(youtube_video_id)
             except Exception:
                 db.rollback()
         raise
@@ -425,6 +435,14 @@ def render_youtube_chunked_orchestrator_task(self, youtube_video_id: int):
             return {"status": "failed", "reason": "video not found"}
         if _is_superseded(self, video):
             return {"status": "superseded"}
+
+        # Guard: bail if cancel/delete ran while this orchestrator was queued
+        if video.status == "failed":
+            logger.info(
+                "YoutubeVideo %s orchestrator skipped — video is failed/cancelled",
+                youtube_video_id,
+            )
+            return {"status": "skipped", "reason": "video cancelled"}
 
         if video.sfx_seed is None:
             video.sfx_seed = random.randint(1, 2**31 - 1)

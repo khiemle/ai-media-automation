@@ -252,3 +252,25 @@ def test_concat_task_returns_early_when_video_is_failed():
 
     mock_concat.assert_not_called()
     assert result["status"] == "skipped"
+
+
+def test_orchestrator_skips_when_video_is_failed():
+    """orchestrator must not dispatch chord if video.status == 'failed'."""
+    from unittest.mock import patch, MagicMock
+
+    video = MagicMock()
+    video.id = 42
+    video.status = "failed"
+    video.celery_task_id = None  # cleared by cancel before orchestrator ran
+
+    db = MagicMock()
+    db.get.return_value = video
+
+    with patch("console.backend.database.SessionLocal", return_value=db), \
+         patch("console.backend.tasks.youtube_render_task._is_superseded", return_value=False), \
+         patch("celery.chord") as mock_chord:
+        from console.backend.tasks.youtube_render_task import render_youtube_chunked_orchestrator_task
+        result = render_youtube_chunked_orchestrator_task.apply(args=[42]).get()
+
+    mock_chord.assert_not_called()
+    assert result["status"] == "skipped"
