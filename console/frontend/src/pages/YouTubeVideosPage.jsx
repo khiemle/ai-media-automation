@@ -916,6 +916,7 @@ export default function YouTubeVideosPage() {
   const [activeTemplate, setActiveTemplate] = useState(null)
   const [makeShortVideo, setMakeShortVideo] = useState(null)
   const [previewVideo, setPreviewVideo] = useState(null)
+  const [editingVideo, setEditingVideo] = useState(null)
   const [toast, setToast]                 = useState(null)
   const [channelPlans, setChannelPlans]     = useState([])
   const [accordionOpen, setAccordionOpen]   = useState(false)
@@ -1137,6 +1138,11 @@ export default function YouTubeVideosPage() {
                     <span className="text-xs font-medium" style={{ color: STATUS_COLORS[v.status] }}>
                       ● {v.status}
                     </span>
+                    {['draft', 'failed', 'audio_preview_ready', 'video_preview_ready'].includes(v.status) && (
+                      <Button variant="ghost" size="sm" onClick={() => setEditingVideo(v)}>
+                        ✎ Edit
+                      </Button>
+                    )}
                     {v.status === 'draft' && (
                       <Button variant="ghost" size="sm" onClick={() => handleRender(v)}>
                         Render →
@@ -1181,6 +1187,22 @@ export default function YouTubeVideosPage() {
           onCreated={() => { setActiveTemplate(null); setActiveChannelPlan(null); load() }}
         />
       )}
+
+      {/* Edit slide-over */}
+      {editingVideo && (() => {
+        const tmpl = templates.find(t => t.id === editingVideo.template_id)
+        return (
+          <CreationPanel
+            template={tmpl}
+            channelPlan={null}
+            channelPlans={[]}
+            mode="edit"
+            existingVideo={editingVideo}
+            onClose={() => setEditingVideo(null)}
+            onCreated={() => { setEditingVideo(null); load() }}
+          />
+        )
+      })()}
 
       {previewVideo && (
         <VideoPreviewModal video={previewVideo} onClose={() => setPreviewVideo(null)} />
