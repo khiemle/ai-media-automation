@@ -30,6 +30,96 @@ def resolve_visual(video, db) -> str | None:
     return None
 
 
+def resolve_visual_playlist(video, db):
+    """Return the ordered list of VideoAsset rows whose files exist on disk.
+
+    Empty list means "use legacy single-asset path" (caller falls back to resolve_visual).
+    """
+    ids = list(getattr(video, "visual_asset_ids", None) or [])
+    if not ids:
+        return []
+    from console.backend.models.video_asset import VideoAsset
+
+    rows = db.query(VideoAsset).filter(VideoAsset.id.in_(ids)).all()
+    by_id = {r.id: r for r in rows}
+    out = []
+    for aid in ids:
+        a = by_id.get(aid)
+        if a and a.file_path and Path(a.file_path).is_file():
+            out.append(a)
+        else:
+            logger.warning("Visual asset %s missing or file not on disk; skipping in playlist", aid)
+    return out
+
+
+def _build_visual_segment(
+    playlist,
+    durations: list[float],
+    loop_mode: str,
+    w: int,
+    h: int,
+    target_dur_s: int,
+    output_dir: Path,
+) -> Path | None:
+    """Render the visual playlist to a single concatenated MP4 (no audio), then loop to target_dur_s.
+
+    Returns the file path of the looped concat, or None if playlist was empty.
+    """
+    if not playlist:
+        return None
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Step 1: render each item to a normalized clip (same scale, fps, codec, no audio)
+    item_paths: list[Path] = []
+    for i, asset in enumerate(playlist):
+        is_image = asset.asset_type == "still_image"
+        # Resolve per-item duration: 0 in concat_loop+video means "native length"
+        item_dur = durations[i] if i < len(durations) else 0.0
+        out = output_dir / f"vseg_{i}.mp4"
+
+        cmd = ["ffmpeg", "-y"]
+        if is_image:
+            cmd += ["-loop", "1", "-t", str(item_dur or 3.0), "-i", asset.file_path]
+        elif loop_mode == "per_clip" and item_dur > 0:
+            # Loop the video so it fills the slot; -t bounds it
+            cmd += ["-stream_loop", "-1", "-t", str(item_dur), "-i", asset.file_path]
+        elif loop_mode == "concat_loop" and item_dur > 0:
+            # Trim to user-specified duration
+            cmd += ["-t", str(item_dur), "-i", asset.file_path]
+        else:
+            # concat_loop + video + duration=0 → native length
+            cmd += ["-i", asset.file_path]
+
+        vf = (
+            f"scale={w}:{h}:force_original_aspect_ratio=decrease,"
+            f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2:black,fps=30"
+        )
+        cmd += ["-vf", vf, "-an", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
+                "-pix_fmt", "yuv420p", str(out)]
+        _run_ffmpeg(cmd, max(120, int(item_dur or 60) * 4))
+        item_paths.append(out)
+
+    # Step 2: concat the items with the concat demuxer
+    list_file = output_dir / "vseg_list.txt"
+    list_file.write_text("\n".join(f"file '{p}'" for p in item_paths))
+    concat_path = output_dir / "vseg_concat.mp4"
+    _run_ffmpeg(
+        ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(list_file),
+         "-c", "copy", str(concat_path)],
+        timeout=300,
+    )
+
+    # Step 3: loop the concat segment to target_dur_s (using -stream_loop on the demuxer side)
+    looped_path = output_dir / "vseg_looped.mp4"
+    _run_ffmpeg(
+        ["ffmpeg", "-y", "-stream_loop", "-1", "-i", str(concat_path),
+         "-t", str(target_dur_s), "-c", "copy", str(looped_path)],
+        timeout=max(300, target_dur_s + 60),
+    )
+    return looped_path
+
+
 def resolve_audio(video, db) -> str | None:
     """Return the file path of the linked music track, or None."""
     if not video.music_track_id:
@@ -303,10 +393,26 @@ def render_landscape(
     w_str, h_str = scale.split(":")
     w, h = int(w_str), int(h_str)
 
-    visual_path = resolve_visual(video, db)
-    is_image = visual_path is not None and Path(visual_path).suffix.lower() in IMAGE_EXTS
-
     output_dir = output_path.parent
+
+    # Try the new playlist path first; fall back to legacy single-asset
+    playlist = resolve_visual_playlist(video, db)
+    playlist_segment_path: Path | None = None
+    if playlist:
+        playlist_segment_path = _build_visual_segment(
+            playlist=playlist,
+            durations=list(getattr(video, "visual_clip_durations_s", None) or []),
+            loop_mode=getattr(video, "visual_loop_mode", None) or "concat_loop",
+            w=w, h=h, target_dur_s=target_dur,
+            output_dir=output_dir,
+        )
+
+    if playlist_segment_path is not None:
+        visual_path = str(playlist_segment_path)
+        is_image = False  # the segment is always an mp4
+    else:
+        visual_path = resolve_visual(video, db)
+        is_image = visual_path is not None and Path(visual_path).suffix.lower() in IMAGE_EXTS
 
     # Pre-render music playlist + SFX pool to temp WAVs (separate ffmpeg passes)
     music_wav = _build_music_playlist_wav(video, db, target_dur, output_dir)
@@ -337,6 +443,9 @@ def render_landscape(
     if visual_path and Path(visual_path).is_file():
         if is_image:
             cmd += ["-loop", "1", "-i", visual_path]
+        elif playlist_segment_path is not None:
+            # Pre-rendered playlist segment: exact duration, no looping needed
+            cmd += ["-i", visual_path]
         else:
             cmd += ["-stream_loop", "-1", "-i", visual_path]
     else:
