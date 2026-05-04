@@ -602,9 +602,17 @@ class YoutubeVideoService:
         return self._dispatch_render_task(render_youtube_chunked_orchestrator_task, v, [video_id])
 
     def cancel_chunked_render(self, video_id: int, user_id: int | None = None) -> dict:
+        from sqlalchemy.orm.attributes import flag_modified
         v = self._load_video_or_404(video_id)
         self._revoke_all_render_jobs(v)
-        v.status = "video_preview_ready" if v.video_preview_path else "queued"
+        v.status = "failed"
+        parts = list(v.render_parts or [])
+        for p in parts:
+            if p.get("status") != "completed":
+                p["status"] = "cancelled"
+        v.render_parts = parts
+        flag_modified(v, "render_parts")
+        v.celery_task_id = None
         _audit(self.db, user_id, "cancel_chunked_render", "youtube_video", str(video_id))
         self.db.commit()
         return {"status": v.status}

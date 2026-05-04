@@ -65,3 +65,78 @@ def test_revoke_all_render_jobs_handles_empty_render_parts():
         svc._revoke_all_render_jobs(video)
 
     mock_revoke.assert_called_once_with("concat-uuid", terminate=True, signal="SIGTERM")
+
+
+def test_cancel_chunked_render_sets_status_to_failed():
+    from console.backend.services.youtube_video_service import YoutubeVideoService
+    db = MagicMock()
+    svc = YoutubeVideoService(db)
+    svc._revoke_all_render_jobs = MagicMock()
+
+    video = _make_video(
+        parts=[
+            {"idx": 0, "task_id": "t0", "status": "completed"},
+            {"idx": 1, "task_id": "t1", "status": "running"},
+        ],
+        celery_task_id="concat-uuid",
+        status="rendering",
+    )
+    db.get.return_value = video
+
+    result = svc.cancel_chunked_render(video_id=42)
+
+    assert result["status"] == "failed"
+    assert video.status == "failed"
+
+
+def test_cancel_chunked_render_marks_non_completed_parts_cancelled():
+    from console.backend.services.youtube_video_service import YoutubeVideoService
+    db = MagicMock()
+    svc = YoutubeVideoService(db)
+    svc._revoke_all_render_jobs = MagicMock()
+
+    video = _make_video(
+        parts=[
+            {"idx": 0, "status": "completed"},
+            {"idx": 1, "status": "running"},
+            {"idx": 2, "status": "pending"},
+        ],
+        celery_task_id="concat-uuid",
+        status="rendering",
+    )
+    db.get.return_value = video
+
+    svc.cancel_chunked_render(video_id=42)
+
+    statuses = {p["idx"]: p["status"] for p in video.render_parts}
+    assert statuses[0] == "completed"  # preserved
+    assert statuses[1] == "cancelled"
+    assert statuses[2] == "cancelled"
+
+
+def test_cancel_chunked_render_clears_celery_task_id():
+    from console.backend.services.youtube_video_service import YoutubeVideoService
+    db = MagicMock()
+    svc = YoutubeVideoService(db)
+    svc._revoke_all_render_jobs = MagicMock()
+
+    video = _make_video(celery_task_id="some-uuid", status="rendering")
+    db.get.return_value = video
+
+    svc.cancel_chunked_render(video_id=42)
+
+    assert video.celery_task_id is None
+
+
+def test_cancel_chunked_render_calls_revoke_all():
+    from console.backend.services.youtube_video_service import YoutubeVideoService
+    db = MagicMock()
+    svc = YoutubeVideoService(db)
+    svc._revoke_all_render_jobs = MagicMock()
+
+    video = _make_video(status="rendering")
+    db.get.return_value = video
+
+    svc.cancel_chunked_render(video_id=42)
+
+    svc._revoke_all_render_jobs.assert_called_once_with(video)
