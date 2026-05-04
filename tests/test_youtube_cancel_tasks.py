@@ -232,3 +232,23 @@ def test_chunk_task_returns_early_when_video_is_failed():
 
     mock_render.assert_not_called()
     assert result["status"] == "skipped"
+
+
+def test_concat_task_returns_early_when_video_is_failed():
+    """concat_youtube_chunks_task must not call concat_parts if video.status == 'failed'."""
+    from unittest.mock import patch, MagicMock
+
+    video = MagicMock()
+    video.id = 42
+    video.status = "failed"
+
+    db = MagicMock()
+    db.get.return_value = video
+
+    with patch("console.backend.database.SessionLocal", return_value=db), \
+         patch("pipeline.concat.concat_parts") as mock_concat:
+        from console.backend.tasks.youtube_render_task import concat_youtube_chunks_task
+        result = concat_youtube_chunks_task.apply(args=[[], 42]).get()
+
+    mock_concat.assert_not_called()
+    assert result["status"] == "skipped"

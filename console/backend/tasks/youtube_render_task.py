@@ -360,6 +360,14 @@ def concat_youtube_chunks_task(self, _chunk_results, youtube_video_id: int):
         if not video:
             return {"status": "failed", "reason": "video not found"}
 
+        # Guard: bail early if video was cancelled while chunks were in flight
+        if video.status == "failed":
+            logger.info(
+                "YoutubeVideo %s concat skipped — video is failed/cancelled",
+                youtube_video_id,
+            )
+            return {"status": "skipped", "reason": "video cancelled"}
+
         parts = sorted(video.render_parts or [], key=lambda p: p["idx"])
         missing = [p for p in parts if p.get("status") != "completed" or not p.get("file_path")]
         if missing:
