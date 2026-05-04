@@ -8,6 +8,7 @@ import RenderStatePanel from '../components/RenderStatePanel.jsx'
 import PreviewApprovalGate from '../components/PreviewApprovalGate.jsx'
 import SfxPickerModal from '../components/SfxPickerModal.jsx'
 import PreviewPlayer from '../components/PreviewPlayer.jsx'
+import VisualPlaylistEditor from '../components/VisualPlaylistEditor.jsx'
 import { useRenderWebSocket } from '../hooks/useRenderWebSocket.js'
 
 const ACTIVE_RENDER_STATES = new Set([
@@ -128,6 +129,10 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
   })
   const [sfxPickerLayer, setSfxPickerLayer] = useState(null)  // 'foreground' | 'midground' | 'background' | null
 
+  const [visualAssetIds, setVisualAssetIds]       = useState([])
+  const [visualDurations, setVisualDurations]     = useState([])
+  const [visualLoopMode, setVisualLoopMode]       = useState('concat_loop')
+
   // ASMR / Soundscape extras
   const [musicTrackIds, setMusicTrackIds]       = useState([])
   const [sfxPool, setSfxPool]                   = useState([])     // [{asset_id, volume}]
@@ -195,7 +200,8 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
         asset_type,
       })
       setAssetList(prev => [...prev, newAsset])
-      setForm(f => ({ ...f, visual_asset_id: String(newAsset.id) }))
+      setVisualAssetIds(prev => [...prev, newAsset.id])
+      setVisualDurations(prev => [...prev, asset_type === 'still_image' ? 3.0 : 0.0])
       setShowVisualUpload(false)
       setVisualUploadFile(null)
       setVisualUploadDesc('')
@@ -288,7 +294,10 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
         theme: form.theme,
         target_duration_h: duration,
         music_track_id: form.music_track_id || null,
-        visual_asset_id: form.visual_asset_id || null,
+        visual_asset_id: null,
+        visual_asset_ids: visualAssetIds,
+        visual_clip_durations_s: visualDurations,
+        visual_loop_mode: visualLoopMode,
         sfx_overrides: (sfxLayers.foreground.asset_id || sfxLayers.midground.asset_id || sfxLayers.background.asset_id)
           ? {
               foreground: sfxLayers.foreground.asset_id ? sfxLayers.foreground : null,
@@ -563,19 +572,34 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
               </button>
             </div>
             <div className="flex flex-col gap-3">
-              <p className="text-xs text-[#5a5a70]">Showing AI-generated clips only (Midjourney · Runway · Veo)</p>
-              <Select
-                label="Visual Loop"
-                value={form.visual_asset_id || ''}
-                onChange={e => setForm(f => ({ ...f, visual_asset_id: e.target.value || null }))}
-              >
-                <option value="">— Select from library —</option>
-                {assetList.map(a => (
-                  <option key={a.id} value={a.id}>
-                    {a.description || `Asset #${a.id}`} ({a.source})
-                  </option>
+              <div className="flex gap-2">
+                {[
+                  { value: 'concat_loop', label: 'Concat-then-loop' },
+                  { value: 'per_clip',    label: 'Per-clip duration' },
+                ].map(opt => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setVisualLoopMode(opt.value)}
+                    className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                      visualLoopMode === opt.value
+                        ? 'bg-[#7c6af7] border-[#7c6af7] text-white'
+                        : 'bg-[#16161a] border-[#2a2a32] text-[#9090a8] hover:text-[#e8e8f0]'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
                 ))}
-              </Select>
+              </div>
+              <VisualPlaylistEditor
+                assetIds={visualAssetIds}
+                durations={visualDurations}
+                loopMode={visualLoopMode}
+                onChange={({ assetIds, durations }) => {
+                  setVisualAssetIds(assetIds)
+                  setVisualDurations(durations)
+                }}
+              />
               {showVisualUpload && (
                 <div className="flex flex-col gap-2 bg-[#0d0d0f] border border-[#2a2a32] rounded-lg p-3">
                   <div className="text-xs text-[#5a5a70] font-medium">Upload Visual Asset</div>
