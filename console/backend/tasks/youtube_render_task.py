@@ -399,6 +399,8 @@ def render_youtube_chunked_orchestrator_task(self, youtube_video_id: int):
     from console.backend.models.youtube_video import YoutubeVideo
     from sqlalchemy.orm.attributes import flag_modified
 
+    from uuid import uuid4
+
     db = SessionLocal()
     video = None
     try:
@@ -429,24 +431,45 @@ def render_youtube_chunked_orchestrator_task(self, youtube_video_id: int):
                     "idx": i, "start_s": start, "end_s": end, "status": "pending",
                     "file_path": None, "started_at": None, "completed_at": None,
                 })
+
+        pending = [p for p in new_parts if p["status"] != "completed"]
+        concat_task_id = str(uuid4())
+
+        if not pending:
+            # All chunks already completed — pre-assign concat task ID before committing.
+            video.render_parts = new_parts
+            flag_modified(video, "render_parts")
+            video.status = "rendering"
+            video.celery_task_id = concat_task_id
+            db.commit()
+            _publish_youtube_render_event(youtube_video_id)
+            logger.info("YoutubeVideo %s planned %s chunks of ~%ss each", youtube_video_id, n_chunks, chunk_size)
+            concat_youtube_chunks_task.apply_async(args=[[], youtube_video_id], task_id=concat_task_id)
+            return {"status": "all-completed", "n_chunks": n_chunks}
+
+        # Assign a UUID to each pending chunk BEFORE committing so cancel can find these IDs immediately.
+        for p in new_parts:
+            if p["status"] != "completed":
+                p["task_id"] = str(uuid4())
+
+        # Update celery_task_id to the concat callback UUID (orchestrator's own ID is useless after exit).
         video.render_parts = new_parts
         flag_modified(video, "render_parts")
         video.status = "rendering"
+        video.celery_task_id = concat_task_id
+        # MUST commit before chord dispatch so cancel can find these IDs immediately.
         db.commit()
         _publish_youtube_render_event(youtube_video_id)
 
         logger.info("YoutubeVideo %s planned %s chunks of ~%ss each", youtube_video_id, n_chunks, chunk_size)
 
-        pending = [p for p in new_parts if p["status"] != "completed"]
-        if not pending:
-            concat_youtube_chunks_task.delay([], youtube_video_id)
-            return {"status": "all-completed", "n_chunks": n_chunks}
-
         sigs = [
             render_youtube_chunk_task.s(youtube_video_id, p["idx"], p["start_s"], p["end_s"])
+            .set(task_id=p["task_id"])
             for p in pending
         ]
-        chord(group(sigs))(concat_youtube_chunks_task.s(youtube_video_id))
+        concat_sig = concat_youtube_chunks_task.s(youtube_video_id).set(task_id=concat_task_id)
+        chord(group(sigs))(concat_sig)
         return {"status": "dispatched", "n_chunks": n_chunks, "pending": len(pending)}
     except Exception as exc:
         logger.exception("YoutubeVideo %s chunked orchestrator failed: %s", youtube_video_id, exc)

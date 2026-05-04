@@ -158,3 +158,56 @@ def test_delete_video_revokes_all_render_jobs():
     svc.delete_video(video_id=42)
 
     svc._revoke_all_render_jobs.assert_called_once_with(video)
+
+
+def test_orchestrator_writes_task_ids_before_chord_dispatch():
+    """render_parts must have task_id populated and committed BEFORE chord dispatch."""
+    from unittest.mock import patch, MagicMock
+
+    video = MagicMock()
+    video.id = 42
+    video.celery_task_id = "old-orch-id"
+    video.sfx_seed = 1  # non-None → skips random.randint branch
+    video.target_duration_h = 1 / 60  # 60s → 1 chunk
+    video.render_parts = None
+    video.status = "rendering"
+
+    db = MagicMock()
+    db.get.return_value = video
+
+    write_order = []
+    committed_state = {}
+
+    def on_commit():
+        if not committed_state:
+            committed_state["parts"] = list(video.render_parts or [])
+            committed_state["celery_task_id"] = video.celery_task_id
+        write_order.append("commit")
+    db.commit.side_effect = on_commit
+
+    mock_chord_partial = MagicMock(side_effect=lambda _sig: write_order.append("dispatch"))
+    mock_chord_cls = MagicMock(return_value=mock_chord_partial)
+
+    # chord, group and SessionLocal are imported inside the function body,
+    # so patch them at their source modules, not at the task module level.
+    with patch("console.backend.database.SessionLocal", return_value=db), \
+         patch("console.backend.tasks.youtube_render_task._is_superseded", return_value=False), \
+         patch("celery.chord", mock_chord_cls), \
+         patch("celery.group", MagicMock()), \
+         patch("sqlalchemy.orm.attributes.flag_modified"):
+        from console.backend.tasks.youtube_render_task import render_youtube_chunked_orchestrator_task
+        render_youtube_chunked_orchestrator_task.apply(args=[42])
+
+    # commit must precede dispatch
+    assert "commit" in write_order, "orchestrator must commit before dispatching"
+    assert "dispatch" in write_order, "orchestrator must dispatch chord"
+    assert write_order.index("commit") < write_order.index("dispatch"), \
+        f"commit must precede dispatch; got order: {write_order}"
+
+    # all pending parts must have task_id at commit time
+    for p in committed_state["parts"]:
+        assert p.get("task_id"), f"part {p.get('idx')} missing task_id at commit time"
+
+    # celery_task_id must have changed from old orch ID to concat UUID
+    assert committed_state["celery_task_id"] != "old-orch-id"
+    assert committed_state["celery_task_id"] is not None
