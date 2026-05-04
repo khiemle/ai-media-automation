@@ -75,6 +75,9 @@ def _video_to_dict(
         "render_parts":        v.render_parts or [],
         "audio_preview_path":  v.audio_preview_path,
         "video_preview_path":  v.video_preview_path,
+        "visual_asset_ids":        list(v.visual_asset_ids or []),
+        "visual_clip_durations_s": list(v.visual_clip_durations_s or []),
+        "visual_loop_mode":        v.visual_loop_mode or "concat_loop",
         "uploads": uploads if uploads is not None else [],
         "created_at": v.created_at.isoformat() if v.created_at else None,
         "updated_at": v.updated_at.isoformat() if v.updated_at else None,
@@ -222,6 +225,9 @@ class YoutubeVideoService:
             seo_title=data.get("seo_title"),
             seo_description=data.get("seo_description"),
             seo_tags=data.get("seo_tags"),
+            visual_asset_ids=data.get("visual_asset_ids") or [],
+            visual_clip_durations_s=data.get("visual_clip_durations_s") or [],
+            visual_loop_mode=data.get("visual_loop_mode") or "concat_loop",
             status="draft",
         )
         self.db.add(video)

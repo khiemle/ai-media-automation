@@ -1,5 +1,6 @@
 # console/backend/routers/youtube_videos.py
 from pathlib import Path
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
@@ -34,6 +35,9 @@ class YoutubeVideoCreate(BaseModel):
     seo_description: str | None = None
     seo_tags: list[str] | None = None
     parent_youtube_video_id: int | None = None
+    visual_asset_ids:        list[int] | None = None
+    visual_clip_durations_s: list[float] | None = None
+    visual_loop_mode:        Literal["concat_loop", "per_clip"] | None = None
 
 
 class YoutubeVideoUpdate(BaseModel):
@@ -52,6 +56,9 @@ class YoutubeVideoUpdate(BaseModel):
     seo_title: str | None = None
     seo_description: str | None = None
     seo_tags: list[str] | None = None
+    visual_asset_ids:        list[int] | None = None
+    visual_clip_durations_s: list[float] | None = None
+    visual_loop_mode:        Literal["concat_loop", "per_clip"] | None = None
 
 
 class StatusUpdate(BaseModel):
