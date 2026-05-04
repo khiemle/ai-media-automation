@@ -486,7 +486,15 @@ def render_landscape(
             if path in (music_wav, sfx_wav):
                 cmd += ["-i", path]
             else:
-                cmd += ["-stream_loop", "-1", "-i", path]
+                if start_s > 0.5:
+                    sfx_dur = _probe_duration(path)
+                    effective_seek = (start_s % sfx_dur) if sfx_dur > 1.0 else 0.0
+                    if effective_seek > 0.5:
+                        cmd += ["-stream_loop", "-1", "-ss", str(int(effective_seek)), "-i", path]
+                    else:
+                        cmd += ["-stream_loop", "-1", "-i", path]
+                else:
+                    cmd += ["-stream_loop", "-1", "-i", path]
     else:
         cmd += ["-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo"]
 
