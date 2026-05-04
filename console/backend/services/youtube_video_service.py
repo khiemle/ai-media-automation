@@ -498,16 +498,15 @@ class YoutubeVideoService:
         task.apply_async(args=args, task_id=new_task_id)
         return new_task_id
 
-    def _revoke_active_render_jobs(self, video_id: int) -> None:
-        """Revoke any in-flight Celery render task for this video."""
+    def _revoke_all_render_jobs(self, video: YoutubeVideo) -> None:
+        """Revoke all chunk task IDs stored in render_parts, plus the concat callback."""
         from console.backend.celery_app import celery_app
-        v = self.db.get(YoutubeVideo, video_id)
-        if v and v.celery_task_id:
-            try:
-                celery_app.control.revoke(v.celery_task_id, terminate=True)
-            except Exception as e:
-                import logging
-                logging.getLogger(__name__).warning("Failed to revoke task %s: %s", v.celery_task_id, e)
+        for part in (video.render_parts or []):
+            task_id = part.get("task_id")
+            if task_id:
+                celery_app.control.revoke(task_id, terminate=True, signal="SIGTERM")
+        if video.celery_task_id:
+            celery_app.control.revoke(video.celery_task_id, terminate=True, signal="SIGTERM")
 
     def start_audio_preview(self, video_id: int, user_id: int | None = None) -> str:
         from console.backend.tasks.youtube_render_task import render_youtube_audio_preview_task
@@ -580,7 +579,7 @@ class YoutubeVideoService:
         if not v.render_parts:
             raise ValueError("No prior render to resume")
         # Revoke in-flight tasks before re-dispatching
-        self._revoke_active_render_jobs(video_id)
+        self._revoke_all_render_jobs(v)
         # Reset failed/running parts to pending
         parts = list(v.render_parts)
         for p in parts:
@@ -595,7 +594,7 @@ class YoutubeVideoService:
 
     def cancel_chunked_render(self, video_id: int, user_id: int | None = None) -> dict:
         v = self._load_video_or_404(video_id)
-        self._revoke_active_render_jobs(video_id)
+        self._revoke_all_render_jobs(v)
         v.status = "video_preview_ready" if v.video_preview_path else "queued"
         _audit(self.db, user_id, "cancel_chunked_render", "youtube_video", str(video_id))
         self.db.commit()
