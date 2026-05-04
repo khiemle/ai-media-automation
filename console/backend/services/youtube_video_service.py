@@ -2,8 +2,11 @@
 """Service for managing YouTube long-form video projects."""
 from __future__ import annotations
 
+import logging
 import uuid
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from sqlalchemy.orm import Session
 
@@ -504,9 +507,15 @@ class YoutubeVideoService:
         for part in (video.render_parts or []):
             task_id = part.get("task_id")
             if task_id:
-                celery_app.control.revoke(task_id, terminate=True, signal="SIGTERM")
+                try:
+                    celery_app.control.revoke(task_id, terminate=True, signal="SIGTERM")
+                except Exception as e:
+                    logger.warning("Failed to revoke chunk task %s: %s", task_id, e)
         if video.celery_task_id:
-            celery_app.control.revoke(video.celery_task_id, terminate=True, signal="SIGTERM")
+            try:
+                celery_app.control.revoke(video.celery_task_id, terminate=True, signal="SIGTERM")
+            except Exception as e:
+                logger.warning("Failed to revoke concat task %s: %s", video.celery_task_id, e)
 
     def start_audio_preview(self, video_id: int, user_id: int | None = None) -> str:
         from console.backend.tasks.youtube_render_task import render_youtube_audio_preview_task

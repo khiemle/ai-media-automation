@@ -7,7 +7,7 @@ def _make_video(parts=None, celery_task_id=None, status="rendering"):
     v.id = 42
     v.status = status
     v.celery_task_id = celery_task_id
-    v.render_parts = parts or []
+    v.render_parts = parts
     return v
 
 
@@ -35,6 +35,7 @@ def test_revoke_all_render_jobs_revokes_each_chunk_task_id():
     assert "concat-uuid" in revoked
     for c in mock_revoke.call_args_list:
         assert c.kwargs.get("terminate") is True
+        assert c.kwargs.get("signal") == "SIGTERM"
 
 
 def test_revoke_all_render_jobs_skips_parts_without_task_id():
