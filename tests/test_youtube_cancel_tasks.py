@@ -140,3 +140,21 @@ def test_cancel_chunked_render_calls_revoke_all():
     svc.cancel_chunked_render(video_id=42)
 
     svc._revoke_all_render_jobs.assert_called_once_with(video)
+
+
+def test_delete_video_revokes_all_render_jobs():
+    from console.backend.services.youtube_video_service import YoutubeVideoService
+    db = MagicMock()
+    svc = YoutubeVideoService(db)
+    svc._revoke_all_render_jobs = MagicMock()
+
+    video = _make_video(
+        parts=[{"idx": 0, "task_id": "t0", "status": "running"}],
+        celery_task_id="concat-uuid",
+        status="rendering",
+    )
+    db.get.return_value = video
+
+    svc.delete_video(video_id=42)
+
+    svc._revoke_all_render_jobs.assert_called_once_with(video)

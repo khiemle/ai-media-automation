@@ -395,10 +395,7 @@ class YoutubeVideoService:
         v = self.db.get(YoutubeVideo, video_id)
         if not v:
             raise KeyError(f"YoutubeVideo {video_id} not found")
-        # Revoke active Celery task if video is queued or rendering
-        if v.celery_task_id and v.status in {"queued", "rendering"}:
-            from console.backend.celery_app import celery_app
-            celery_app.control.revoke(v.celery_task_id, terminate=True)
+        self._revoke_all_render_jobs(v)
         try:
             _audit(self.db, user_id, "delete_video", "youtube_video", str(video_id),
                    {"title": v.title})
