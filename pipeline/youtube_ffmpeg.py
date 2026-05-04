@@ -211,13 +211,23 @@ def _probe_duration(path: str) -> float:
 
 
 def _nvenc_available() -> bool:
-    """Check if h264_nvenc (NVIDIA GPU encoder) is available in ffmpeg."""
+    """Return True only if h264_nvenc can actually encode (not just listed).
+
+    ffmpeg lists h264_nvenc even when libnvidia-encode.so.1 is missing (common
+    on Docker Desktop / WSL2 where NVML works but NVENC does not). A real encode
+    attempt is the only reliable check; ffmpeg exits 0 regardless with -f null,
+    so we inspect stderr for the library-load error instead.
+    """
     try:
         result = subprocess.run(
-            ["ffmpeg", "-hide_banner", "-encoders"],
-            capture_output=True, text=True, timeout=10,
+            [
+                "ffmpeg", "-hide_banner", "-loglevel", "error",
+                "-f", "lavfi", "-i", "nullsrc=s=64x64:r=1",
+                "-frames:v", "1", "-c:v", "h264_nvenc", "-f", "null", "-",
+            ],
+            capture_output=True, text=True, timeout=15,
         )
-        return "h264_nvenc" in (result.stdout or "")
+        return "Cannot load libnvidia" not in (result.stderr or "")
     except Exception:
         return False
 
