@@ -464,7 +464,15 @@ def render_landscape(
             # Pre-rendered playlist segment: exact duration, no looping needed
             cmd += ["-i", visual_path]
         else:
-            cmd += ["-stream_loop", "-1", "-i", visual_path]
+            if start_s > 0.5:
+                vid_dur = _probe_duration(visual_path)
+                effective_seek = (start_s % vid_dur) if vid_dur > 1.0 else 0.0
+                if effective_seek > 0.5:
+                    cmd += ["-stream_loop", "-1", "-ss", str(int(effective_seek)), "-i", visual_path]
+                else:
+                    cmd += ["-stream_loop", "-1", "-i", visual_path]
+            else:
+                cmd += ["-stream_loop", "-1", "-i", visual_path]
     else:
         cmd += ["-f", "lavfi", "-i", f"color=c=black:s={w}x{h}:r=30"]
 
@@ -514,14 +522,6 @@ def render_landscape(
         else:
             cmd += ["-vf", base_vf]
 
-    # Window: -ss only for single-asset looping path; playlist segments are already pre-cut
-    # to target_dur, so applying -ss would seek past their end and produce empty output.
-    # NOTE: this means each chunk's playlist starts from item 0 (not continuous across
-    # chunks) — acceptable for ambient/loop content. To restore continuity across chunks
-    # would require passing start_s into _build_visual_segment and using input-side seek
-    # on the looped concat.
-    if start_s > 0 and playlist_segment_path is None:
-        cmd += ["-ss", str(int(start_s))]
     cmd += ["-t", str(target_dur)]
 
     # Encoder — IDENTICAL across chunks for stream-copy concat to work.

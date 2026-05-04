@@ -254,3 +254,79 @@ def test_probe_duration_returns_zero_on_timeout():
     with patch("subprocess.run", side_effect=subprocess.TimeoutExpired("ffprobe", 15)):
         result = _probe_duration("/some/file.mp4")
     assert result == 0.0
+
+
+def test_render_landscape_chunk_places_ss_before_visual_input(tmp_path):
+    """start_s=300, file_dur=120 → effective_seek=60 → -ss 60 is BEFORE -i visual_path"""
+    output = tmp_path / "chunk.mp4"
+    visual = tmp_path / "visual.mp4"
+    visual.write_bytes(b"fake")
+
+    with patch("shutil.which", return_value="/usr/bin/ffmpeg"), \
+         patch("pipeline.youtube_ffmpeg.resolve_visual_playlist", return_value=[]), \
+         patch("pipeline.youtube_ffmpeg.resolve_visual", return_value=str(visual)), \
+         patch("pipeline.youtube_ffmpeg._build_music_playlist_wav", return_value=None), \
+         patch("pipeline.youtube_ffmpeg._build_sfx_pool_wav", return_value=None), \
+         patch("pipeline.youtube_ffmpeg.resolve_sfx_layers", return_value=[]), \
+         patch("pipeline.youtube_ffmpeg._probe_duration", return_value=120.0), \
+         patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stderr="")
+        from pipeline.youtube_ffmpeg import render_landscape
+        render_landscape(_make_video(), output, MagicMock(), start_s=300.0, end_s=600.0)
+
+    cmd = mock_run.call_args[0][0]
+    assert "-ss" in cmd
+    ss_idx = cmd.index("-ss")
+    i_idx = cmd.index(str(visual))
+    assert ss_idx < i_idx, "-ss must appear before -i visual_path"
+    assert cmd[ss_idx + 1] == "60", f"expected effective_seek=60, got {cmd[ss_idx + 1]}"
+
+
+def test_render_landscape_chunk_no_ss_when_effective_seek_is_zero(tmp_path):
+    """start_s=360, file_dur=120 → effective_seek=0 → no -ss in cmd"""
+    output = tmp_path / "chunk.mp4"
+    visual = tmp_path / "visual.mp4"
+    visual.write_bytes(b"fake")
+
+    with patch("shutil.which", return_value="/usr/bin/ffmpeg"), \
+         patch("pipeline.youtube_ffmpeg.resolve_visual_playlist", return_value=[]), \
+         patch("pipeline.youtube_ffmpeg.resolve_visual", return_value=str(visual)), \
+         patch("pipeline.youtube_ffmpeg._build_music_playlist_wav", return_value=None), \
+         patch("pipeline.youtube_ffmpeg._build_sfx_pool_wav", return_value=None), \
+         patch("pipeline.youtube_ffmpeg.resolve_sfx_layers", return_value=[]), \
+         patch("pipeline.youtube_ffmpeg._probe_duration", return_value=120.0), \
+         patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stderr="")
+        from pipeline.youtube_ffmpeg import render_landscape
+        render_landscape(_make_video(), output, MagicMock(), start_s=360.0, end_s=660.0)
+
+    cmd = mock_run.call_args[0][0]
+    assert "-ss" not in cmd, "effective_seek=0 should produce no -ss flag"
+
+
+def test_render_landscape_no_output_side_ss_after_map(tmp_path):
+    """Even with start_s > 0, -ss must never appear after -map in the command."""
+    output = tmp_path / "chunk.mp4"
+    visual = tmp_path / "visual.mp4"
+    visual.write_bytes(b"fake")
+
+    with patch("shutil.which", return_value="/usr/bin/ffmpeg"), \
+         patch("pipeline.youtube_ffmpeg.resolve_visual_playlist", return_value=[]), \
+         patch("pipeline.youtube_ffmpeg.resolve_visual", return_value=str(visual)), \
+         patch("pipeline.youtube_ffmpeg._build_music_playlist_wav", return_value=None), \
+         patch("pipeline.youtube_ffmpeg._build_sfx_pool_wav", return_value=None), \
+         patch("pipeline.youtube_ffmpeg.resolve_sfx_layers", return_value=[]), \
+         patch("pipeline.youtube_ffmpeg._probe_duration", return_value=120.0), \
+         patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stderr="")
+        from pipeline.youtube_ffmpeg import render_landscape
+        render_landscape(_make_video(), output, MagicMock(), start_s=300.0, end_s=600.0)
+
+    cmd = mock_run.call_args[0][0]
+    # If -map exists, -ss must not appear after it (output-side seek is forbidden)
+    if "-map" in cmd:
+        map_idx = cmd.index("-map")
+        assert "-ss" not in cmd[map_idx:], "-ss must not appear after -map (no output-side seek)"
+    else:
+        # No -map means no complex filter path, so any -ss would be input-side only, which is fine
+        pass
