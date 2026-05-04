@@ -56,6 +56,6 @@ class YoutubeVideo(Base):
     video_preview_path:  Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     # Visual playlist + loop mode (added by migration 015)
-    visual_asset_ids:        Mapped[list[int]]   = mapped_column(ARRAY(Integer), default=list, server_default="{}", nullable=False)
-    visual_clip_durations_s: Mapped[list[float]] = mapped_column(ARRAY(Float),   default=list, server_default="{}", nullable=False)
+    visual_asset_ids:        Mapped[list[int]]   = mapped_column(ARRAY(Integer), default=list, server_default="{}")
+    visual_clip_durations_s: Mapped[list[float]] = mapped_column(ARRAY(Float),   default=list, server_default="{}")
     visual_loop_mode:        Mapped[str]         = mapped_column(String(20), default="concat_loop", server_default="concat_loop", nullable=False)
