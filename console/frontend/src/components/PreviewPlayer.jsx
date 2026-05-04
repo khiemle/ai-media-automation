@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 // Module-level "currently playing" reference so starting one preview stops any other.
 let _activeStop = null
@@ -17,24 +17,22 @@ let _activeStop = null
  */
 export default function PreviewPlayer({ src, kind, size = 'sm', className = '' }) {
   const mediaRef = useRef(null)
-  const stopRef = useRef(null)
   const [playing, setPlaying] = useState(false)
 
-  const stop = () => {
+  // Stable identity across renders so unmount-cleanup and click-time _activeStop
+  // assignment always reference the same function — required for the equality check below.
+  const stop = useCallback(() => {
     if (mediaRef.current) {
       mediaRef.current.pause()
       mediaRef.current.currentTime = 0
     }
     setPlaying(false)
-  }
-  stopRef.current = stop
+  }, [])
 
   useEffect(() => () => {
-    // On unmount, stop playback and clear the active-stop ref if it points at us
     if (mediaRef.current) mediaRef.current.pause()
-    if (_activeStop && _activeStop === stopRef.current) _activeStop = null
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    if (_activeStop === stop) _activeStop = null
+  }, [stop])
 
   const handleToggle = (e) => {
     e.stopPropagation()

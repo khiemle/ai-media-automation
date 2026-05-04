@@ -209,6 +209,11 @@ class YoutubeVideoService:
         if skip_previews is None:
             skip_previews = template.slug not in ("asmr", "soundscape")
 
+        # Validate visual playlist (if provided) — same rules as update_video
+        playlist_validation = self._validate_visual_playlist(data)
+        if playlist_validation is not None:
+            data = {**data, "visual_clip_durations_s": playlist_validation}
+
         video = YoutubeVideo(
             title=data["title"],
             template_id=template_id,
