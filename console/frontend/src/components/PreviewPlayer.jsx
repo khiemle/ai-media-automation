@@ -17,14 +17,8 @@ let _activeStop = null
  */
 export default function PreviewPlayer({ src, kind, size = 'sm', className = '' }) {
   const mediaRef = useRef(null)
+  const stopRef = useRef(null)
   const [playing, setPlaying] = useState(false)
-
-  useEffect(() => () => {
-    // On unmount, stop playback and clear the active-stop ref if it points at us
-    if (mediaRef.current) mediaRef.current.pause()
-    if (_activeStop && _activeStop === stop) _activeStop = null
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   const stop = () => {
     if (mediaRef.current) {
@@ -33,6 +27,14 @@ export default function PreviewPlayer({ src, kind, size = 'sm', className = '' }
     }
     setPlaying(false)
   }
+  stopRef.current = stop
+
+  useEffect(() => () => {
+    // On unmount, stop playback and clear the active-stop ref if it points at us
+    if (mediaRef.current) mediaRef.current.pause()
+    if (_activeStop && _activeStop === stopRef.current) _activeStop = null
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleToggle = (e) => {
     e.stopPropagation()
