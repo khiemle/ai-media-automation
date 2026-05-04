@@ -193,3 +193,72 @@ _run_ffmpeg(cmd, int(start_s * 0.5) + target_dur * 2 + 120)
 ```
 
 This is a band-aid, not a fix — it lets chunks finish but render time grows linearly with position.
+
+---
+
+## Log Evidence (Production — 2026-05-04, celery-render container)
+
+### Timing table — YoutubeVideo 42 (8h video, 96 × 300s chunks, `asset_5.mp4`, `libx264 ultrafast`)
+
+| Chunk | Window (s) | start_s | Task time (s) | Result |
+|------:|-----------|--------:|---------------:|--------|
+| 0 | [0, 300) | 0 | 93.8 | ✅ succeeded |
+| 1 | [300, 600) | 300 | 143.0 | ✅ succeeded |
+| 2 | [600, 900) | 600 | 202.8 | ✅ succeeded |
+| 3 | [900, 1200) | 900 | 260.6 | ✅ succeeded |
+| 4 | [1200, 1500) | 1200 | 316.0 | ✅ succeeded |
+| 5 | [1500, 1800) | 1500 | 373.7 | ✅ succeeded |
+| 6 | [1800, 2100) | 1800 | 431.7 | ✅ succeeded |
+| 7 | [2100, 2400) | 2100 | 489.8 | ✅ succeeded |
+| 8 | [2400, 2700) | 2400 | 544.6 | ✅ succeeded |
+| 9 | [2700, 3000) | 2700 | >600 | ❌ timeout |
+| 10–35+ | [3000, …) | 3000+ | >600 | ❌ timeout (all) |
+
+**Observed encode rate during discard:** ~300 s of discarded video costs ~57 s wall-clock → ~5.3× realtime.  
+**Observed encode rate for output:** 300 s chunk in 93.8 s → ~3.2× realtime.  
+**Linear model:** `task_time ≈ 93.8 + start_s × 0.19` → breakpoint at `start_s = (600 - 93.8) / 0.19 ≈ 2664 s` (chunk 8/9 boundary).
+
+### Representative log lines
+
+**Chunk 0 — no `-ss`, succeeds fast:**
+```
+[23:25:35] ffmpeg landscape cmd (window [0,300)): ffmpeg -y -stream_loop -1 -i /app/assets/video_db/manual/asset_5.mp4 \
+  -i .../chunk_0/music_playlist.wav -stream_loop -1 -i assets/sfx/sfx_6.wav \
+  -filter_complex [...] -map [vout] -map [aout] \
+  -t 300 -c:v libx264 -preset ultrafast -crf 23 -c:a aac -b:a 192k -ar 44100 \
+  -movflags +faststart .../chunk_0/chunk.mp4
+[23:27:08] YoutubeVideo 42 chunk 0 done  (93.8s)
+```
+
+**Chunk 8 — `-ss 2400`, barely under limit:**
+```
+[23:43:03] ffmpeg landscape cmd (window [2400,2700)): ffmpeg -y -stream_loop -1 -i /app/assets/video_db/manual/asset_5.mp4 \
+  -i .../chunk_8/music_playlist.wav -stream_loop -1 -i assets/sfx/sfx_6.wav \
+  -filter_complex [...] -map [vout] -map [aout] \
+  -ss 2400 -t 300 -c:v libx264 -preset ultrafast -crf 23 ...
+[23:52:07] YoutubeVideo 42 chunk 8 done  (544.6s)
+```
+
+**Chunk 9 — `-ss 2700`, first failure:**
+```
+[23:46:46] ffmpeg landscape cmd (window [2700,3000)): ffmpeg -y -stream_loop -1 -i /app/assets/video_db/manual/asset_5.mp4 \
+  -i .../chunk_9/music_playlist.wav -stream_loop -1 -i assets/sfx/sfx_6.wav \
+  -filter_complex [...] -map [vout] -map [aout] \
+  -ss 2700 -t 300 -c:v libx264 -preset ultrafast -crf 23 ...
+[23:56:48] ERROR YoutubeVideo 42 chunk 9 failed: ffmpeg timed out after 600s
+[23:56:48] Task tasks.render_youtube_chunk retry: Retry in 60s: RuntimeError('ffmpeg timed out after 600s')
+```
+
+**Chunk 27 — `-ss 8100`, deep into retry spiral (from earlier log capture):**
+```
+[01:22:13] ffmpeg landscape cmd (window [8100,8400)): ffmpeg -y -stream_loop -1 -i /app/assets/video_db/manual/asset_5.mp4 \
+  -i .../chunk_27/music_playlist.wav -stream_loop -1 -i assets/sfx/sfx_6.wav \
+  -filter_complex [...] -map [vout] -map [aout] \
+  -ss 8100 -t 300 -c:v libx264 -preset ultrafast -crf 23 ...
+[01:32:13] ERROR YoutubeVideo 42 chunk 27 failed: ffmpeg timed out after 600s
+[01:32:13] Task tasks.render_youtube_chunk retry: Retry in 60s: RuntimeError('ffmpeg timed out after 600s')
+```
+
+### Note on blackout filter (chunks 12+)
+
+Starting at chunk 12 (start_s=3600), the filter graph gains the blackout overlay chain. This is unrelated to the timeout — by that point all chunks were already failing due to the seek overhead. The blackout filter is correctly chunk-relative and will remain unchanged by the fix.
