@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Button, Modal } from './index.jsx'
 import { fetchApi } from '../api/client.js'
+import PreviewPlayer from './PreviewPlayer.jsx'
 
 // Music + SFX list endpoints return raw arrays (not {items: [...]} envelopes).
 // Tolerate both shapes so this component keeps working if the API ever switches.
@@ -83,6 +84,7 @@ export default function SfxPoolEditor({ pool = [], densitySeconds, onChange }) {
                 key={asset_id}
                 className="flex items-center gap-2 px-2 py-1.5 bg-[#1c1c22] border border-[#2a2a32] rounded"
               >
+                <PreviewPlayer src={`/api/sfx/${asset_id}/stream`} kind="audio" />
                 <span className="text-sm text-[#e8e8f0] flex-1 truncate">
                   {s?.title || `SFX #${asset_id}`}
                 </span>
@@ -137,17 +139,22 @@ export default function SfxPoolEditor({ pool = [], densitySeconds, onChange }) {
           {filtered.map(s => {
             const active = poolIds.includes(s.id)
             return (
-              <button
+              <div
                 key={s.id}
-                type="button"
-                onClick={() => togglePick(s.id)}
-                className={`text-left px-3 py-2 rounded border ${
+                className={`flex items-stretch gap-2 px-3 py-2 rounded border ${
                   active ? 'border-[#7c6af7] bg-[#7c6af7]/10' : 'border-[#2a2a32] hover:bg-[#1c1c22]'
                 }`}
               >
-                <div className="text-sm text-[#e8e8f0] truncate">{s.title}</div>
-                {s.sound_type && <div className="text-[10px] text-[#5a5a70]">{s.sound_type}</div>}
-              </button>
+                <PreviewPlayer src={`/api/sfx/${s.id}/stream`} kind="audio" />
+                <button
+                  type="button"
+                  onClick={() => togglePick(s.id)}
+                  className="flex-1 text-left min-w-0"
+                >
+                  <div className="text-sm text-[#e8e8f0] truncate">{s.title}</div>
+                  {s.sound_type && <div className="text-[10px] text-[#5a5a70]">{s.sound_type}</div>}
+                </button>
+              </div>
             )
           })}
         </div>
