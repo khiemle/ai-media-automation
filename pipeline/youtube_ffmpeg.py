@@ -548,7 +548,7 @@ def render_landscape(
             str(output_path)]
 
     logger.info("ffmpeg landscape cmd (window [%s,%s)): %s", start_s, end_s, " ".join(cmd))
-    _run_ffmpeg(cmd, target_dur * 2)
+    _run_ffmpeg(cmd, max(120, target_dur * 2))
 
 
 def render_portrait_short(video, template, output_path: Path, db) -> None:
