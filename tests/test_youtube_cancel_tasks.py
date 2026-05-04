@@ -211,3 +211,24 @@ def test_orchestrator_writes_task_ids_before_chord_dispatch():
     # celery_task_id must have changed from old orch ID to concat UUID
     assert committed_state["celery_task_id"] != "old-orch-id"
     assert committed_state["celery_task_id"] is not None
+
+
+def test_chunk_task_returns_early_when_video_is_failed():
+    """render_youtube_chunk_task must not call render_landscape if video.status == 'failed'."""
+    from unittest.mock import patch, MagicMock
+
+    video = MagicMock()
+    video.id = 42
+    video.status = "failed"
+
+    db = MagicMock()
+    db.get.return_value = video
+
+    # The status guard returns before _update_chunk_status is called, so no need to patch it.
+    with patch("console.backend.database.SessionLocal", return_value=db), \
+         patch("pipeline.youtube_ffmpeg.render_landscape") as mock_render:
+        from console.backend.tasks.youtube_render_task import render_youtube_chunk_task
+        result = render_youtube_chunk_task.apply(args=[42, 0, 0.0, 300.0]).get()
+
+    mock_render.assert_not_called()
+    assert result["status"] == "skipped"

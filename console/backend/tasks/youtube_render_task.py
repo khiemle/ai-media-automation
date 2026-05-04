@@ -290,6 +290,14 @@ def render_youtube_chunk_task(self, youtube_video_id: int, chunk_idx: int, start
         if not video:
             return {"status": "failed", "reason": "video not found"}
 
+        # Guard: bail early if video was cancelled or failed while this task was queued
+        if video.status == "failed":
+            logger.info(
+                "YoutubeVideo %s chunk %s skipped — video is failed/cancelled",
+                youtube_video_id, chunk_idx,
+            )
+            return {"status": "skipped", "reason": "video cancelled"}
+
         # Mark chunk running
         _update_chunk_status(db, youtube_video_id, chunk_idx, {
             "idx": chunk_idx, "start_s": start_s, "end_s": end_s,
