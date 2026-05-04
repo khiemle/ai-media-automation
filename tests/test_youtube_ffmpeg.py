@@ -228,3 +228,29 @@ def test_render_portrait_short_falls_back_to_hardcoded_default_when_no_cta(tmp_p
         )
     cmd = " ".join(mock_run.call_args[0][0])
     assert "Watch the full video" in cmd
+
+
+# ── _probe_duration ────────────────────────────────────────────────────────────
+
+def test_probe_duration_returns_float_from_ffprobe_stdout():
+    from pipeline.youtube_ffmpeg import _probe_duration
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stdout="120.5\n", stderr="")
+        result = _probe_duration("/some/file.mp4")
+    assert result == pytest.approx(120.5)
+
+
+def test_probe_duration_returns_zero_on_bad_output():
+    from pipeline.youtube_ffmpeg import _probe_duration
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stdout="not_a_float\n", stderr="")
+        result = _probe_duration("/some/file.mp4")
+    assert result == 0.0
+
+
+def test_probe_duration_returns_zero_on_timeout():
+    import subprocess
+    from pipeline.youtube_ffmpeg import _probe_duration
+    with patch("subprocess.run", side_effect=subprocess.TimeoutExpired("ffprobe", 15)):
+        result = _probe_duration("/some/file.mp4")
+    assert result == 0.0

@@ -196,6 +196,20 @@ def _run_ffmpeg(cmd: list[str], timeout: float) -> None:
         raise RuntimeError(f"ffmpeg failed: {(result.stderr or '')[-800:]}")
 
 
+def _probe_duration(path: str) -> float:
+    try:
+        result = subprocess.run(
+            ["ffprobe", "-v", "quiet",
+             "-show_entries", "format=duration",
+             "-of", "default=noprint_wrappers=1:nokey=1",
+             path],
+            capture_output=True, text=True, timeout=15,
+        )
+        return float(result.stdout.strip())
+    except (ValueError, AttributeError, subprocess.TimeoutExpired):
+        return 0.0
+
+
 def _build_music_playlist_wav(video, db, target_duration_s: int, output_dir: Path) -> str | None:
     """Render the multi-track music playlist to a single temp WAV, with crossfade and loop.
 
