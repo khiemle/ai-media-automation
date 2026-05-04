@@ -210,7 +210,7 @@ def _probe_duration(path: str) -> float:
         return 0.0
 
 
-def _build_music_playlist_wav(video, db, target_duration_s: int, output_dir: Path) -> str | None:
+def _build_music_playlist_wav(video, db, target_duration_s: int, output_dir: Path, start_s: float = 0.0) -> str | None:
     """Render the multi-track music playlist to a single temp WAV, with crossfade and loop.
 
     Falls back to single ``music_track_id`` when ``music_track_ids`` is empty.
@@ -265,7 +265,10 @@ def _build_music_playlist_wav(video, db, target_duration_s: int, output_dir: Pat
             prev = label
         parts.append("[joined]aloop=loop=-1:size=2147483647[looped]")
 
-    parts.append(f"[looped]atrim=duration={target_duration_s}[out]")
+    parts.append(
+        f"[looped]atrim=start={start_s}:end={start_s + target_duration_s},"
+        f"asetpts=PTS-STARTPTS[out]"
+    )
 
     cmd += [
         "-filter_complex", ";".join(parts),
@@ -432,7 +435,7 @@ def render_landscape(
         is_image = visual_path is not None and Path(visual_path).suffix.lower() in IMAGE_EXTS
 
     # Pre-render music playlist + SFX pool to temp WAVs (separate ffmpeg passes)
-    music_wav = _build_music_playlist_wav(video, db, target_dur, output_dir)
+    music_wav = _build_music_playlist_wav(video, db, target_dur, output_dir, start_s=start_s)
     sfx_wav = _build_sfx_pool_wav(video, db, target_dur, start_s, output_dir)
 
     # Existing 3-layer SFX overrides remain additive

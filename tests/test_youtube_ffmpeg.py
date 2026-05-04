@@ -330,3 +330,52 @@ def test_render_landscape_no_output_side_ss_after_map(tmp_path):
     else:
         # No -map means no complex filter path, so any -ss would be input-side only, which is fine
         pass
+
+
+# ── _build_music_playlist_wav ─────────────────────────────────────────────────
+
+def _make_music_video_and_db(tmp_path):
+    """Return (video_mock, db_mock) with one music track file on disk."""
+    music_file = tmp_path / "track.mp3"
+    music_file.write_bytes(b"fake")
+
+    track = MagicMock()
+    track.id = 1
+    track.file_path = str(music_file)
+    track.volume = 1.0
+
+    video = MagicMock()
+    video.music_track_ids = [1]
+    video.music_track_id = None
+
+    db = MagicMock()
+    db.query.return_value.filter.return_value.all.return_value = [track]
+    return video, db
+
+
+def test_build_music_playlist_wav_uses_start_s_in_atrim(tmp_path):
+    """start_s=300, target_dur=300 → atrim=start=300.0:end=600.0"""
+    video, db = _make_music_video_and_db(tmp_path)
+
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+        from pipeline.youtube_ffmpeg import _build_music_playlist_wav
+        _build_music_playlist_wav(video, db, 300, tmp_path, start_s=300.0)
+
+    cmd = " ".join(mock_run.call_args[0][0])
+    assert "atrim=start=300.0:end=600.0" in cmd
+    assert "asetpts=PTS-STARTPTS" in cmd
+
+
+def test_build_music_playlist_wav_default_start_s_is_zero(tmp_path):
+    """Default start_s=0 → atrim=start=0:end=300"""
+    video, db = _make_music_video_and_db(tmp_path)
+
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+        from pipeline.youtube_ffmpeg import _build_music_playlist_wav
+        _build_music_playlist_wav(video, db, 300, tmp_path)
+
+    cmd = " ".join(mock_run.call_args[0][0])
+    assert "atrim=start=0" in cmd
+    assert "asetpts=PTS-STARTPTS" in cmd
