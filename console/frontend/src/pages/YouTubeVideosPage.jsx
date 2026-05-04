@@ -6,6 +6,8 @@ import MusicPlaylistEditor from '../components/MusicPlaylistEditor.jsx'
 import SfxPoolEditor from '../components/SfxPoolEditor.jsx'
 import RenderStatePanel from '../components/RenderStatePanel.jsx'
 import PreviewApprovalGate from '../components/PreviewApprovalGate.jsx'
+import SfxPickerModal from '../components/SfxPickerModal.jsx'
+import PreviewPlayer from '../components/PreviewPlayer.jsx'
 import { useRenderWebSocket } from '../hooks/useRenderWebSocket.js'
 
 const ACTIVE_RENDER_STATES = new Set([
@@ -124,6 +126,7 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
     midground:  { asset_id: '', volume: 0.3 },
     background: { asset_id: '', volume: 0.1 },
   })
+  const [sfxPickerLayer, setSfxPickerLayer] = useState(null)  // 'foreground' | 'midground' | 'background' | null
 
   // ASMR / Soundscape extras
   const [musicTrackIds, setMusicTrackIds]       = useState([])
@@ -638,30 +641,45 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
                 { key: 'foreground', label: 'Foreground', defaultVol: 0.6 },
                 { key: 'midground',  label: 'Midground',  defaultVol: 0.3 },
                 { key: 'background', label: 'Background', defaultVol: 0.1 },
-              ].map(({ key, label, defaultVol }) => {
+              ].map(({ key, label }) => {
                 const sfxPack = template?.sfx_pack?.[key]
                 const layerDefault = sfxList.find(s => s.id === sfxPack?.asset_id)
+                const pickedId = sfxLayers[key].asset_id
+                const pickedSfx = sfxList.find(s => String(s.id) === String(pickedId))
                 return (
                   <div key={key} className="bg-[#0d0d0f] border border-[#2a2a32] rounded-lg p-3 flex flex-col gap-2">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-medium text-[#9090a8]">{label}</span>
-                      {layerDefault && !sfxLayers[key].asset_id && (
+                      {layerDefault && !pickedId && (
                         <span className="text-[10px] text-[#5a5a70] font-mono">template default: {layerDefault.title}</span>
                       )}
                     </div>
-                    <select
-                      value={sfxLayers[key].asset_id}
-                      onChange={e => setSfxLayers(prev => ({
-                        ...prev,
-                        [key]: { ...prev[key], asset_id: e.target.value },
-                      }))}
-                      className="bg-[#16161a] border border-[#2a2a32] rounded-lg px-3 py-1.5 text-sm text-[#e8e8f0] focus:outline-none focus:border-[#7c6af7] transition-colors w-full"
-                    >
-                      <option value="">— {layerDefault ? `${layerDefault.title} (template default)` : 'No SFX'} —</option>
-                      {sfxList.map(s => (
-                        <option key={s.id} value={String(s.id)}>{s.title} ({s.category || 'sfx'})</option>
-                      ))}
-                    </select>
+                    {pickedId ? (
+                      <div className="flex items-center gap-2 px-2 py-1.5 bg-[#1c1c22] border border-[#2a2a32] rounded">
+                        <PreviewPlayer src={`/api/sfx/${pickedId}/stream`} kind="audio" />
+                        <button
+                          type="button"
+                          onClick={() => setSfxPickerLayer(key)}
+                          className="flex-1 text-left text-sm text-[#e8e8f0] truncate"
+                        >
+                          {pickedSfx?.title || `SFX #${pickedId}`}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSfxLayers(prev => ({ ...prev, [key]: { ...prev[key], asset_id: '' } }))}
+                          className="text-[#f87171] text-xs px-1"
+                          aria-label={`Clear ${label}`}
+                        >×</button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setSfxPickerLayer(key)}
+                        className="px-3 py-1.5 rounded border border-dashed border-[#2a2a32] text-xs text-[#9090a8] hover:text-[#e8e8f0] hover:border-[#7c6af7] transition-colors"
+                      >
+                        + Pick SFX
+                      </button>
+                    )}
                     <div className="flex items-center gap-3">
                       <span className="text-xs text-[#5a5a70] w-16 shrink-0">Volume</span>
                       <input
@@ -729,6 +747,18 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
             </Select>
           </section>
         </div>
+
+        <SfxPickerModal
+          open={sfxPickerLayer !== null}
+          onClose={() => setSfxPickerLayer(null)}
+          selectedId={sfxPickerLayer ? sfxLayers[sfxPickerLayer].asset_id : null}
+          onSelect={(s) => {
+            setSfxLayers(prev => ({
+              ...prev,
+              [sfxPickerLayer]: { ...prev[sfxPickerLayer], asset_id: String(s.id) },
+            }))
+          }}
+        />
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-[#2a2a32] flex gap-3 justify-end">
