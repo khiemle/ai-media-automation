@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Button, Modal } from './index.jsx'
 import { fetchApi } from '../api/client.js'
+import PreviewPlayer from './PreviewPlayer.jsx'
 
 // Music + SFX list endpoints return raw arrays (not {items: [...]} envelopes).
 // Tolerate both shapes so this component keeps working if the API ever switches.
@@ -51,6 +52,7 @@ export default function MusicPlaylistEditor({ trackIds = [], onChange }) {
       {tracks.map((t, i) => (
         <div key={`${t.id}-${i}`} className="flex items-center gap-2 px-2 py-1.5 bg-[#1c1c22] border border-[#2a2a32] rounded">
           <span className="text-xs font-mono text-[#5a5a70] w-6">{i + 1}</span>
+          <PreviewPlayer src={`/api/music/${t.id}/stream`} kind="audio" />
           <span className="text-sm text-[#e8e8f0] flex-1 truncate">{t.title}</span>
           <span className="text-xs font-mono text-[#9090a8]">{Math.round(t.duration_s || 0)}s</span>
           <button
@@ -90,18 +92,23 @@ export default function MusicPlaylistEditor({ trackIds = [], onChange }) {
           {filtered.map(t => {
             const already = trackIds.includes(t.id)
             return (
-              <button
+              <div
                 key={t.id}
-                type="button"
-                onClick={() => add(t.id)}
-                className="w-full text-left px-3 py-2 hover:bg-[#1c1c22] rounded text-sm text-[#e8e8f0] flex items-center justify-between gap-2"
+                className="flex items-center gap-2 px-3 py-2 hover:bg-[#1c1c22] rounded"
               >
-                <span className="truncate">
-                  {t.title}{' '}
-                  <span className="text-[#5a5a70] text-xs">({Math.round(t.duration_s || 0)}s)</span>
-                </span>
-                {already && <span className="text-[10px] text-[#7c6af7]">in playlist</span>}
-              </button>
+                <PreviewPlayer src={`/api/music/${t.id}/stream`} kind="audio" />
+                <button
+                  type="button"
+                  onClick={() => add(t.id)}
+                  className="flex-1 text-left text-sm text-[#e8e8f0] flex items-center justify-between gap-2"
+                >
+                  <span className="truncate">
+                    {t.title}{' '}
+                    <span className="text-[#5a5a70] text-xs">({Math.round(t.duration_s || 0)}s)</span>
+                  </span>
+                  {already && <span className="text-[10px] text-[#7c6af7]">in playlist</span>}
+                </button>
+              </div>
             )
           })}
         </div>
