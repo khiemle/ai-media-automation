@@ -33,9 +33,20 @@ def upgrade() -> None:
             nullable=False,
         ),
     )
+    op.create_check_constraint(
+        "ck_youtube_videos_visual_loop_mode",
+        "youtube_videos",
+        "visual_loop_mode IN ('concat_loop', 'per_clip')",
+    )
 
 
 def downgrade() -> None:
+    # Use IF EXISTS so a re-run downgrade is idempotent and safe even if the
+    # constraint was never created (e.g. when rolling back a migration that was
+    # first applied without the constraint).
+    op.execute(
+        "ALTER TABLE youtube_videos DROP CONSTRAINT IF EXISTS ck_youtube_videos_visual_loop_mode"
+    )
     op.drop_column("youtube_videos", "visual_loop_mode")
     op.drop_column("youtube_videos", "visual_clip_durations_s")
     op.drop_column("youtube_videos", "visual_asset_ids")
