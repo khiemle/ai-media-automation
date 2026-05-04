@@ -96,20 +96,21 @@ function VideoPreviewModal({ video, onClose }) {
   )
 }
 
-function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCreated }) {
+function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCreated, mode = 'create', existingVideo = null }) {
+  const isEdit = mode === 'edit' && existingVideo
   const [selectedPlan, setSelectedPlan] = useState(channelPlan)
   const [form, setForm] = useState({
-    theme: '',
-    target_duration_h: template?.target_duration_h || 8,
-    customDuration: '',
-    isCustomDuration: false,
-    music_track_id: null,
-    visual_asset_id: null,
-    sfx_overrides: null,
-    seo_title: '',
-    seo_description: '',
-    seo_tags: '',
-    output_quality: '1080p',
+    theme:                 isEdit ? (existingVideo.theme || '')                  : '',
+    target_duration_h:     isEdit ? (existingVideo.target_duration_h || 8)       : (template?.target_duration_h || 8),
+    customDuration:        '',
+    isCustomDuration:      false,
+    music_track_id:        isEdit ? existingVideo.music_track_id                 : null,
+    visual_asset_id:       isEdit ? existingVideo.visual_asset_id                : null,
+    sfx_overrides:         null,
+    seo_title:             isEdit ? (existingVideo.seo_title || '')              : '',
+    seo_description:       isEdit ? (existingVideo.seo_description || '')        : '',
+    seo_tags:              isEdit ? (existingVideo.seo_tags || []).join(', ')    : '',
+    output_quality:        isEdit ? (existingVideo.output_quality || '1080p')    : '1080p',
   })
   const [musicList, setMusicList]   = useState([])
   const [assetList, setAssetList]   = useState([])
@@ -120,26 +121,42 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
   const [autofillError, setAutofillError] = useState(null)
   const [autofillSuno, setAutofillSuno] = useState(null)
   const [autofillRunway, setAutofillRunway] = useState(null)
-  const [autofilled, setAutofilled] = useState(false)
+  const [autofilled, setAutofilled] = useState(isEdit)  // skip the auto-SEO useEffect on edit
 
-  const [sfxLayers, setSfxLayers] = useState({
-    foreground: { asset_id: '', volume: 0.6 },
-    midground:  { asset_id: '', volume: 0.3 },
-    background: { asset_id: '', volume: 0.1 },
+  const [sfxLayers, setSfxLayers] = useState(() => {
+    const overrides = isEdit ? (existingVideo.sfx_overrides || {}) : {}
+    return {
+      foreground: { asset_id: overrides.foreground?.asset_id ? String(overrides.foreground.asset_id) : '', volume: overrides.foreground?.volume ?? 0.6 },
+      midground:  { asset_id: overrides.midground?.asset_id  ? String(overrides.midground.asset_id)  : '', volume: overrides.midground?.volume  ?? 0.3 },
+      background: { asset_id: overrides.background?.asset_id ? String(overrides.background.asset_id) : '', volume: overrides.background?.volume ?? 0.1 },
+    }
   })
+
   const [sfxPickerLayer, setSfxPickerLayer] = useState(null)  // 'foreground' | 'midground' | 'background' | null
 
-  const [visualAssetIds, setVisualAssetIds]       = useState([])
-  const [visualDurations, setVisualDurations]     = useState([])
-  const [visualLoopMode, setVisualLoopMode]       = useState('concat_loop')
-
   // ASMR / Soundscape extras
-  const [musicTrackIds, setMusicTrackIds]       = useState([])
-  const [sfxPool, setSfxPool]                   = useState([])     // [{asset_id, volume}]
-  const [sfxDensity, setSfxDensity]             = useState(60)
-  const [blackFromSeconds, setBlackFromSeconds] = useState('')
-  const [skipPreviews, setSkipPreviews]         = useState(false)
+  const [musicTrackIds, setMusicTrackIds]       = useState(isEdit ? (existingVideo.music_track_ids || []) : [])
+  const [sfxPool, setSfxPool]                   = useState(isEdit ? (existingVideo.sfx_pool || [])       : [])
+  const [sfxDensity, setSfxDensity]             = useState(isEdit ? (existingVideo.sfx_density_seconds || 60) : 60)
+  const [blackFromSeconds, setBlackFromSeconds] = useState(isEdit && existingVideo.black_from_seconds != null ? String(existingVideo.black_from_seconds) : '')
+  const [skipPreviews, setSkipPreviews]         = useState(isEdit ? !!existingVideo.skip_previews : false)
   const isAsmrLike = ['asmr', 'soundscape'].includes(template?.slug)
+
+  // Visual playlist — fall back to legacy single visual_asset_id when array is empty
+  // so editing a pre-feature video doesn't drop the existing visual.
+  const [visualAssetIds, setVisualAssetIds]   = useState(() => {
+    if (!isEdit) return []
+    if (existingVideo.visual_asset_ids?.length > 0) return existingVideo.visual_asset_ids
+    if (existingVideo.visual_asset_id) return [existingVideo.visual_asset_id]
+    return []
+  })
+  const [visualDurations, setVisualDurations] = useState(() => {
+    if (!isEdit) return []
+    if (existingVideo.visual_clip_durations_s?.length > 0) return existingVideo.visual_clip_durations_s
+    if (existingVideo.visual_asset_id) return [0.0]  // 0 = use native length in concat_loop
+    return []
+  })
+  const [visualLoopMode, setVisualLoopMode]   = useState(isEdit ? (existingVideo.visual_loop_mode || 'concat_loop') : 'concat_loop')
 
   const [showMusicUpload, setShowMusicUpload] = useState(false)
   const [musicUploadFile, setMusicUploadFile] = useState(null)
@@ -231,6 +248,7 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
   }, [])
 
   useEffect(() => {
+    if (isEdit) return  // edit mode: never auto-rewrite SEO from theme
     if (form.theme && template && !autofilled) {
       const h = form.isCustomDuration
         ? (parseFloat(form.customDuration) || 8)
@@ -246,7 +264,7 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
           .replace('{duration}', durationDisplay),
       }))
     }
-  }, [form.theme, form.target_duration_h, form.customDuration, form.isCustomDuration, autofilled])
+  }, [form.theme, form.target_duration_h, form.customDuration, form.isCustomDuration, autofilled, isEdit])
 
   const handleAutofill = async () => {
     if (!selectedPlan || !form.theme) return
@@ -288,7 +306,7 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
     setLoading(true)
     try {
       const title = form.seo_title || `${template.label} — ${form.theme}`
-      await youtubeVideosApi.create({
+      const body = {
         title,
         template_id: template.id,
         theme: form.theme,
@@ -318,7 +336,12 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
           black_from_seconds: blackFromSeconds ? parseInt(blackFromSeconds, 10) : null,
           skip_previews: skipPreviews,
         } : {}),
-      })
+      }
+      if (isEdit) {
+        await youtubeVideosApi.update(existingVideo.id, body)
+      } else {
+        await youtubeVideosApi.create(body)
+      }
       onCreated()
       onClose()
     } catch (e) {
@@ -335,13 +358,15 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#2a2a32]">
           <div className="flex flex-col gap-0.5 min-w-0">
-            <h2 className="text-base font-semibold text-[#e8e8f0]">New {template?.label}</h2>
+            <h2 className="text-base font-semibold text-[#e8e8f0]">
+              {isEdit ? 'Edit' : 'New'} {template?.label}
+            </h2>
             {selectedPlan && (
               <span className="text-xs text-[#7c6af7] font-mono">{selectedPlan.name}</span>
             )}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            {(selectedPlan || channelPlans.length > 0) && (
+            {!isEdit && (selectedPlan || channelPlans.length > 0) && (
               <Button
                 variant="accent"
                 size="sm"
@@ -787,7 +812,9 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
         {/* Footer */}
         <div className="px-6 py-4 border-t border-[#2a2a32] flex gap-3 justify-end">
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button variant="primary" loading={loading} onClick={handleSubmit}>Queue Render →</Button>
+          <Button variant="primary" loading={loading} onClick={handleSubmit}>
+            {isEdit ? 'Save changes →' : 'Queue Render →'}
+          </Button>
         </div>
       </div>
     </div>
