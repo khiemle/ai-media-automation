@@ -101,8 +101,11 @@ def _build_visual_segment(
         item_paths.append(out)
 
     # Step 2: concat the items with the concat demuxer
+    # ffmpeg resolves paths in the list file relative to the LIST FILE's directory,
+    # not the cwd. The items live alongside the list file, so use bare basenames —
+    # using the full path would double the prefix (e.g., 'foo/bar/foo/bar/x.mp4').
     list_file = output_dir / "vseg_list.txt"
-    list_file.write_text("\n".join(f"file '{p}'" for p in item_paths))
+    list_file.write_text("\n".join(f"file '{p.name}'" for p in item_paths))
     concat_path = output_dir / "vseg_concat.mp4"
     _run_ffmpeg(
         ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(list_file),

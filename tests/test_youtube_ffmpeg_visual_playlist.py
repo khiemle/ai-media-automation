@@ -156,3 +156,37 @@ def test_render_landscape_skips_ss_when_using_playlist_segment(monkeypatch, tmp_
     assert "-t" in cmd
     t_idx = cmd.index("-t")
     assert cmd[t_idx + 1] == "300"
+
+
+def test_build_visual_segment_concat_list_uses_basenames(monkeypatch, tmp_path):
+    """Regression: concat list must use basenames, not full paths.
+
+    ffmpeg's concat demuxer resolves entries relative to the LIST FILE's directory.
+    Writing the full output_dir-prefixed path doubles the prefix and produces
+    'output_dir/output_dir/vseg_0.mp4' which doesn't exist.
+    """
+    a = MagicMock(); a.file_path = str(tmp_path / "v.mp4"); a.asset_type = "video_clip"
+    (tmp_path / "v.mp4").write_bytes(b"fake")
+
+    # Stub _run_ffmpeg so the per-item ffmpeg calls don't actually need to run,
+    # but we still capture what the code WOULD have written into vseg_list.txt.
+    monkeypatch.setattr("pipeline.youtube_ffmpeg._run_ffmpeg", lambda cmd, timeout: None)
+
+    from pipeline.youtube_ffmpeg import _build_visual_segment
+    _build_visual_segment(
+        playlist=[a],
+        durations=[0.0],
+        loop_mode="concat_loop",
+        w=1920, h=1080, target_dur_s=60,
+        output_dir=tmp_path,
+    )
+
+    list_text = (tmp_path / "vseg_list.txt").read_text()
+    # Each non-empty line must be 'file 'BASENAME'' — no path separators inside the quotes
+    for line in list_text.splitlines():
+        if not line.strip():
+            continue
+        assert line.startswith("file '") and line.endswith("'"), f"unexpected line: {line!r}"
+        inner = line[len("file '"):-1]
+        assert "/" not in inner, f"concat list contains path separator: {inner!r}"
+        assert inner == "vseg_0.mp4", f"expected basename 'vseg_0.mp4', got: {inner!r}"
