@@ -222,12 +222,15 @@ def _nvenc_available() -> bool:
         result = subprocess.run(
             [
                 "ffmpeg", "-hide_banner", "-loglevel", "error",
-                "-f", "lavfi", "-i", "nullsrc=s=64x64:r=1",
+                "-f", "lavfi", "-i", "nullsrc=s=256x256:r=30",
                 "-frames:v", "1", "-c:v", "h264_nvenc", "-f", "null", "-",
             ],
             capture_output=True, text=True, timeout=15,
         )
-        return "Cannot load libnvidia" not in (result.stderr or "")
+        # ffmpeg exits 0 even on init failure with -f null; check stderr instead.
+        # "Cannot load libnvidia" = library missing (Docker Desktop runc runtime).
+        # Any other stderr = unexpected failure, treat as unavailable.
+        return result.returncode == 0 and not (result.stderr or "").strip()
     except Exception:
         return False
 

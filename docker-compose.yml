@@ -79,6 +79,12 @@ services:
     env_file:
       - ./console/.env
       - ./pipeline.env
+    # Mount WSL2 NVIDIA userspace libs so h264_nvenc can load libnvidia-encode.so.1.
+    # Docker Desktop on Windows passes the GPU device through (nvidia-smi works) but
+    # runs containers with the default runc runtime, which does NOT inject the NVENC
+    # encoding library. Mounting /usr/lib/wsl/lib and setting LD_LIBRARY_PATH fixes this.
+    environment:
+      - LD_LIBRARY_PATH=/usr/lib/wsl/lib
     depends_on:
       - postgres
       - redis
@@ -89,6 +95,7 @@ services:
       - ${MODELS_PATH:-C:/render/models}:/app/models
       - ${MUSIC_PATH:-C:/render/assets/music}:/app/assets/music
       - ${SFX_PATH:-C:/render/assets/sfx}:/app/assets/sfx
+      - /usr/lib/wsl/lib:/usr/lib/wsl/lib:ro
     deploy:
       resources:
         reservations:
