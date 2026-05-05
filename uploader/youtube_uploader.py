@@ -7,6 +7,17 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+try:
+    from googleapiclient.discovery import build
+    from googleapiclient.http import MediaFileUpload
+    from google.oauth2.credentials import Credentials
+    from google.auth.transport.requests import Request
+except ImportError:
+    build = None  # type: ignore[assignment]
+    MediaFileUpload = None  # type: ignore[assignment]
+    Credentials = None  # type: ignore[assignment]
+    Request = None  # type: ignore[assignment]
+
 CHUNK_SIZE = 10 * 1024 * 1024   # 10MB resumable upload chunks
 
 
@@ -148,3 +159,31 @@ def _niche_to_category(niche: str) -> str:
 # Legacy alias used by console upload task
 def upload_to_youtube(video_path, metadata, credentials) -> str:
     return upload(video_path, metadata, credentials)
+
+
+def set_thumbnail(platform_video_id: str, thumbnail_path: str | Path, credentials: dict) -> None:
+    """Set a custom thumbnail on a YouTube video via the Data API v3.
+
+    Does not raise on API failure — callers should catch and log warnings.
+    """
+    if build is None:
+        raise RuntimeError(
+            "google-api-python-client not installed. "
+            "Run: pip install google-api-python-client google-auth"
+        )
+
+    creds = Credentials(
+        token=credentials.get("access_token"),
+        refresh_token=credentials.get("refresh_token"),
+        client_id=credentials.get("client_id"),
+        client_secret=credentials.get("client_secret"),
+        token_uri="https://oauth2.googleapis.com/token",
+    )
+    if creds.expired and creds.refresh_token:
+        creds.refresh(Request())
+        logger.info("[YouTube] Token refreshed for thumbnail set")
+
+    youtube = build("youtube", "v3", credentials=creds)
+    media = MediaFileUpload(str(thumbnail_path), mimetype="image/png")
+    youtube.thumbnails().set(videoId=platform_video_id, media_body=media).execute()
+    logger.info("[YouTube] Thumbnail set for video %s", platform_video_id)

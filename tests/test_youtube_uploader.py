@@ -37,3 +37,32 @@ def test_niche_to_category_fitness():
 
 def test_niche_to_category_unknown_defaults_to_people_blogs():
     assert _niche_to_category("unknown_niche") == "22"
+
+
+def test_set_thumbnail_calls_thumbnails_set():
+    from unittest.mock import MagicMock, patch
+    mock_youtube = MagicMock()
+    mock_creds = MagicMock()
+    mock_creds.expired = False
+
+    with patch("uploader.youtube_uploader.Credentials", return_value=mock_creds), \
+         patch("uploader.youtube_uploader.build", return_value=mock_youtube), \
+         patch("uploader.youtube_uploader.MediaFileUpload") as mock_media:
+        from uploader.youtube_uploader import set_thumbnail
+        set_thumbnail(
+            "abc123",
+            "/tmp/thumb.png",
+            {"access_token": "tok", "refresh_token": "ref", "client_id": "cid", "client_secret": "sec"},
+        )
+
+    mock_youtube.thumbnails().set.assert_called_once_with(
+        videoId="abc123", media_body=mock_media.return_value
+    )
+    mock_youtube.thumbnails().set().execute.assert_called_once()
+
+
+def test_set_thumbnail_has_correct_signature():
+    import inspect
+    from uploader.youtube_uploader import set_thumbnail
+    params = list(inspect.signature(set_thumbnail).parameters.keys())
+    assert params == ["platform_video_id", "thumbnail_path", "credentials"]
