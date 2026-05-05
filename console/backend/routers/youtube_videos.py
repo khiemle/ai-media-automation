@@ -1,8 +1,9 @@
 # console/backend/routers/youtube_videos.py
+import time
 from pathlib import Path
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -63,6 +64,10 @@ class YoutubeVideoUpdate(BaseModel):
 
 class StatusUpdate(BaseModel):
     status: str
+
+
+class ThumbnailGenerateRequest(BaseModel):
+    text: str | None = None
 
 
 # ── Templates ────────────────────────────────────────────────────────────────
@@ -386,4 +391,128 @@ def get_video_preview_file(video_id: int, db: Session = Depends(get_db)):
     if not Path(video.video_preview_path).is_file():
         raise HTTPException(status_code=404, detail="Video preview file not found on disk")
     return FileResponse(video.video_preview_path, media_type="video/mp4")
+
+
+# ── Thumbnail endpoints ───────────────────────────────────────────────────────
+
+
+@router.post("/{video_id}/thumbnail-image", status_code=201)
+async def upload_thumbnail_image(
+    video_id: int,
+    image: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _user=Depends(require_editor_or_admin),
+):
+    """Upload a Midjourney source image; saves as VideoAsset(source='midjourney')."""
+    from console.backend.models.youtube_video import YoutubeVideo
+    from console.backend.models.video_asset import VideoAsset
+
+    video = db.get(YoutubeVideo, video_id)
+    if not video:
+        raise HTTPException(status_code=404, detail=f"YoutubeVideo {video_id} not found")
+    if video.status == "published":
+        raise HTTPException(status_code=400, detail="Cannot update thumbnail of a published video")
+
+    content = await image.read()
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Image too large (max 10MB)")
+
+    filename = image.filename or "thumbnail.jpg"
+    ext = Path(filename).suffix.lower() or ".jpg"
+    save_dir = Path("assets/thumbnails/source")
+    save_dir.mkdir(parents=True, exist_ok=True)
+    save_path = save_dir / f"yt_{video_id}_{int(time.time())}{ext}"
+    save_path.write_bytes(content)
+
+    asset = VideoAsset(
+        file_path=str(save_path),
+        source="midjourney",
+        asset_type="still_image",
+        description=f"Thumbnail source for YouTube video {video_id}",
+    )
+    db.add(asset)
+    db.flush()
+    video.thumbnail_asset_id = asset.id
+    db.commit()
+    db.refresh(asset)
+
+    return {"asset_id": asset.id, "source_url": f"/api/youtube-videos/{video_id}/thumbnail-source"}
+
+
+@router.post("/{video_id}/thumbnail-generate")
+def generate_thumbnail_endpoint(
+    video_id: int,
+    body: ThumbnailGenerateRequest,
+    db: Session = Depends(get_db),
+    _user=Depends(require_editor_or_admin),
+):
+    """Generate (or regenerate) the thumbnail PNG from the uploaded source image."""
+    from console.backend.models.youtube_video import YoutubeVideo
+    from console.backend.models.video_asset import VideoAsset
+    from pipeline.youtube_thumbnail import generate_thumbnail
+
+    video = db.get(YoutubeVideo, video_id)
+    if not video:
+        raise HTTPException(status_code=404, detail=f"YoutubeVideo {video_id} not found")
+    if not video.thumbnail_asset_id:
+        raise HTTPException(status_code=400, detail="No thumbnail image uploaded yet")
+
+    text = body.text
+    if text and len(text.strip().split()) > 5:
+        raise HTTPException(status_code=400, detail="Thumbnail text must be 5 words or fewer")
+
+    asset = db.get(VideoAsset, video.thumbnail_asset_id)
+    if not asset:
+        raise HTTPException(status_code=400, detail="Thumbnail source asset not found")
+
+    output_path = Path(f"assets/thumbnails/generated/yt_{video_id}.png")
+    try:
+        generate_thumbnail(source_path=asset.file_path, output_path=output_path, text=text or None)
+    except Exception as exc:
+        video.thumbnail_path = None
+        db.commit()
+        raise HTTPException(status_code=500, detail=f"Thumbnail generation failed: {exc}")
+
+    video.thumbnail_path = str(output_path)
+    video.thumbnail_text = text or None
+    db.commit()
+
+    return {"thumbnail_url": f"/api/youtube-videos/{video_id}/thumbnail"}
+
+
+@router.get("/{video_id}/thumbnail")
+def get_thumbnail(video_id: int, db: Session = Depends(get_db)):
+    """Serve the generated thumbnail PNG."""
+    from console.backend.models.youtube_video import YoutubeVideo
+
+    video = db.get(YoutubeVideo, video_id)
+    if not video or not video.thumbnail_path:
+        raise HTTPException(status_code=404, detail="No thumbnail available")
+    p = Path(video.thumbnail_path)
+    if not p.is_file():
+        raise HTTPException(status_code=404, detail="Thumbnail file not found on disk")
+    return FileResponse(str(p), media_type="image/png")
+
+
+@router.get("/{video_id}/thumbnail-source")
+def get_thumbnail_source(video_id: int, db: Session = Depends(get_db)):
+    """Serve the original Midjourney source image."""
+    from console.backend.models.youtube_video import YoutubeVideo
+    from console.backend.models.video_asset import VideoAsset
+
+    video = db.get(YoutubeVideo, video_id)
+    if not video or not video.thumbnail_asset_id:
+        raise HTTPException(status_code=404, detail="No thumbnail source available")
+    asset = db.get(VideoAsset, video.thumbnail_asset_id)
+    if not asset:
+        raise HTTPException(status_code=404, detail="Thumbnail source asset not found")
+    p = Path(asset.file_path)
+    if not p.is_file():
+        raise HTTPException(status_code=404, detail="Thumbnail source file not found on disk")
+    ext = p.suffix.lower()
+    media_type = {
+        ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+        ".png": "image/png", ".webp": "image/webp",
+    }.get(ext, "image/jpeg")
+    return FileResponse(str(p), media_type=media_type)
 
