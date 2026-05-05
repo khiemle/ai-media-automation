@@ -197,7 +197,8 @@ def render_youtube_audio_preview_task(self, youtube_video_id: int):
         logger.exception("YoutubeVideo %s audio preview failed: %s", youtube_video_id, exc)
         if video is not None:
             try:
-                video.status = "queued"  # roll back to queued so editor can retry
+                is_final = self.request.retries >= self.max_retries
+                video.status = "failed" if is_final else "queued"
                 db.commit()
                 _publish_youtube_render_event(youtube_video_id)
             except Exception:
@@ -254,7 +255,8 @@ def render_youtube_video_preview_task(self, youtube_video_id: int):
         logger.exception("YoutubeVideo %s video preview failed: %s", youtube_video_id, exc)
         if video is not None:
             try:
-                video.status = "audio_preview_ready"  # back one gate
+                is_final = self.request.retries >= self.max_retries
+                video.status = "failed" if is_final else "audio_preview_ready"
                 db.commit()
                 _publish_youtube_render_event(youtube_video_id)
             except Exception:
@@ -327,7 +329,6 @@ def render_youtube_chunk_task(self, youtube_video_id: int, chunk_idx: int, start
     except Exception as exc:
         logger.exception("YoutubeVideo %s chunk %s failed: %s", youtube_video_id, chunk_idx, exc)
         try:
-            # Don't overwrite "cancelled" status or retry if video was cancelled
             current_video = db.get(YoutubeVideo, youtube_video_id)
             if current_video and current_video.status == "failed":
                 logger.info(
@@ -339,6 +340,9 @@ def render_youtube_chunk_task(self, youtube_video_id: int, chunk_idx: int, start
                 "status": "failed",
                 "error": str(exc)[:500],
             })
+            if self.request.retries >= self.max_retries and current_video:
+                current_video.status = "failed"
+                db.commit()
             _publish_youtube_render_event(youtube_video_id)
         except Exception:
             pass
@@ -402,7 +406,7 @@ def concat_youtube_chunks_task(self, _chunk_results, youtube_video_id: int):
             try:
                 db.refresh(video)
                 if video.status != "failed":  # don't undo a cancel
-                    video.status = "video_preview_ready"  # back to last gate
+                    video.status = "failed"
                     db.commit()
                     _publish_youtube_render_event(youtube_video_id)
             except Exception:
@@ -510,7 +514,7 @@ def render_youtube_chunked_orchestrator_task(self, youtube_video_id: int):
         logger.exception("YoutubeVideo %s chunked orchestrator failed: %s", youtube_video_id, exc)
         if video is not None:
             try:
-                video.status = "video_preview_ready"
+                video.status = "failed"
                 db.commit()
                 _publish_youtube_render_event(youtube_video_id)
             except Exception:
