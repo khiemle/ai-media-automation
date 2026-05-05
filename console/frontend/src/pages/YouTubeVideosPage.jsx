@@ -158,6 +158,12 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
   })
   const [visualLoopMode, setVisualLoopMode]   = useState(isEdit ? (existingVideo.visual_loop_mode || 'concat_loop') : 'concat_loop')
 
+  const [thumbnailFile, setThumbnailFile] = useState(null)
+  const [thumbnailText, setThumbnailText] = useState(isEdit ? (existingVideo?.thumbnail_text || '') : '')
+  const [thumbnailPreviewKey, setThumbnailPreviewKey] = useState(0)
+  const [hasThumbnail, setHasThumbnail] = useState(isEdit ? !!existingVideo?.thumbnail_path : false)
+  const [thumbnailGenerating, setThumbnailGenerating] = useState(false)
+
   const [showMusicUpload, setShowMusicUpload] = useState(false)
   const [musicUploadFile, setMusicUploadFile] = useState(null)
   const [musicUploadTitle, setMusicUploadTitle] = useState('')
@@ -228,6 +234,31 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
       showToast(e.message, 'error')
     } finally {
       setVisualUploading(false)
+    }
+  }
+
+  const handleGenerateThumbnail = async () => {
+    if (!thumbnailFile && !hasThumbnail) return
+    const wordCount = thumbnailText.trim()
+      ? thumbnailText.trim().split(/\s+/).filter(Boolean).length
+      : 0
+    if (wordCount > 5) { showToast('Thumbnail text must be 5 words or fewer', 'error'); return }
+    const id = existingVideo?.id
+    if (!id) { showToast('Save the video first before generating a thumbnail preview', 'info'); return }
+    setThumbnailGenerating(true)
+    try {
+      if (thumbnailFile) {
+        await youtubeVideosApi.uploadThumbnailImage(id, thumbnailFile)
+        setThumbnailFile(null)
+        setHasThumbnail(true)
+      }
+      await youtubeVideosApi.generateThumbnail(id, thumbnailText.trim() || null)
+      setThumbnailPreviewKey(k => k + 1)
+      showToast('Thumbnail generated', 'success')
+    } catch (e) {
+      showToast(e.message, 'error')
+    } finally {
+      setThumbnailGenerating(false)
     }
   }
 
@@ -337,10 +368,20 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
           skip_previews: skipPreviews,
         } : {}),
       }
+      let videoId = existingVideo?.id
       if (isEdit) {
-        await youtubeVideosApi.update(existingVideo.id, body)
+        await youtubeVideosApi.update(videoId, body)
       } else {
-        await youtubeVideosApi.create(body)
+        const created = await youtubeVideosApi.create(body)
+        videoId = created.id
+      }
+      if (!isEdit && thumbnailFile && videoId) {
+        try {
+          await youtubeVideosApi.uploadThumbnailImage(videoId, thumbnailFile)
+          await youtubeVideosApi.generateThumbnail(videoId, thumbnailText.trim() || null)
+        } catch (e) {
+          showToast(`Thumbnail could not be generated — retry from the edit form. (${e.message})`, 'warning')
+        }
       }
       onCreated()
       onClose()
@@ -486,6 +527,67 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
                 onChange={e => setForm(f => ({ ...f, seo_tags: e.target.value }))}
                 placeholder="asmr, rain, sleep, relaxing"
               />
+            </div>
+          </section>
+
+          {/* THUMBNAIL */}
+          <section>
+            <div className="text-xs font-bold text-[#5a5a70] tracking-widest mb-3">THUMBNAIL</div>
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-[#9090a8] font-medium">
+                  Midjourney Image (optional)
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={e => setThumbnailFile(e.target.files?.[0] || null)}
+                  className="text-sm text-[#9090a8] file:mr-3 file:py-1 file:px-2 file:rounded file:border-0 file:bg-[#2a2a32] file:text-[#e8e8f0] file:text-xs cursor-pointer"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs text-[#9090a8] font-medium">
+                    Thumbnail Text (optional, ≤5 words)
+                  </label>
+                  <span className={`text-xs font-mono ${
+                    thumbnailText.trim().split(/\s+/).filter(Boolean).length > 5
+                      ? 'text-[#f87171]'
+                      : 'text-[#5a5a70]'
+                  }`}>
+                    {thumbnailText.trim() ? thumbnailText.trim().split(/\s+/).filter(Boolean).length : 0}/5
+                  </span>
+                </div>
+                <Input
+                  value={thumbnailText}
+                  onChange={e => setThumbnailText(e.target.value)}
+                  placeholder="e.g. DEEP FOCUS"
+                />
+              </div>
+              {isEdit && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  loading={thumbnailGenerating}
+                  disabled={
+                    (!thumbnailFile && !hasThumbnail) ||
+                    thumbnailText.trim().split(/\s+/).filter(Boolean).length > 5
+                  }
+                  onClick={handleGenerateThumbnail}
+                >
+                  Generate Preview
+                </Button>
+              )}
+              {isEdit && hasThumbnail && (
+                <img
+                  key={thumbnailPreviewKey}
+                  src={`${youtubeVideosApi.thumbnailUrl(existingVideo.id)}?t=${thumbnailPreviewKey}`}
+                  alt="Thumbnail preview"
+                  className="w-full rounded-lg border border-[#2a2a32]"
+                  style={{ aspectRatio: '16/9', objectFit: 'cover' }}
+                  onError={() => setHasThumbnail(false)}
+                />
+              )}
             </div>
           </section>
 
@@ -1117,6 +1219,15 @@ export default function YouTubeVideosPage() {
             const isActive = ACTIVE_RENDER_STATES.has(v.status)
             return (
               <Card key={v.id} className="px-5 py-4">
+                {v.thumbnail_path && (
+                  <img
+                    src={`/api/youtube-videos/${v.id}/thumbnail`}
+                    alt="thumbnail"
+                    className="w-full rounded-t-lg mb-3 -mx-5 -mt-4"
+                    style={{ aspectRatio: '16/9', objectFit: 'cover', width: 'calc(100% + 2.5rem)' }}
+                    onError={e => { e.target.style.display = 'none' }}
+                  />
+                )}
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-start gap-3 min-w-0">
                     {/* Template label chip */}

@@ -249,6 +249,27 @@ export const youtubeVideosApi = {
   cancel: (id) => fetchApi(`/api/youtube-videos/${id}/render/cancel`, { method: 'POST' }),
   audioPreviewUrl: (id) => `/api/youtube-videos/${id}/preview/audio`,
   videoPreviewUrl: (id) => `/api/youtube-videos/${id}/preview/video`,
+
+  uploadThumbnailImage: (id, file) => {
+    const form = new FormData()
+    form.append('image', file)
+    const headers = {}
+    const token = getToken()
+    if (token) headers['Authorization'] = `Bearer ${token}`
+    return fetch(`/api/youtube-videos/${id}/thumbnail-image`, { method: 'POST', body: form, headers })
+      .then(async res => {
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ detail: res.statusText }))
+          throw new Error(err.detail || `HTTP ${res.status}`)
+        }
+        return res.json()
+      })
+  },
+  generateThumbnail: (id, text) => fetchApi(`/api/youtube-videos/${id}/thumbnail-generate`, {
+    method: 'POST',
+    body: JSON.stringify({ text: text || null }),
+  }),
+  thumbnailUrl: (id) => `/api/youtube-videos/${id}/thumbnail`,
 }
 
 // ── Templates ───────────────────────────────────────────────────────────────────
