@@ -375,16 +375,20 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
         const created = await youtubeVideosApi.create(body)
         videoId = created.id
       }
+      let thumbnailError = null
       if (!isEdit && thumbnailFile && videoId) {
         try {
           await youtubeVideosApi.uploadThumbnailImage(videoId, thumbnailFile)
           await youtubeVideosApi.generateThumbnail(videoId, thumbnailText.trim() || null)
         } catch (e) {
-          showToast(`Thumbnail could not be generated — retry from the edit form. (${e.message})`, 'warning')
+          thumbnailError = e.message
         }
       }
       onCreated()
       onClose()
+      if (thumbnailError) {
+        showToast(`Thumbnail could not be generated — retry from the edit form. (${thumbnailError})`, 'warning')
+      }
     } catch (e) {
       showToast(e.message, 'error')
     } finally {
@@ -1221,7 +1225,7 @@ export default function YouTubeVideosPage() {
               <Card key={v.id} className="px-5 py-4">
                 {v.thumbnail_path && (
                   <img
-                    src={`/api/youtube-videos/${v.id}/thumbnail`}
+                    src={youtubeVideosApi.thumbnailUrl(v.id)}
                     alt="thumbnail"
                     className="w-full rounded-t-lg mb-3 -mx-5 -mt-4"
                     style={{ aspectRatio: '16/9', objectFit: 'cover', width: 'calc(100% + 2.5rem)' }}
