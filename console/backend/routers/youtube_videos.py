@@ -401,9 +401,10 @@ async def upload_thumbnail_image(
     video_id: int,
     image: UploadFile = File(...),
     db: Session = Depends(get_db),
-    _user=Depends(require_editor_or_admin),
+    user=Depends(require_editor_or_admin),
 ):
     """Upload a Midjourney source image; saves as VideoAsset(source='midjourney')."""
+    from console.backend.models.audit_log import AuditLog
     from console.backend.models.youtube_video import YoutubeVideo
     from console.backend.models.video_asset import VideoAsset
 
@@ -419,9 +420,11 @@ async def upload_thumbnail_image(
 
     filename = image.filename or "thumbnail.jpg"
     ext = Path(filename).suffix.lower() or ".jpg"
+    if ext not in {'.jpg', '.jpeg', '.png', '.webp'}:
+        raise HTTPException(status_code=400, detail="Unsupported image type. Use jpg, png, or webp.")
     save_dir = Path("assets/thumbnails/source")
     save_dir.mkdir(parents=True, exist_ok=True)
-    save_path = save_dir / f"yt_{video_id}_{int(time.time())}{ext}"
+    save_path = (save_dir / f"yt_{video_id}_{int(time.time())}{ext}").resolve()
     save_path.write_bytes(content)
 
     asset = VideoAsset(
@@ -430,11 +433,23 @@ async def upload_thumbnail_image(
         asset_type="still_image",
         description=f"Thumbnail source for YouTube video {video_id}",
     )
-    db.add(asset)
-    db.flush()
-    video.thumbnail_asset_id = asset.id
-    db.commit()
-    db.refresh(asset)
+    try:
+        db.add(asset)
+        db.flush()
+        video.thumbnail_asset_id = asset.id
+        db.commit()
+        db.refresh(asset)
+        db.add(AuditLog(
+            user_id=user.id,
+            action="upload_thumbnail_image",
+            target_type="youtube_video",
+            target_id=str(video_id),
+            details={"asset_id": asset.id, "filename": filename},
+        ))
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to save thumbnail asset")
 
     return {"asset_id": asset.id, "source_url": f"/api/youtube-videos/{video_id}/thumbnail-source"}
 
@@ -444,9 +459,10 @@ def generate_thumbnail_endpoint(
     video_id: int,
     body: ThumbnailGenerateRequest,
     db: Session = Depends(get_db),
-    _user=Depends(require_editor_or_admin),
+    user=Depends(require_editor_or_admin),
 ):
     """Generate (or regenerate) the thumbnail PNG from the uploaded source image."""
+    from console.backend.models.audit_log import AuditLog
     from console.backend.models.youtube_video import YoutubeVideo
     from console.backend.models.video_asset import VideoAsset
     from pipeline.youtube_thumbnail import generate_thumbnail
@@ -465,7 +481,7 @@ def generate_thumbnail_endpoint(
     if not asset:
         raise HTTPException(status_code=400, detail="Thumbnail source asset not found")
 
-    output_path = Path(f"assets/thumbnails/generated/yt_{video_id}.png")
+    output_path = Path(f"assets/thumbnails/generated/yt_{video_id}.png").resolve()
     try:
         generate_thumbnail(source_path=asset.file_path, output_path=output_path, text=text or None)
     except Exception as exc:
@@ -475,6 +491,14 @@ def generate_thumbnail_endpoint(
 
     video.thumbnail_path = str(output_path)
     video.thumbnail_text = text or None
+    db.commit()
+    db.add(AuditLog(
+        user_id=user.id,
+        action="generate_thumbnail",
+        target_type="youtube_video",
+        target_id=str(video_id),
+        details={"text": text or None},
+    ))
     db.commit()
 
     return {"thumbnail_url": f"/api/youtube-videos/{video_id}/thumbnail"}
