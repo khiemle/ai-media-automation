@@ -13,7 +13,7 @@ from console.backend.models.channel import Channel
 from console.backend.models.credentials import PlatformCredential
 from console.backend.models.youtube_video import YoutubeVideo
 from console.backend.models.youtube_video_upload import YoutubeVideoUpload
-from uploader.youtube_uploader import upload_to_youtube
+from uploader.youtube_uploader import set_thumbnail, upload_to_youtube
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +71,15 @@ def upload_youtube_video_task(self, youtube_video_id: int, channel_id: int, uplo
         }
 
         platform_id = upload_to_youtube(video.output_path, video_meta, credentials_dict)
+
+        if video.thumbnail_path:
+            try:
+                set_thumbnail(platform_id, video.thumbnail_path, credentials_dict)
+            except Exception as thumb_exc:
+                logger.warning(
+                    "Thumbnail set failed for YoutubeVideo %s → %s: %s",
+                    youtube_video_id, platform_id, thumb_exc,
+                )
 
         upload.status = "done"
         upload.platform_id = platform_id
