@@ -185,5 +185,8 @@ def set_thumbnail(platform_video_id: str, thumbnail_path: str | Path, credential
 
     youtube = build("youtube", "v3", credentials=creds)
     media = MediaFileUpload(str(thumbnail_path), mimetype="image/png")
-    youtube.thumbnails().set(videoId=platform_video_id, media_body=media).execute()
-    logger.info("[YouTube] Thumbnail set for video %s", platform_video_id)
+    try:
+        youtube.thumbnails().set(videoId=platform_video_id, media_body=media).execute()
+        logger.info("[YouTube] Thumbnail set for video %s", platform_video_id)
+    except Exception as exc:
+        logger.warning("[YouTube] Thumbnail set failed for video %s: %s", platform_video_id, exc)

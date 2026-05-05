@@ -66,3 +66,18 @@ def test_set_thumbnail_has_correct_signature():
     from uploader.youtube_uploader import set_thumbnail
     params = list(inspect.signature(set_thumbnail).parameters.keys())
     assert params == ["platform_video_id", "thumbnail_path", "credentials"]
+
+
+def test_set_thumbnail_does_not_raise_on_api_error():
+    from unittest.mock import MagicMock, patch
+    mock_youtube = MagicMock()
+    mock_youtube.thumbnails().set().execute.side_effect = RuntimeError("API down")
+    mock_creds = MagicMock()
+    mock_creds.expired = False
+
+    with patch("uploader.youtube_uploader.Credentials", return_value=mock_creds), \
+         patch("uploader.youtube_uploader.build", return_value=mock_youtube), \
+         patch("uploader.youtube_uploader.MediaFileUpload"):
+        from uploader.youtube_uploader import set_thumbnail
+        # Must not raise
+        set_thumbnail("abc123", "/tmp/thumb.png", {"access_token": "tok"})
