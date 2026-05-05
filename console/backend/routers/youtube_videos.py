@@ -422,9 +422,9 @@ async def upload_thumbnail_image(
     ext = Path(filename).suffix.lower() or ".jpg"
     if ext not in {'.jpg', '.jpeg', '.png', '.webp'}:
         raise HTTPException(status_code=400, detail="Unsupported image type. Use jpg, png, or webp.")
-    save_dir = Path("assets/thumbnails/source")
+    save_dir = Path("assets/thumbnails/source").resolve()
     save_dir.mkdir(parents=True, exist_ok=True)
-    save_path = (save_dir / f"yt_{video_id}_{int(time.time())}{ext}").resolve()
+    save_path = save_dir / f"yt_{video_id}_{int(time.time())}{ext}"
     save_path.write_bytes(content)
 
     asset = VideoAsset(

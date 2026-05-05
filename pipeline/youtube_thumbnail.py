@@ -5,14 +5,40 @@ make_youtube_thumbnail.py delegates to this module as a thin CLI wrapper.
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Iterable
 
 from PIL import Image, ImageDraw, ImageFont
 
 THUMBNAIL_SIZE = (1280, 720)
-DEFAULT_REGULAR_FONT = Path("/System/Library/Fonts/SFNS.ttf")
-DEFAULT_BOLD_FONT = Path("/System/Library/Fonts/SFNS.ttf")
+
+
+def _find_system_font() -> Path:
+    candidates = [
+        Path("/System/Library/Fonts/SFNS.ttf"),                                    # macOS
+        Path("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"),   # Ubuntu/Debian
+        Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),                   # common Linux fallback
+        Path("/usr/share/fonts/TTF/DejaVuSans.ttf"),                               # Arch Linux
+        Path("/usr/share/fonts/dejavu-sans-fonts/DejaVuSans.ttf"),                 # Fedora/RHEL
+    ]
+    for p in candidates:
+        if p.exists():
+            return p
+    raise FileNotFoundError(
+        "No system font found. Set THUMBNAIL_FONT_PATH env var or install liberation-fonts / fonts-dejavu."
+    )
+
+
+def _resolve_font(env_var: str) -> Path:
+    override = os.environ.get(env_var)
+    if override:
+        return Path(override)
+    return _find_system_font()
+
+
+DEFAULT_REGULAR_FONT = _resolve_font("THUMBNAIL_FONT_PATH")
+DEFAULT_BOLD_FONT = _resolve_font("THUMBNAIL_BOLD_FONT_PATH")
 
 
 def split_text(text: str) -> list[str]:
