@@ -8,6 +8,7 @@ try:
 except ImportError:
     ElevenLabs = None
 
+# pcm/ulaw/alaw use .wav extension; ffprobe reads actual format, not extension
 _FORMAT_TO_EXT = {
     "mp3":  ".mp3",
     "pcm":  ".wav",
