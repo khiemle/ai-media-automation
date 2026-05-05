@@ -27,6 +27,7 @@ OUTPUT_DIR = Path(
 def render_youtube_short_task(self, youtube_video_id: int):
     """Render a portrait 9:16 YouTube Short from the video's source materials."""
     from console.backend.database import SessionLocal
+    from console.backend.models.video_asset import VideoAsset  # noqa: F401 — registers video_assets FK target
     from console.backend.models.video_template import VideoTemplate
     from console.backend.models.youtube_video import YoutubeVideo
     from pipeline.youtube_ffmpeg import render_portrait_short

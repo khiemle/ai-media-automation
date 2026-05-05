@@ -11,6 +11,8 @@ from console.backend.config import settings
 from console.backend.database import SessionLocal
 from console.backend.models.channel import Channel
 from console.backend.models.credentials import PlatformCredential
+from console.backend.models.video_asset import VideoAsset  # noqa: F401 — registers video_assets FK target
+from console.backend.models.video_template import VideoTemplate  # noqa: F401 — registers video_templates FK target
 from console.backend.models.youtube_video import YoutubeVideo
 from console.backend.models.youtube_video_upload import YoutubeVideoUpload
 from uploader.youtube_uploader import set_thumbnail, upload_to_youtube
