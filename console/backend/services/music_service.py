@@ -27,6 +27,7 @@ def _track_to_dict(t) -> dict:
         "provider_task_id": t.provider_task_id,
         "generation_status":t.generation_status,
         "generation_prompt":t.generation_prompt,
+        "composition_plan": t.composition_plan,
         "created_at":       t.created_at.isoformat() if t.created_at else None,
     }
 
@@ -123,6 +124,18 @@ class MusicService:
         t = self.db.query(MusicTrack).filter(MusicTrack.id == track_id).first()
         if t:
             t.generation_status = "failed"
+            self.db.commit()
+
+    def mark_ready_with_plan(
+        self, track_id: int, file_path: str, duration_s: float, composition_plan: dict
+    ) -> None:
+        MusicTrack = self._model()
+        t = self.db.query(MusicTrack).filter(MusicTrack.id == track_id).first()
+        if t:
+            t.file_path = file_path
+            t.duration_s = duration_s
+            t.composition_plan = composition_plan
+            t.generation_status = "ready"
             self.db.commit()
 
     def set_provider_task_id(self, track_id: int, provider_task_id: str) -> None:
