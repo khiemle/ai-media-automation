@@ -164,8 +164,13 @@ def upload_to_youtube(video_path, metadata, credentials) -> str:
 def set_thumbnail(platform_video_id: str, thumbnail_path: str | Path, credentials: dict) -> None:
     """Set a custom thumbnail on a YouTube video via the Data API v3.
 
-    Does not raise on API failure — callers should catch and log warnings.
+    Logs a warning on API failure and returns silently; does not raise on API error.
+    Raises FileNotFoundError if thumbnail_path does not exist on disk.
     """
+    thumbnail_path = Path(thumbnail_path)
+    if not thumbnail_path.exists():
+        raise FileNotFoundError(f"Thumbnail file not found: {thumbnail_path}")
+
     if build is None:
         raise RuntimeError(
             "google-api-python-client not installed. "

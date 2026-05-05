@@ -1,5 +1,6 @@
 import pytest
-from uploader.youtube_uploader import _build_tags, _build_description, _niche_to_category
+from unittest.mock import MagicMock, patch
+from uploader.youtube_uploader import _build_tags, _build_description, _niche_to_category, set_thumbnail
 
 
 def test_build_tags_always_has_shorts_first():
@@ -40,15 +41,14 @@ def test_niche_to_category_unknown_defaults_to_people_blogs():
 
 
 def test_set_thumbnail_calls_thumbnails_set():
-    from unittest.mock import MagicMock, patch
     mock_youtube = MagicMock()
     mock_creds = MagicMock()
     mock_creds.expired = False
 
     with patch("uploader.youtube_uploader.Credentials", return_value=mock_creds), \
          patch("uploader.youtube_uploader.build", return_value=mock_youtube), \
-         patch("uploader.youtube_uploader.MediaFileUpload") as mock_media:
-        from uploader.youtube_uploader import set_thumbnail
+         patch("uploader.youtube_uploader.MediaFileUpload") as mock_media, \
+         patch("pathlib.Path.exists", return_value=True):
         set_thumbnail(
             "abc123",
             "/tmp/thumb.png",
@@ -61,15 +61,22 @@ def test_set_thumbnail_calls_thumbnails_set():
     mock_youtube.thumbnails().set().execute.assert_called_once()
 
 
-def test_set_thumbnail_has_correct_signature():
-    import inspect
-    from uploader.youtube_uploader import set_thumbnail
-    params = list(inspect.signature(set_thumbnail).parameters.keys())
-    assert params == ["platform_video_id", "thumbnail_path", "credentials"]
+def test_set_thumbnail_forwards_video_id_to_api():
+    mock_youtube = MagicMock()
+    mock_creds = MagicMock()
+    mock_creds.expired = False
+
+    with patch("uploader.youtube_uploader.Credentials", return_value=mock_creds), \
+         patch("uploader.youtube_uploader.build", return_value=mock_youtube), \
+         patch("uploader.youtube_uploader.MediaFileUpload"), \
+         patch("pathlib.Path.exists", return_value=True):
+        set_thumbnail("my_video_id", "/tmp/thumb.png", {"access_token": "tok"})
+
+    call_kwargs = mock_youtube.thumbnails().set.call_args[1]
+    assert call_kwargs["videoId"] == "my_video_id"
 
 
 def test_set_thumbnail_does_not_raise_on_api_error():
-    from unittest.mock import MagicMock, patch
     mock_youtube = MagicMock()
     mock_youtube.thumbnails().set().execute.side_effect = RuntimeError("API down")
     mock_creds = MagicMock()
@@ -77,7 +84,7 @@ def test_set_thumbnail_does_not_raise_on_api_error():
 
     with patch("uploader.youtube_uploader.Credentials", return_value=mock_creds), \
          patch("uploader.youtube_uploader.build", return_value=mock_youtube), \
-         patch("uploader.youtube_uploader.MediaFileUpload"):
-        from uploader.youtube_uploader import set_thumbnail
+         patch("uploader.youtube_uploader.MediaFileUpload"), \
+         patch("pathlib.Path.exists", return_value=True):
         # Must not raise
         set_thumbnail("abc123", "/tmp/thumb.png", {"access_token": "tok"})
