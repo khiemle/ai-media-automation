@@ -1,0 +1,189 @@
+{
+  "meta": {
+    "title": "Amazon Rainforest — Tropical Ambience",
+    "theme": "amazon-rainforest-tropical-ambience",
+    "channel": "soundscapes",
+    "use_case": "focus",
+    "video_length_hours": 3,
+    "generated_date": "2026-05-06",
+    "paired_suno_file": null
+  },
+
+  "scene": {
+    "pov": "Eye-level seated perspective in the middle of the Amazon rainforest floor, no interior anchor, looking into infinite forest depth",
+    "time_of_day": "Late golden hour, 4–5pm",
+    "weather": "No rain, humid post-afternoon air, warm and still",
+    "atmosphere": "Warm and humid, delicate mist rising from damp forest floor, soft god-rays through canopy, alive with distant insect and bird sounds",
+    "visual_style": "photoreal",
+    "foreground_anchor": null,
+    "color_palette": ["deep forest green", "warm earth brown", "golden amber"],
+    "loop_strategy": "static-cinemagraph"
+  },
+
+  "midjourney": {
+    "prompt": "Ancient Amazon rainforest interior at late golden hour, towering tropical hardwood trees with dramatic buttress roots rising from the forest floor, dense layered canopy far overhead filtering warm amber sunlight into soft volumetric god-rays, rich tropical undergrowth of giant ferns, philodendrons and deep green mossy ground cover, hanging lianas and aerial roots draping from branches above, delicate wisps of warm mist rising gently from the damp earth, eye-level perspective seated among the trees looking into infinite forest depth, no people, deep shadow pools between trunks contrasting with golden light columns, humid golden atmosphere, shallow depth of field with background trees softly bokeh'd, deep forest green foreground, warm earth brown mid-tones, golden amber light shafts, 35mm film photography, Kodak Portra 800, National Geographic editorial quality, Roger Deakins natural lighting",
+    "parameters": "--ar 16:9 --style raw --v 6.1 --q 2",
+    "full_prompt": "Ancient Amazon rainforest interior at late golden hour, towering tropical hardwood trees with dramatic buttress roots rising from the forest floor, dense layered canopy far overhead filtering warm amber sunlight into soft volumetric god-rays, rich tropical undergrowth of giant ferns, philodendrons and deep green mossy ground cover, hanging lianas and aerial roots draping from branches above, delicate wisps of warm mist rising gently from the damp earth, eye-level perspective seated among the trees looking into infinite forest depth, no people, deep shadow pools between trunks contrasting with golden light columns, humid golden atmosphere, shallow depth of field with background trees softly bokeh'd, deep forest green foreground, warm earth brown mid-tones, golden amber light shafts, 35mm film photography, Kodak Portra 800, National Geographic editorial quality, Roger Deakins natural lighting --ar 16:9 --style raw --v 6.1 --q 2"
+  },
+
+  "runway": {
+    "prompt": "Faint warm mist and water vapor rise slowly from the damp forest floor in soft wispy tendrils, drifting upward and dissolving gently into the canopy light. Foreground tropical ferns and broad leaves sway imperceptibly in the barest forest breath, each leaf moving independently at its own unhurried pace. Distant upper canopy foliage shimmers very slightly as warm golden light holds steady. Static camera. Meditative, slow, focus-friendly, designed to loop seamlessly.",
+    "settings": {
+      "motion_intensity": 3,
+      "duration_seconds": 5,
+      "camera": "static",
+      "loop_strategy": "static-cinemagraph"
+    }
+  },
+
+  "sfx": {
+    "background": {
+      "description_vi": "Dàn côn trùng nhiệt đới liên tục — ve sầu, dế và các loài côn trùng nhiệt đới tạo thành tấm âm thanh nền broadband, không tông nhạc, không nhịp điệu. Âm thanh 'im lặng có tiếng' của rừng Amazon. Loop crossfade vô hạn, không bao giờ tắt.",
+      "english_prompt": "Amazon tropical forest insect chorus, continuous broadband ambient texture, cicadas and crickets combined, no tonal centre, no rhythmic pattern, no individual insect distinguishable, steady uniform density, no surges or pauses, loop-safe infinite sustain, mid-distance outdoor reverb, very low mix level approximately -30dB relative to music, no thunder, no wind gusts, no bird calls",
+      "mix_level_db_relative_to_music": -30,
+      "loop_type": "crossfade"
+    },
+
+    "midground": [
+      {
+        "name_vi": "Tiếng chim nhiệt đới xa",
+        "description_vi": "Một tiếng chim từ sâu trong rừng, ~15–20 mét, bị tán cây lọc, nghe mềm và mờ. 1–2 tiếng ngắn rồi im.",
+        "interval_seconds": "12-20",
+        "mix_level_db_relative_to_music": -15,
+        "fade_in_seconds": 0.2,
+        "fade_out_seconds": 0.5,
+        "english_prompt": "single tropical forest bird call, 1-2 short notes only, mid-distance 15-20m, muffled by forest canopy, soft onset no sharp attack, 0.8-1.2 second duration, short natural decay, no echo, not melodic, not repeating within 15 seconds, sparse isolated event, mix level approximately -15dB relative to music"
+      },
+      {
+        "name_vi": "Lá cây xào xạc trong làn gió nhỏ",
+        "description_vi": "Làn gió nhẹ rung rinh một cụm lá rộng trong 2–3 giây. Âm thanh mềm, không đột ngột.",
+        "interval_seconds": "15-25",
+        "mix_level_db_relative_to_music": -14,
+        "fade_in_seconds": 0.3,
+        "fade_out_seconds": 0.8,
+        "english_prompt": "tropical broad leaves rustling in a light breeze, 2-3 second duration, soft onset gradual fade-in, smooth fade-out, no sharp transients, mid-distance outdoor, dense leaf mass texture, no wind howl no gusts, isolated single event, mix level approximately -14dB relative to music"
+      },
+      {
+        "name_vi": "Giọt nước lớn rơi từ tán cao xuống lá",
+        "description_vi": "Nước đọng còn lại từ buổi chiều nhỏ xuống từ tán cao 3–4 mét. Soft-percussive, tự nhiên. Mỗi 20–30 giây.",
+        "interval_seconds": "20-30",
+        "mix_level_db_relative_to_music": -13,
+        "fade_in_seconds": 0.1,
+        "fade_out_seconds": 0.4,
+        "english_prompt": "single large water drop falling from high tropical leaf to broad leaf below, 3-4 metres drop height, soft percussive impact on wet leaf surface, 0.5-0.8 second duration, gentle natural drip tail, no sharp hard attack, mid-distance, isolated single event non-repeating within 20 seconds, no thunder no rain hiss context, mix level approximately -13dB relative to music"
+      },
+      {
+        "name_vi": "Cộng hưởng xa của khỉ hú",
+        "description_vi": "Rất xa 100+ mét, bị rừng lọc còn bass resonance mờ nhạt. Nghe như rừng có gì đó đang sống. Xuất hiện mỗi 25–40 giây.",
+        "interval_seconds": "25-40",
+        "mix_level_db_relative_to_music": -20,
+        "fade_in_seconds": 0.5,
+        "fade_out_seconds": 1.0,
+        "english_prompt": "howler monkey distant call, 100+ metres away, heavily filtered by dense forest, bass resonance only no clear vocalization, very soft onset, 1.5-2 second duration, slow natural fade-out, no sharp attack, barely audible, mix level approximately -20dB relative to music, isolated single event, not recognizable as monkey if listener is unfocused"
+      }
+    ],
+
+    "foreground": [],
+
+    "random_sfx": {
+      "trigger_interval_seconds": "60-100",
+      "playback_rules": {
+        "fade_in_seconds": "0.2-0.5",
+        "fade_out_seconds": "0.5-1.5",
+        "max_volume_rule": "never louder than music",
+        "cooldown_minutes": 10,
+        "shuffle": true
+      },
+      "items": [
+        {
+          "id": 1,
+          "name_en": "Wind Swell Through Upper Canopy",
+          "description_vi": "Làn gió qua tầng tán cao — toàn bộ rừng 'thở' một hơi dài 4 giây. Mass-movement của hàng ngàn lá, lên từ từ, giữ, xuống từ từ. Vượt qua half-asleep test vì không có điểm bắt đầu đột ngột.",
+          "automation_only": false,
+          "english_prompt": "mass canopy leaf movement from wind swell, distant upper forest level 20+ metres high, broadband whoosh with dense leaf texture, slow fade-in 1.5 seconds, peak hold 1 second, slow fade-out 1.5 seconds, total 4 seconds, no wind howl no sharp onset, no individual leaf distinguishable, outdoor reverb, mix level approximately -12dB relative to music",
+          "warning": null
+        },
+        {
+          "id": 2,
+          "name_en": "Single Large Canopy Drip Sequence",
+          "description_vi": "Giọt nước lớn rơi qua nhiều tầng lá — tạo chuỗi 3–4 âm nhỏ dần trong 1.5 giây. Rất tự nhiên, không gây giật mình.",
+          "automation_only": false,
+          "english_prompt": "large water drop falling through multiple leaf layers from high canopy, 4-6 metres total drop, sequence of 3-4 progressively quieter soft percussive impacts on wet leaves, 1.5 second total duration, each impact has soft onset and short drip tail, overall fading trajectory, mid-distance, no sharp first attack, isolated non-repeating event, mix level approximately -11dB relative to music",
+          "warning": null
+        },
+        {
+          "id": 3,
+          "name_en": "Palm Frond Slow Sweep",
+          "description_vi": "Hai tán lá cọ cọ nhẹ vào nhau — tiếng xào xạc mềm và dài ~2 giây, không pitch. Gợi cảm giác không gian lớn.",
+          "automation_only": false,
+          "english_prompt": "two large palm fronds brushing slowly against each other in a gentle breeze, soft papery sweep texture, 2 second duration, gradual onset and gradual fade, no sharp transients, no pitch or tone, mid-distance forest context, isolated single event, mix level approximately -12dB relative to music",
+          "warning": null
+        },
+        {
+          "id": 4,
+          "name_en": "Distant Toucan Single Note Call",
+          "description_vi": "Một tiếng toucan từ xa 30+ mét, chỉ một nốt đơn bass-dominant, bị rừng lọc. Ngắn, không melodic. Vượt qua half-asleep test vì thấp, mờ, không lặp.",
+          "automation_only": false,
+          "english_prompt": "toucan single call note, far distance 30+ metres, filtered through dense forest canopy, low-frequency dominant, muffled high end, 0.5-0.8 second duration, soft onset, short decay no sustain, isolated single note not a series, outdoor reverb moderate, mix level approximately -16dB relative to music, not melodic",
+          "warning": "EQ cut above 2kHz if source sample sounds too crisp"
+        },
+        {
+          "id": 5,
+          "name_en": "Small Creature Movement in Leaf Litter",
+          "description_vi": "Sinh vật nhỏ di chuyển qua lá mục ở xa ~5–8 mét, 0.5 giây, rất mờ. Não xử lý như background noise, không phải event. Tốt cho Soundscapes focus.",
+          "automation_only": false,
+          "english_prompt": "small creature moving through dry leaf litter, 5-8 metres distance, 0.4-0.6 second duration, brief soft rustle texture, no sharp onset, very fast fade-in and fade-out, mid-distance outdoor, no vocalization no animal sound just movement, isolated single burst non-repeating, mix level approximately -18dB relative to music",
+          "warning": null
+        },
+        {
+          "id": 6,
+          "name_en": "Large Branch Settling Creak",
+          "description_vi": "Cành cây lớn kẽo kẹt chậm, trầm, 0.8 giây — như rừng già 'thở'. Bass và chậm nên không gây giật mình. Gợi cảm giác rừng tồn tại lâu dài.",
+          "automation_only": false,
+          "english_prompt": "large tree branch slow creak from weight settling, single low-pitched wooden creak, 0.7-0.9 second duration, soft onset gradual build, natural decay, no sharp attack, bass-dominant, mid-distance forest context, isolated single event non-repeating, mix level approximately -14dB relative to music",
+          "warning": null
+        },
+        {
+          "id": 7,
+          "name_en": "Large Insect Passing Buzz",
+          "description_vi": "Côn trùng lớn bay qua từ trái sang phải, ~3–4 mét, tiếng vo ve mềm ~1 giây. Gợi cảm giác không gian 3D. Không sharp, không có pitch rõ ràng.",
+          "automation_only": false,
+          "english_prompt": "large insect flying past left to right, 3-4 metres distance, soft buzzing texture, panning movement implied, gradual fade-in as it approaches and fade-out as it passes, 0.8-1.2 second total duration, no sharp onset, not a mosquito whine (lower frequency), isolated single pass non-repeating, mix level approximately -15dB relative to music",
+          "warning": null
+        },
+        {
+          "id": 8,
+          "name_en": "Insect Chorus Micro-Swell",
+          "description_vi": "Automation trên track Layer 1 — âm lượng tăng +2dB trong 5 giây, giữ 2 giây, trở về. Như rừng 'tỉnh dậy' một chút. Không có sound event mới — chỉ là texture variation. Vượt qua half-asleep test hoàn toàn.",
+          "automation_only": true,
+          "english_prompt": "No audio file needed — volume automation only. Automate gain on Layer 1 (background insect chorus) track: Fade-in +2dB over 5 seconds → hold at peak for 2 seconds → return to original level over 5 seconds. Total duration: 12 seconds. Apply subtle high-shelf boost (+1dB above 4kHz) during peak for presence.",
+          "warning": null
+        },
+        {
+          "id": 9,
+          "name_en": "Leaf Cluster Falling Through Canopy",
+          "description_vi": "Cụm lá nhỏ rời cành, rơi qua nhiều tầng tán, tiếng xào xạc giảm dần ~2 giây. Kết thúc mềm trên nền đất ẩm. Cảm giác chu kỳ tự nhiên của rừng.",
+          "automation_only": false,
+          "english_prompt": "small leaf cluster detaching and falling through multiple canopy layers, 2 second duration, sequence of decreasing-volume rustles as leaves pass through each forest tier, ends with very soft landing on wet forest floor soil, no hard impact at end, gradual overall fade trajectory, soft onset, mid-distance 5-10 metres, isolated single event non-repeating, mix level approximately -13dB relative to music",
+          "warning": null
+        },
+        {
+          "id": 10,
+          "name_en": "Distant Tropical Frog Single Call",
+          "description_vi": "Một con ếch nhiệt đới từ xa ~10 mét, một tiếng ngắn bass-dominant rồi im hoàn toàn. Ngắn, không lặp, thấp. Vượt qua half-asleep test.",
+          "automation_only": false,
+          "english_prompt": "single tropical frog call, short 1-note vocalization, 0.4-0.6 second duration, low-to-mid pitch (not high-pitched), 8-12 metres distance, soft onset, short natural decay no long sustain, outdoor forest reverb minimal, isolated single call non-repeating within 10 minutes, mix level approximately -16dB relative to music, no artificial reverb added",
+          "warning": "Avoid high-pitched tree frog samples. Select species with lower fundamental frequency."
+        },
+        {
+          "id": 11,
+          "name_en": "Canopy Settling After Wind",
+          "description_vi": "Sau khi gió qua, rừng dần yên — fade-out chậm của mass leaf movement, 3 giây, như tiếng thở ra. Có thể pair với SFX #1 (Wind Swell) cách 8–12 giây.",
+          "automation_only": false,
+          "english_prompt": "forest canopy settling after a wind gust passes, slow fade-out of mass leaf movement, 3 second duration, starts at moderate level and fades to near-silence, broadband texture no single leaf distinguishable, gradual onset slow decay, high canopy 20+ metres distance, outdoor natural reverb, isolated single event, mix level starts at approximately -12dB fading to -30dB relative to music",
+          "warning": null
+        }
+      ]
+    }
+  }
+}
