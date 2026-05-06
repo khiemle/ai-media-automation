@@ -375,6 +375,13 @@ function ImportAssetModal({ onClose, onImported }) {
   )
 }
 
+// ── 4K resolution helper ──────────────────────────────────────────────────────
+function isAlready4K(resolution) {
+  if (!resolution) return false;
+  const parts = resolution.split('x').map(Number);
+  return parts.some(d => d >= 3840);
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function VideoAssetsPage() {
   const [filterKeywords,  setFilterKeywords]  = useState('')
@@ -427,6 +434,17 @@ export default function VideoAssetsPage() {
       showToast(e.message, 'error')
     } finally {
       setDeletingId(null)
+    }
+  }
+
+  const handleUpscale = async (asset) => {
+    try {
+      await assetsApi.upscaleTo4k(asset.id)
+      showToast('4K upscale queued', 'success')
+      refetch()
+    } catch (err) {
+      const msg = err?.detail || err?.message || 'Failed to start upscale'
+      showToast(msg, 'error')
     }
   }
 
@@ -663,6 +681,34 @@ export default function VideoAssetsPage() {
                           ✕
                         </Button>
                       </div>
+                      {/* 4K upscale */}
+                      {!isAlready4K(asset.resolution) && (
+                        <div className="mt-2">
+                          {(!asset.upscale_status || asset.upscale_status === 'failed') && (
+                            <button
+                              onClick={() => handleUpscale(asset)}
+                              className="w-full px-3 py-1.5 text-xs bg-[#2a2a32] hover:bg-[#7c6af7]/20 text-[#9090a8] hover:text-[#7c6af7] rounded border border-[#2a2a32] hover:border-[#7c6af7]/40 transition-colors"
+                            >
+                              {asset.upscale_status === 'failed' ? '⚠ Retry 4K Upscale' : '↑ Upscale to 4K'}
+                            </button>
+                          )}
+                          {asset.upscale_status === 'pending' && (
+                            <div className="flex items-center gap-1.5 text-xs text-[#fbbf24]">
+                              <span className="animate-spin inline-block">⟳</span> Queued…
+                            </div>
+                          )}
+                          {asset.upscale_status === 'processing' && (
+                            <div className="flex items-center gap-1.5 text-xs text-[#4a9eff]">
+                              <span className="animate-spin inline-block">⟳</span> Upscaling…
+                            </div>
+                          )}
+                          {asset.upscale_status === 'ready' && (
+                            <span className="inline-flex items-center gap-1 text-xs text-[#34d399] bg-[#34d399]/10 px-2 py-0.5 rounded">
+                              ✓ 4K Ready
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}
