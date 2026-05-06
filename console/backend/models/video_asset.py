@@ -26,6 +26,10 @@ class VideoAsset(Base):
     generation_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
     runway_status: Mapped[str] = mapped_column(String(20), default="none", server_default="none")
     runway_invocation_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    upscale_task_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    topaz_request_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    upscale_status: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    original_asset_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
