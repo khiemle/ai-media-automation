@@ -131,6 +131,13 @@ export const musicApi = {
   pollTask: (taskId) => fetchApi(`/api/music/tasks/${taskId}`),
   streamUrl: (id) => `/api/music/${id}/stream`,
   listTemplates: () => fetchApi('/api/music/templates'),
+  elevenlabsPlan: (input, music_length_ms = 60000) =>
+    fetchApi('/api/music/elevenlabs/plan', {
+      method: 'POST',
+      body: JSON.stringify({ input, music_length_ms }),
+    }),
+  elevenlabsCompose: (body) =>
+    fetchApi('/api/music/elevenlabs/compose', { method: 'POST', body: JSON.stringify(body) }),
 }
 
 // ── Video Assets ───────────────────────────────────────────────────────────────
