@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Card, Button, Select, Spinner, Toast, ProgressBar } from '../components/index.jsx'
-import { fetchApi } from '../api/client.js'
+import { fetchApi, topazApi } from '../api/client.js'
 
 const GEMINI_MEDIA_MODELS = ['veo-3.1-lite-generate-preview', 'veo-2.0-flash', 'veo-2.0-flash-lite']
 const GEMINI_MUSIC_MODELS = ['lyria-3-clip-preview', 'lyria-3-pro-preview']
@@ -52,6 +52,11 @@ export default function LLMPage() {
   const [runwaySaving, setRunwaySaving] = useState(false)
   const [runwayTesting, setRunwayTesting] = useState(false)
   const [runwayTestResult, setRunwayTestResult] = useState(null)
+  const [topazKey, setTopazKey] = useState('')
+  const [topazMasked, setTopazMasked] = useState('')
+  const [topazSaving, setTopazSaving] = useState(false)
+  const [topazTesting, setTopazTesting] = useState(false)
+  const [topazTestResult, setTopazTestResult] = useState(null)
   const timerRef = useRef(null)
 
   const showToast = (msg, type = 'success') => {
@@ -87,6 +92,9 @@ export default function LLMPage() {
     } catch (e) {
       // Silently fail if Runway endpoint not available
     }
+
+    // Load Topaz config separately
+    topazApi.getConfig().then(d => setTopazMasked(d.api_key_masked || '')).catch(() => {})
   }
 
   useEffect(() => { load() }, [])
@@ -147,6 +155,33 @@ export default function LLMPage() {
       setRunwayTestResult({ ok: false, error: e.message })
     } finally {
       setRunwayTesting(false)
+    }
+  }
+
+  const handleTopazSave = async () => {
+    setTopazSaving(true)
+    try {
+      const d = await topazApi.saveConfig(topazKey)
+      setTopazMasked(d.api_key_masked || '')
+      setTopazKey('')
+      showToast('Topaz API key saved')
+    } catch (e) {
+      showToast(e.message || 'Failed to save Topaz key', 'error')
+    } finally {
+      setTopazSaving(false)
+    }
+  }
+
+  const handleTopazTest = async () => {
+    setTopazTesting(true)
+    setTopazTestResult(null)
+    try {
+      const d = await topazApi.testConnection()
+      setTopazTestResult(d)
+    } catch (e) {
+      setTopazTestResult({ ok: false, error: e.message })
+    } finally {
+      setTopazTesting(false)
     }
   }
 
@@ -457,6 +492,37 @@ export default function LLMPage() {
           {runwayTestResult && (
             <div className={`text-xs px-3 py-2 rounded-lg font-mono ${runwayTestResult.ok ? 'bg-[#34d399] bg-opacity-10 text-[#34d399]' : 'bg-[#f87171] bg-opacity-10 text-[#f87171]'}`}>
               {runwayTestResult.ok ? '✓ Connected' : `✗ ${runwayTestResult.error}`}
+            </div>
+          )}
+        </div>
+      </Card>
+
+      {/* Topaz Video AI */}
+      <Card title={
+        <span className="flex items-center gap-2">
+          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0 inline-block bg-[#a855f7]" />
+          Topaz Video AI
+        </span>
+      } actions={topazSaving && <Spinner size={16} />}>
+        <div className="space-y-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-[#9090a8] font-medium">API Key</label>
+            <KeyInput
+              value={topazKey}
+              onChange={v => setTopazKey(v)}
+              placeholder="tvai-..."
+            />
+            {topazMasked && (
+              <span className="text-xs text-[#5a5a70] font-mono">{topazMasked}</span>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" loading={topazSaving} onClick={handleTopazSave}>Save</Button>
+            <Button size="sm" variant="ghost" loading={topazTesting} onClick={handleTopazTest}>Test Connection</Button>
+          </div>
+          {topazTestResult && (
+            <div className={`text-xs px-3 py-2 rounded-lg font-mono ${topazTestResult.ok ? 'bg-[#34d399] bg-opacity-10 text-[#34d399]' : 'bg-[#f87171] bg-opacity-10 text-[#f87171]'}`}>
+              {topazTestResult.ok ? '✓ Connected' : `✗ ${topazTestResult.error}`}
             </div>
           )}
         </div>
