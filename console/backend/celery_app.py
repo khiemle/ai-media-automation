@@ -37,12 +37,20 @@ celery_app.conf.update(
         "console.backend.tasks.youtube_short_render_task.*": {"queue": "render_q"},
         "console.backend.tasks.youtube_upload_task.*": {"queue": "upload_q"},
         "console.backend.tasks.runway_task.*": {"queue": "render_q"},
+        "tasks.animate_workflow": {"queue": "render_q"},
+        "tasks.recover_pending_runway": {"queue": "render_q"},
     },
     beat_schedule={
         # Refresh expiring OAuth tokens every 30 minutes
         "token-refresh-every-30min": {
             "task": "console.backend.tasks.token_refresh.refresh_expiring_tokens",
             "schedule": crontab(minute="*/30"),
+        },
+        # Re-queue poll tasks for any Runway assets stuck in pending (e.g. after worker restart)
+        "recover-pending-runway-every-5min": {
+            "task": "tasks.recover_pending_runway",
+            "schedule": crontab(minute="*/5"),
+            "options": {"queue": "render_q"},
         },
     },
 )

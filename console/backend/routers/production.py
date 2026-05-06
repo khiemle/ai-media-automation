@@ -279,16 +279,32 @@ def animate_asset_endpoint(
 
     wf = video_types[body.video_type]
     svc = RunwayService(api_key=api_key)
-    public_url = os.environ.get("PUBLIC_API_URL", "http://localhost:8080")
-    image_uri = f"{public_url}/api/production/assets/{asset_id}/stream"
 
-    invocation_id = svc.submit_workflow(
-        workflow_id=wf["workflow_id"],
-        prompt_node_id=wf["prompt_node_id"],
-        image_node_id=wf["image_node_id"],
-        prompt=body.prompt,
-        image_uri=image_uri,
-    )
+    # Build image URI: prefer a public URL if configured, otherwise base64 data URI
+    import base64, mimetypes
+    import requests as _requests
+    public_url = os.environ.get("PUBLIC_API_URL", "").strip()
+    if public_url and "localhost" not in public_url:
+        image_uri = f"{public_url}/api/production/assets/{asset_id}/stream"
+    else:
+        image_path = Path(asset.file_path)
+        if not image_path.is_file():
+            raise HTTPException(status_code=404, detail="Asset file not found on disk")
+        mime_type = mimetypes.guess_type(str(image_path))[0] or "image/jpeg"
+        b64 = base64.b64encode(image_path.read_bytes()).decode()
+        image_uri = f"data:{mime_type};base64,{b64}"
+
+    try:
+        invocation_id = svc.submit_workflow(
+            workflow_id=wf["workflow_id"],
+            prompt_node_id=wf["prompt_node_id"],
+            image_node_id=wf["image_node_id"],
+            prompt=body.prompt,
+            image_uri=image_uri,
+        )
+    except _requests.exceptions.HTTPError as exc:
+        body_text = exc.response.text if exc.response is not None else str(exc)
+        raise HTTPException(status_code=502, detail=f"Runway API error: {body_text}")
 
     child = VideoAsset(
         file_path="",
@@ -297,6 +313,7 @@ def animate_asset_endpoint(
         parent_asset_id=asset_id,
         generation_prompt=body.prompt,
         runway_status="pending",
+        runway_invocation_id=invocation_id,
         description=f"Runway {body.video_type} animation of asset {asset_id}",
     )
     db.add(child)
@@ -304,6 +321,9 @@ def animate_asset_endpoint(
     db.refresh(child)
 
     output_filename = f"runway_{child.id}.mp4"
-    task = animate_workflow_task.delay(child.id, invocation_id, output_filename)
+    task = animate_workflow_task.apply_async(
+        args=[child.id, invocation_id, output_filename],
+        queue="render_q",
+    )
 
     return {"asset_id": child.id, "task_id": task.id, "invocation_id": invocation_id}

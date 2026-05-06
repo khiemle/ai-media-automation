@@ -76,6 +76,15 @@ class RunwayService:
                     output_url = fallback[0]
                 elif isinstance(fallback, str):
                     output_url = fallback
+                elif isinstance(fallback, dict):
+                    # {node_id: [url, ...]} or {node_id: url}
+                    for v in fallback.values():
+                        if isinstance(v, list) and v:
+                            output_url = v[0]
+                        elif isinstance(v, str):
+                            output_url = v
+                        if output_url:
+                            break
             if output_url is None:
                 import logging
                 logging.getLogger(__name__).warning(
@@ -86,14 +95,14 @@ class RunwayService:
         return {"status": status, "output_url": output_url}
 
     def test_connection(self) -> dict:
-        """Probe the dev API with a dummy UUID. 404 = auth OK, 401/403 = bad key."""
+        """Probe the loop workflow endpoint. 200 = auth OK, 401/403 = bad key."""
         try:
             resp = requests.get(
-                f"{RUNWAY_API_BASE}/workflow_invocations/00000000-0000-0000-0000-000000000000",
+                f"{RUNWAY_API_BASE}/workflows/45c6012f-6993-4c34-85bd-cea416b04598",
                 headers=self._headers(),
                 timeout=10,
             )
-            if resp.status_code in (200, 404):
+            if resp.status_code == 200:
                 return {"ok": True, "error": None}
             if resp.status_code in (401, 403):
                 return {"ok": False, "error": f"Invalid API key (HTTP {resp.status_code})"}
