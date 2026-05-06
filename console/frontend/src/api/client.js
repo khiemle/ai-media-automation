@@ -156,6 +156,8 @@ export const assetsApi = {
   thumbnailUrl: (id) => `/api/production/assets/${id}/thumbnail`,
   animateWithRunway: (id, body) =>
     fetchApi(`/api/production/assets/${id}/animate`, { method: 'POST', body: JSON.stringify(body) }),
+  upscaleTo4k: (id) =>
+    fetchApi(`/api/production/assets/${id}/upscale`, { method: 'POST' }),
   upload: (file, { source = 'manual', description = '', keywords = '', asset_type = '', generation_prompt = '' } = {}) => {
     const form = new FormData()
     form.append('file', file)
@@ -346,4 +348,11 @@ export const channelPlansApi = {
       method: 'POST',
       body: JSON.stringify({ theme, context }),
     }),
+}
+
+// ── Topaz (4K Upscaling) ────────────────────────────────────────────────────
+export const topazApi = {
+  getConfig: () => fetchApi('/api/llm/topaz'),
+  saveConfig: (api_key) => fetchApi('/api/llm/topaz', { method: 'PUT', body: JSON.stringify({ api_key }) }),
+  testConnection: () => fetchApi('/api/llm/topaz/test-connection', { method: 'POST' }),
 }
