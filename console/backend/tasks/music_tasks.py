@@ -156,3 +156,52 @@ def generate_lyria_music_task(self, track_id: int):
     finally:
         db.close()
 
+
+@celery_app.task(
+    bind=True,
+    name="console.backend.tasks.music_tasks.generate_elevenlabs_music_task",
+    queue="render_q",
+)
+def generate_elevenlabs_music_task(
+    self,
+    track_id: int,
+    composition_plan: dict,
+    output_format: str = "mp3_44100_192",
+    respect_sections_durations: bool = True,
+):
+    """Generate music via ElevenLabs compose API, save to disk, update DB."""
+    from console.backend.database import SessionLocal
+    from console.backend.services.music_service import MusicService
+    from pipeline.music_providers.elevenlabs_provider import ElevenLabsProvider, _ext_for_format
+
+    db = SessionLocal()
+    try:
+        svc = MusicService(db)
+        provider = ElevenLabsProvider()
+
+        audio_bytes = provider.compose(
+            plan=composition_plan,
+            output_format=output_format,
+            respect_sections_durations=respect_sections_durations,
+        )
+
+        MUSIC_DIR.mkdir(parents=True, exist_ok=True)
+        ext = _ext_for_format(output_format)
+        dest = MUSIC_DIR / f"{track_id}{ext}"
+        dest.write_bytes(audio_bytes)
+
+        from pipeline.music_providers import probe_audio_duration
+        duration = probe_audio_duration(str(dest))
+        svc.mark_ready_with_plan(track_id, str(dest), duration, composition_plan)
+        logger.info(f"[music_tasks] ElevenLabs track {track_id} ready: {dest} ({duration:.1f}s)")
+        return {"status": "ready", "track_id": track_id, "file_path": str(dest)}
+
+    except Exception:
+        try:
+            MusicService(db).mark_failed(track_id)
+        except Exception:
+            pass
+        raise
+    finally:
+        db.close()
+
