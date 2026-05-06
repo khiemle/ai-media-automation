@@ -88,7 +88,6 @@ export default function LLMPage() {
     try {
       const runwayData = await fetchApi('/api/llm/runway')
       setRunwayConfig(runwayData)
-      setRunwayModel(runwayData.model || 'gen3-alpha')
     } catch (e) {
       // Silently fail if Runway endpoint not available
     }
