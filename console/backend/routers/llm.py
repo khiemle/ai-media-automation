@@ -84,6 +84,41 @@ def test_runway_connection(_user=Depends(require_admin)):
         return {"ok": False, "error": str(exc)}
 
 
+@router.get("/topaz")
+def get_topaz_config(_user=Depends(require_admin)):
+    """Get Topaz config (masked API key)."""
+    from config import api_config
+    cfg = api_config.get_config()
+    api_key = (cfg.get("topaz", {}).get("api_key") or "").strip() or os.environ.get("TOPAZ_API_KEY", "").strip()
+    api_key_masked = f"key_...{api_key[-6:]}" if len(api_key) > 6 else ("set" if api_key else "")
+    return {"api_key_masked": api_key_masked}
+
+
+@router.put("/topaz")
+def update_topaz_config(body: dict, _user=Depends(require_admin)):
+    """Persist Topaz API key to config/api_keys.json."""
+    from config import api_config
+    api_key = (body.get("api_key") or "").strip()
+    cfg = api_config.get_config()
+    cfg["topaz"] = {"api_key": api_key}
+    api_config.save_config(cfg)
+    api_key_masked = f"key_...{api_key[-6:]}" if len(api_key) > 6 else ("set" if api_key else "")
+    return {"api_key_masked": api_key_masked, "ok": True}
+
+
+@router.post("/topaz/test-connection")
+def test_topaz_connection(_user=Depends(require_admin)):
+    """Test Topaz API key connectivity."""
+    from config import api_config
+    cfg = api_config.get_config()
+    api_key = (cfg.get("topaz", {}).get("api_key") or "").strip() or os.environ.get("TOPAZ_API_KEY", "").strip()
+    if not api_key:
+        return {"ok": False, "error": "TOPAZ_API_KEY not configured"}
+    from pipeline.topaz_client import TopazClient
+    result = TopazClient(api_key=api_key).test_connection()
+    return {"ok": result["connected"], "error": result.get("message") if not result["connected"] else None}
+
+
 # ── Autofill ──────────────────────────────────────────────────────────────────
 
 class _AutofillMeta(BaseModel):
