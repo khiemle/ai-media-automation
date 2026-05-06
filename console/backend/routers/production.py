@@ -233,12 +233,11 @@ def start_production(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-# ── Animate still image with Runway ───────────────────────────────────────────
+# ── Animate still image with Runway workflow ──────────────────────────────────
 
 class AnimateBody(BaseModel):
     prompt: str
-    motion_intensity: int = 2
-    duration: int = 5
+    video_type: str = "loop"
 
 
 @router.post("/assets/{asset_id}/animate")
@@ -249,8 +248,10 @@ def animate_asset_endpoint(
     _user=Depends(require_editor_or_admin),
 ):
     import os
+    import yaml
+    from pathlib import Path
     from console.backend.models.video_asset import VideoAsset
-    from console.backend.tasks.runway_task import animate_asset_task
+    from console.backend.tasks.runway_task import animate_workflow_task
     from console.backend.services.runway_service import RunwayService
 
     asset = db.get(VideoAsset, asset_id)
@@ -263,12 +264,29 @@ def animate_asset_endpoint(
     if not api_key:
         raise HTTPException(status_code=400, detail="RUNWAY_API_KEY not configured")
 
-    model = os.environ.get("RUNWAY_MODEL", "gen3-alpha")
-    svc = RunwayService(api_key=api_key, model=model)
+    config_path = Path(__file__).parents[3] / "config" / "runway_workflows.yaml"
+    with open(config_path) as f:
+        workflow_config = yaml.safe_load(f)
 
+    video_types = workflow_config.get("video_types", {})
+    if body.video_type not in video_types:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown video_type '{body.video_type}'. Valid: {list(video_types.keys())}",
+        )
+
+    wf = video_types[body.video_type]
+    svc = RunwayService(api_key=api_key)
     public_url = os.environ.get("PUBLIC_API_URL", "http://localhost:8080")
-    image_url = f"{public_url}/api/production/assets/{asset_id}/stream"
-    runway_task_id = svc.submit_image_to_video(image_url, body.prompt, body.duration, body.motion_intensity)
+    image_uri = f"{public_url}/api/production/assets/{asset_id}/stream"
+
+    invocation_id = svc.submit_workflow(
+        workflow_id=wf["workflow_id"],
+        prompt_node_id=wf["prompt_node_id"],
+        image_node_id=wf["image_node_id"],
+        prompt=body.prompt,
+        image_uri=image_uri,
+    )
 
     child = VideoAsset(
         file_path="",
@@ -277,13 +295,13 @@ def animate_asset_endpoint(
         parent_asset_id=asset_id,
         generation_prompt=body.prompt,
         runway_status="pending",
-        description=f"Runway animation of asset {asset_id}",
+        description=f"Runway {body.video_type} animation of asset {asset_id}",
     )
     db.add(child)
     db.commit()
     db.refresh(child)
 
     output_filename = f"runway_{child.id}.mp4"
-    task = animate_asset_task.delay(child.id, runway_task_id, output_filename)
+    task = animate_workflow_task.delay(child.id, invocation_id, output_filename)
 
-    return {"asset_id": child.id, "task_id": task.id, "runway_task_id": runway_task_id}
+    return {"asset_id": child.id, "task_id": task.id, "invocation_id": invocation_id}
