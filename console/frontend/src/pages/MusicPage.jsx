@@ -736,7 +736,7 @@ function ElevenLabsModal({ niches, onClose, onGenerated, onPollTrack }) {
             <input
               type="number" min={3000} max={600000} step={1000}
               value={lengthMs}
-              onChange={e => setLengthMs(parseInt(e.target.value) || 60000)}
+              onChange={e => setLengthMs(Math.min(600000, Math.max(1000, parseInt(e.target.value) || 60000)))}
               className="bg-[#16161a] border border-[#2a2a32] rounded-lg px-3 py-1.5 text-sm text-[#e8e8f0] focus:outline-none focus:border-[#7c6af7] w-40"
             />
             <p className="text-xs text-[#5a5a70]">{(lengthMs / 1000).toFixed(0)}s</p>

@@ -5,7 +5,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from console.backend.auth import require_editor_or_admin
@@ -45,7 +45,7 @@ class UpdateBody(BaseModel):
 
 class ElevenLabsPlanBody(BaseModel):
     input: str
-    music_length_ms: int = 60000
+    music_length_ms: int = Field(default=60000, le=600000, ge=1000)
 
 
 class ElevenLabsComposeBody(BaseModel):
