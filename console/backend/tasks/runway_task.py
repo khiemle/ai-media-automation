@@ -4,7 +4,6 @@ import time
 from pathlib import Path
 
 import requests
-import requests as _requests
 
 from console.backend.celery_app import celery_app
 
@@ -33,7 +32,7 @@ def animate_workflow_task(
     while time.time() < deadline:
         try:
             result = svc.poll_workflow_invocation(invocation_id)
-        except _requests.RequestException as exc:
+        except requests.RequestException as exc:
             raise self.retry(exc=exc, countdown=30)
 
         status = result["status"]
@@ -41,8 +40,11 @@ def animate_workflow_task(
         if status == "SUCCEEDED" and result["output_url"]:
             RUNWAY_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
             dest = RUNWAY_OUTPUT_DIR / output_filename
-            video_resp = requests.get(result["output_url"], timeout=120)
-            video_resp.raise_for_status()
+            try:
+                video_resp = requests.get(result["output_url"], timeout=120)
+                video_resp.raise_for_status()
+            except requests.RequestException as exc:
+                raise self.retry(exc=exc, countdown=30)
             dest.write_bytes(video_resp.content)
 
             db = SessionLocal()
