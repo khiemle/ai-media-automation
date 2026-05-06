@@ -43,6 +43,21 @@ class UpdateBody(BaseModel):
     quality_score: int | None = None
 
 
+class ElevenLabsPlanBody(BaseModel):
+    input: str
+    music_length_ms: int = 60000
+
+
+class ElevenLabsComposeBody(BaseModel):
+    composition_plan: dict
+    title: str = ""
+    niches: list[str] = []
+    moods: list[str] = []
+    genres: list[str] = []
+    output_format: str = "mp3_44100_192"
+    respect_sections_durations: bool = True
+
+
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @router.get("/templates")
@@ -171,6 +186,54 @@ def get_task_status(
         "state":   result.state,
         "info":    result.info if isinstance(result.info, dict) else {},
     }
+
+
+@router.post("/elevenlabs/plan")
+def elevenlabs_preview_plan(
+    body: ElevenLabsPlanBody,
+    _user=Depends(require_editor_or_admin),
+):
+    """Generate or parse a composition plan. Returns plan JSON for editor preview."""
+    from pipeline.music_providers.elevenlabs_provider import ElevenLabsProvider
+    try:
+        provider = ElevenLabsProvider()
+        plan = provider.create_plan(body.input, body.music_length_ms)
+        return {"composition_plan": plan}
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+
+@router.post("/elevenlabs/compose", status_code=201)
+def elevenlabs_compose(
+    body: ElevenLabsComposeBody,
+    db: Session = Depends(get_db),
+    _user=Depends(require_editor_or_admin),
+):
+    """Create MusicTrack row and dispatch ElevenLabs audio generation task."""
+    import json as _json
+
+    svc = MusicService(db)
+    title = body.title or "ElevenLabs Track"
+    track = svc.create_pending(
+        title=title,
+        niches=body.niches,
+        moods=body.moods,
+        genres=body.genres,
+        is_vocal=False,
+        volume=0.15,
+        provider="elevenlabs",
+        prompt=_json.dumps(body.composition_plan),
+    )
+    track_id = track["id"]
+
+    from console.backend.tasks.music_tasks import generate_elevenlabs_music_task
+    celery_task = generate_elevenlabs_music_task.delay(
+        track_id,
+        body.composition_plan,
+        body.output_format,
+        body.respect_sections_durations,
+    )
+    return {"task_id": celery_task.id, "track_id": track_id}
 
 
 @router.get("/{track_id}")
