@@ -9,6 +9,78 @@ from console.backend.services.pipeline_service import emit_log
 logger = logging.getLogger(__name__)
 
 
+def _auto_generate_elevenlabs_music(db, script_id: int, niche: str, mood: str, duration_s: float) -> None:
+    """Auto-generate ElevenLabs music track for a script if enabled in config and no library track exists."""
+    import os
+    import yaml
+    from pathlib import Path
+    from sqlalchemy import text
+
+    cfg_path = Path(__file__).parents[4] / "config" / "pipeline_config.yaml"
+    try:
+        with open(cfg_path) as f:
+            cfg = yaml.safe_load(f)
+    except Exception:
+        return
+
+    prod_cfg = cfg.get("production", {})
+    if not prod_cfg.get("auto_music_elevenlabs", False):
+        return
+
+    output_format = prod_cfg.get("auto_music_elevenlabs_format", "mp3_44100_192")
+    length_ms = prod_cfg.get("auto_music_elevenlabs_length_ms", 0) or int((duration_s or 60) * 1000)
+
+    from console.backend.services.music_service import MusicService
+    svc = MusicService(db)
+    existing = svc.list_tracks(niche=niche, mood=mood, status="ready")
+    if existing:
+        track_id = existing[0]["id"]
+        db.execute(
+            text("UPDATE generated_scripts SET music_track_id = :tid WHERE id = :sid"),
+            {"tid": track_id, "sid": script_id},
+        )
+        db.commit()
+        return
+
+    prompt = f"{mood or 'uplifting'} background music for a {niche or 'lifestyle'} video, {int(duration_s or 60)}s, instrumental"
+    try:
+        from pipeline.music_providers.elevenlabs_provider import ElevenLabsProvider, _ext_for_format
+        provider = ElevenLabsProvider()
+        plan = provider.create_plan(prompt, length_ms)
+        audio_bytes = provider.compose(plan, output_format)
+
+        MUSIC_DIR = Path(os.environ.get("MUSIC_PATH", "./assets/music"))
+        MUSIC_DIR.mkdir(parents=True, exist_ok=True)
+
+        track = svc.create_pending(
+            title=f"{niche or 'auto'} {mood or 'uplifting'} auto-generated",
+            niches=[niche] if niche else [],
+            moods=[mood] if mood else [],
+            genres=[],
+            is_vocal=False,
+            volume=0.15,
+            provider="elevenlabs",
+            prompt=prompt,
+        )
+        track_id = track["id"]
+        ext = _ext_for_format(output_format)
+        dest = MUSIC_DIR / f"{track_id}{ext}"
+        dest.write_bytes(audio_bytes)
+
+        from pipeline.music_providers import probe_audio_duration
+        duration = probe_audio_duration(str(dest))
+        svc.mark_ready_with_plan(track_id, str(dest), duration, plan)
+
+        db.execute(
+            text("UPDATE generated_scripts SET music_track_id = :tid WHERE id = :sid"),
+            {"tid": track_id, "sid": script_id},
+        )
+        db.commit()
+        logger.info(f"[render] Auto-generated ElevenLabs track {track_id} for script {script_id}")
+    except Exception as e:
+        logger.warning(f"[render] Auto ElevenLabs music failed for script {script_id}: {e}")
+
+
 @celery_app.task(bind=True, name="console.backend.tasks.production_tasks.regenerate_tts_task", queue="render_q")
 def regenerate_tts_task(self, script_id: int, scene_index: int):
     """Regenerate TTS audio for a specific scene."""
@@ -108,6 +180,18 @@ def render_video_task(self, script_id: int):
 
         script.status = "producing"
         db.commit()
+
+        # Auto-generate ElevenLabs music if configured and no track assigned
+        meta = (script.script_json or {}).get("meta", {})
+        if not script.music_track_id:
+            _auto_generate_elevenlabs_music(
+                db=db,
+                script_id=script_id,
+                niche=meta.get("niche", ""),
+                mood=meta.get("mood", "uplifting"),
+                duration_s=meta.get("duration_s", 60.0),
+            )
+            db.refresh(script)
 
         # Step 1: Compose
         from pipeline.composer import compose_video
