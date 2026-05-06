@@ -137,6 +137,7 @@ const PROVIDER_COLORS = {
   suno:         'bg-[#1e0a3e] text-[#a78bfa] border-[#3d1a70]',
   'lyria-clip': 'bg-[#001624] text-[#4a9eff] border-[#002840]',
   'lyria-pro':  'bg-[#001e12] text-[#34d399] border-[#003020]',
+  elevenlabs:   'bg-[#1a1000] text-[#fbbf24] border-[#3a2800]',
   import:       'bg-[#1e1e2e] text-[#9090a8] border-[#2a2a42]',
 }
 const STATUS_COLORS = {
@@ -591,6 +592,177 @@ function ImportModal({ niches, onClose, onImported }) {
   )
 }
 
+// ── ElevenLabs Modal ─────────────────────────────────────────────────────────
+const OUTPUT_FORMATS = [
+  { value: 'mp3_44100_192', label: 'MP3 44.1kHz 192kbps (default)' },
+  { value: 'pcm_44100',     label: 'PCM 44.1kHz WAV (lossless)' },
+  { value: 'opus_48000_192',label: 'Opus 48kHz 192kbps' },
+]
+
+function ElevenLabsModal({ niches, onClose, onGenerated, onPollTrack }) {
+  const [input,        setInput]        = useState('')
+  const [lengthMs,     setLengthMs]     = useState(60000)
+  const [outputFormat, setOutputFormat] = useState('mp3_44100_192')
+  const [selNiches,    setSelNiches]    = useState([])
+  const [selMoods,     setSelMoods]     = useState([])
+  const [title,        setTitle]        = useState('')
+  const [planJson,     setPlanJson]     = useState('')
+  const [showPlanEditor, setShowPlanEditor] = useState(false)
+  const [previewing,   setPreviewing]   = useState(false)
+  const [generating,   setGenerating]   = useState(false)
+  const [toast,        setToast]        = useState(null)
+  const showToast = (msg, type = 'error') => { setToast({ msg, type }); setTimeout(() => setToast(null), 4000) }
+
+  const isJsonPlan = (() => {
+    try {
+      const p = JSON.parse(input.trim())
+      return typeof p === 'object' && p !== null && ('sections' in p || 'positive_global_styles' in p)
+    } catch { return false }
+  })()
+
+  const handlePreviewPlan = async () => {
+    if (!input.trim()) { showToast('Enter a prompt or paste a composition plan JSON'); return }
+    setPreviewing(true)
+    try {
+      const res = await musicApi.elevenlabsPlan(input.trim(), isJsonPlan ? undefined : lengthMs)
+      setPlanJson(JSON.stringify(res.composition_plan, null, 2))
+      setShowPlanEditor(true)
+    } catch (e) { showToast(e.message) }
+    finally { setPreviewing(false) }
+  }
+
+  const handleGenerateDirect = async () => {
+    if (!input.trim()) { showToast('Enter a prompt or paste a composition plan JSON'); return }
+    setGenerating(true)
+    try {
+      let plan
+      if (isJsonPlan) {
+        plan = JSON.parse(input.trim())
+      } else {
+        const res = await musicApi.elevenlabsPlan(input.trim(), lengthMs)
+        plan = res.composition_plan
+      }
+      await _submitCompose(plan)
+    } catch (e) { showToast(e.message) }
+    finally { setGenerating(false) }
+  }
+
+  const handleGenerateFromEditor = async () => {
+    let plan
+    try {
+      plan = JSON.parse(planJson)
+    } catch {
+      showToast('Invalid JSON in plan editor — fix syntax before generating', 'error')
+      return
+    }
+    setGenerating(true)
+    try {
+      await _submitCompose(plan)
+    } catch (e) { showToast(e.message) }
+    finally { setGenerating(false) }
+  }
+
+  const _submitCompose = async (plan) => {
+    const res = await musicApi.elevenlabsCompose({
+      composition_plan: plan,
+      title: title || 'ElevenLabs Track',
+      niches: selNiches,
+      moods: selMoods,
+      output_format: outputFormat,
+    })
+    onPollTrack(res.track_id, res.task_id)
+    onGenerated()
+    onClose()
+  }
+
+  if (showPlanEditor) {
+    return (
+      <Modal open onClose={() => setShowPlanEditor(false)} title="Edit Composition Plan" width="max-w-2xl"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setShowPlanEditor(false)}>Back</Button>
+            <Button variant="primary" loading={generating} onClick={handleGenerateFromEditor}>Generate Audio</Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-3">
+          <p className="text-xs text-[#9090a8]">Review and edit the composition plan JSON before generating. Changes here affect the final audio.</p>
+          <textarea
+            value={planJson}
+            onChange={e => setPlanJson(e.target.value)}
+            rows={28}
+            spellCheck={false}
+            className="w-full bg-[#0d0d0f] border border-[#2a2a32] rounded-lg px-3 py-2 text-xs font-mono text-[#e8e8f0] focus:outline-none focus:border-[#7c6af7] resize-y leading-relaxed"
+          />
+        </div>
+      </Modal>
+    )
+  }
+
+  return (
+    <Modal open onClose={onClose} title="Generate with ElevenLabs" width="max-w-xl"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="default" loading={previewing} onClick={handlePreviewPlan}>Preview Plan</Button>
+          <Button variant="primary" loading={generating} onClick={handleGenerateDirect}>Generate Direct</Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center justify-between">
+            <label className="text-xs text-[#9090a8] font-medium">Prompt or Composition Plan JSON</label>
+            <span className={`text-xs font-mono px-2 py-0.5 rounded border ${
+              isJsonPlan
+                ? 'bg-[#001e12] text-[#34d399] border-[#003020]'
+                : 'bg-[#16161a] text-[#9090a8] border-[#2a2a32]'
+            }`}>
+              {isJsonPlan ? 'JSON plan' : 'text prompt'}
+            </span>
+          </div>
+          <textarea
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            rows={6}
+            placeholder={'e.g. "uplifting background music for a fitness video, 90s, instrumental"\n\nor paste a full composition plan JSON'}
+            className="bg-[#16161a] border border-[#2a2a32] rounded-lg px-3 py-2 text-sm text-[#e8e8f0] placeholder:text-[#5a5a70] focus:outline-none focus:border-[#7c6af7] resize-y font-mono"
+          />
+        </div>
+
+        {!isJsonPlan && (
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-[#9090a8] font-medium">Duration (ms)</label>
+            <input
+              type="number" min={3000} max={600000} step={1000}
+              value={lengthMs}
+              onChange={e => setLengthMs(parseInt(e.target.value) || 60000)}
+              className="bg-[#16161a] border border-[#2a2a32] rounded-lg px-3 py-1.5 text-sm text-[#e8e8f0] focus:outline-none focus:border-[#7c6af7] w-40"
+            />
+            <p className="text-xs text-[#5a5a70]">{(lengthMs / 1000).toFixed(0)}s</p>
+          </div>
+        )}
+
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-[#9090a8] font-medium">Output Format</label>
+          <select
+            value={outputFormat}
+            onChange={e => setOutputFormat(e.target.value)}
+            className="bg-[#16161a] border border-[#2a2a32] rounded-lg px-3 py-1.5 text-sm text-[#e8e8f0] focus:outline-none focus:border-[#7c6af7]"
+          >
+            {OUTPUT_FORMATS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
+          </select>
+        </div>
+
+        <Input label="Title" value={title} onChange={e => setTitle(e.target.value)} placeholder="Track title (optional)" />
+        <MultiSelect label="Niches" options={niches.map(n => n.name)} value={selNiches} onChange={setSelNiches} />
+        <MultiSelect label="Moods"  options={MOODS} value={selMoods} onChange={setSelMoods} />
+      </div>
+      {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+    </Modal>
+  )
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function MusicPage() {
   const [filterNiche,  setFilterNiche]  = useState('')
@@ -601,8 +773,9 @@ export default function MusicPage() {
   const [editingTrack, setEditingTrack] = useState(null)
   const [playingTrack, setPlayingTrack] = useState(null)
   const [deletingId,   setDeletingId]   = useState(null)
-  const [showGenerate, setShowGenerate] = useState(false)
-  const [showImport,   setShowImport]   = useState(false)
+  const [showGenerate,   setShowGenerate]   = useState(false)
+  const [showImport,     setShowImport]     = useState(false)
+  const [showElevenLabs, setShowElevenLabs] = useState(false)
   const [toast,        setToast]        = useState(null)
   const [pendingPolls, setPendingPolls] = useState({}) // trackId → celeryTaskId
 
@@ -670,6 +843,7 @@ export default function MusicPage() {
         </div>
         <div className="flex gap-2">
           <Button variant="default" onClick={() => setShowImport(true)}>↑ Import</Button>
+          <Button variant="default" onClick={() => setShowElevenLabs(true)}>♪ ElevenLabs</Button>
           <Button variant="primary" onClick={() => setShowGenerate(true)}>+ Generate</Button>
         </div>
       </div>
@@ -789,6 +963,15 @@ export default function MusicPage() {
           niches={nicheList}
           onClose={() => setShowImport(false)}
           onImported={refetch}
+        />
+      )}
+
+      {showElevenLabs && (
+        <ElevenLabsModal
+          niches={nicheList}
+          onClose={() => setShowElevenLabs(false)}
+          onGenerated={refetch}
+          onPollTrack={(trackId, taskId) => setPendingPolls(p => ({ ...p, [trackId]: taskId }))}
         />
       )}
 
