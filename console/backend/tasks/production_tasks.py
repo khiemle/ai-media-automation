@@ -16,7 +16,7 @@ def _auto_generate_elevenlabs_music(db, script_id: int, niche: str, mood: str, d
     from pathlib import Path
     from sqlalchemy import text
 
-    cfg_path = Path(__file__).parents[4] / "config" / "pipeline_config.yaml"
+    cfg_path = Path(__file__).parents[3] / "config" / "pipeline_config.yaml"
     try:
         with open(cfg_path) as f:
             cfg = yaml.safe_load(f)
