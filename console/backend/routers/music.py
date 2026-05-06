@@ -201,6 +201,8 @@ def elevenlabs_preview_plan(
         return {"composition_plan": plan}
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"ElevenLabs API error: {e}")
 
 
 @router.post("/elevenlabs/compose", status_code=201)
