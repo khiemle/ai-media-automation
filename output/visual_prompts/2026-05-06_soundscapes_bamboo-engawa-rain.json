@@ -1,0 +1,205 @@
+{
+  "meta": {
+    "title": "Bamboo Engawa Rain — Study Focus",
+    "theme": "bamboo-engawa-rain",
+    "channel": "soundscapes",
+    "use_case": "study",
+    "video_length_hours": 8,
+    "generated_date": "2026-05-06",
+    "paired_suno_file": "suno-prompt_20260506-0158_study-focus_d-dorian_koto.md"
+  },
+
+  "scene": {
+    "pov": "traditional Japanese engawa wooden porch sitting on floor looking out into dense bamboo grove",
+    "time_of_day": "soft overcast afternoon",
+    "weather": "light rain with gentle mist in bamboo grove",
+    "atmosphere": "cool, quiet, misty, wabi-sabi",
+    "visual_style": "photoreal",
+    "foreground_anchor": null,
+    "color_palette": ["deep forest green", "grey-white overcast sky", "warm honey-brown wood", "grey-blue mist"],
+    "loop_strategy": "static-cinemagraph"
+  },
+
+  "midjourney": {
+    "prompt": "Traditional Japanese engawa wooden porch looking out onto dense bamboo forest in soft afternoon rain, no people, no foreground objects, bamboo stalks filling mid-ground and distance, misty grey-white diffuse overcast sky visible through bamboo canopy, fine diagonal rain streaks across the frame, small drips falling from engawa roof edge, cool forest-green tones, warm honey-brown wooden floor planks, diffuse soft light from above with no harsh shadows, 50mm lens, eye-level sitting perspective from engawa floor, extreme depth through bamboo rows into mist, 35mm film, Kodak Portra 400 slight cool push, Roger Deakins diffuse lighting, soft grain, wabi-sabi mood, hyper-detailed bamboo texture and wood grain, mist layered between bamboo rows, Japanese aesthetic, cinematic still frame",
+    "parameters": "--ar 16:9 --style raw --v 6.1 --q 2",
+    "full_prompt": "Traditional Japanese engawa wooden porch looking out onto dense bamboo forest in soft afternoon rain, no people, no foreground objects, bamboo stalks filling mid-ground and distance, misty grey-white diffuse overcast sky visible through bamboo canopy, fine diagonal rain streaks across the frame, small drips falling from engawa roof edge, cool forest-green tones, warm honey-brown wooden floor planks, diffuse soft light from above with no harsh shadows, 50mm lens, eye-level sitting perspective from engawa floor, extreme depth through bamboo rows into mist, 35mm film, Kodak Portra 400 slight cool push, Roger Deakins diffuse lighting, soft grain, wabi-sabi mood, hyper-detailed bamboo texture and wood grain, mist layered between bamboo rows, Japanese aesthetic, cinematic still frame --ar 16:9 --style raw --v 6.1 --q 2"
+  },
+
+  "runway": {
+    "prompt": "Bamboo stalks sway very gently in a soft lateral breeze from right to left, individual leaves trembling slightly at their own pace. Fine rain falls diagonally at a slow and steady rate across the entire frame, uniform and unhurried. Small drips fall irregularly from the engawa roof edge at the very top of frame, two or three seconds apart. Mist drifts imperceptibly deeper into the bamboo grove, barely visible movement. The wooden engawa floor remains completely motionless. Static camera, absolutely no camera movement. Slow, hypnotic, meditative pace. Designed for seamless looping. Rain and bamboo motion only.",
+    "settings": {
+      "motion_intensity": 2,
+      "duration_seconds": 5,
+      "camera": "static",
+      "loop_strategy": "static-cinemagraph crossfade end-to-start if needed"
+    }
+  },
+
+  "sfx": {
+    "background": {
+      "description_vi": "Tiếng mưa nhẹ liên tục trên mái và lá tre — đều đặn, broadband, không có giọt riêng lẻ, không có nhịp. Nghe như 'im lặng có texture', lấp đầy room-tone.",
+      "english_prompt": "continuous soft rain hiss on bamboo leaves and roof, broadband texture no individual drops audible, no rhythm no pitch, steady and uniform throughout, no thunder no wind gusts, infinitely loopable ambient bed, very quiet background level -30 dB relative to music",
+      "mix_level_db_relative_to_music": -30,
+      "loop_type": "crossfade"
+    },
+
+    "midground": [
+      {
+        "name_vi": "Giọt mưa trên lá tre riêng lẻ",
+        "description_vi": "Vài giọt nặng hơn rơi từ lá xuống lá bên dưới, 0.5–1s, không có attack sắc, fade-out ngay. Mỗi 12–18s.",
+        "interval_seconds": "12-18",
+        "mix_level_db_relative_to_music": -15,
+        "fade_in_seconds": 0.3,
+        "fade_out_seconds": 0.8,
+        "english_prompt": "rain drops falling from bamboo leaf to lower leaf, soft onset no sharp attack, 0.5-1 second duration, natural drip tail, gentle fade-out, mid-distance, sparse isolated events not rhythmic, quiet mid level"
+      },
+      {
+        "name_vi": "Tre kẽo kẹt nhẹ trong gió",
+        "description_vi": "Tiếng gỗ tre cọ vào nhau rất khẽ, thấp, 1–2s. Mỗi 15–22s.",
+        "interval_seconds": "15-22",
+        "mix_level_db_relative_to_music": -16,
+        "fade_in_seconds": 0.4,
+        "fade_out_seconds": 0.8,
+        "english_prompt": "bamboo stalks rubbing together gently in wind, low-pitched wooden creak, soft onset gradual fade-out, 1-2 second duration, no sharp crack, mid-distance outdoor, sparse irregular interval"
+      },
+      {
+        "name_vi": "Giọt nước từ mái hiên rơi xuống sàn đá",
+        "description_vi": "Một giọt nặng, rõ hơn một chút, rơi vào đá hoặc đất ướt bên ngoài, 0.3s. Mỗi 20–30s.",
+        "interval_seconds": "20-30",
+        "mix_level_db_relative_to_music": -13,
+        "fade_in_seconds": 0.1,
+        "fade_out_seconds": 0.5,
+        "english_prompt": "single heavy raindrop falling from roof eave onto wet stone ground, 0.3 second duration, soft impact no harsh transient, short wet decay, mid-foreground distance, isolated single event"
+      }
+    ],
+
+    "foreground": [
+      {
+        "name_vi": "Một giọt mưa lớn rơi ngay gần sàn engawa",
+        "description_vi": "Tiếng gõ nhẹ trên gỗ ẩm, 0.3s, gần hơn tất cả các âm thanh khác. Cảm giác như nó rơi ngay cạnh chỗ ngồi. Mỗi ~50s.",
+        "interval_seconds": "45-55",
+        "fade_in_seconds": 0.05,
+        "fade_out_seconds": 0.4,
+        "english_prompt": "single large raindrop hitting wet wooden porch floor, close-mic foreground presence, soft thud no sharp crack, 0.3 second duration, short damp decay on wet wood, isolated single event, intimate close distance"
+      },
+      {
+        "name_vi": "Thân tre gõ nhẹ vào nhau một lần",
+        "description_vi": "Hai cái gõ thấp, 0.5s, rồi im lặng hoàn toàn. Mỗi ~55s.",
+        "interval_seconds": "50-60",
+        "fade_in_seconds": 0.1,
+        "fade_out_seconds": 0.3,
+        "english_prompt": "two bamboo stalks knocking together once, low hollow unpitched knock, two soft impacts 0.5 second total, no resonant pitch, gentle onset hard stop, close-mid distance, single isolated event then silence"
+      }
+    ],
+
+    "random_sfx": {
+      "trigger_interval_seconds": "60-100",
+      "playback_rules": {
+        "fade_in_seconds": "0.2-0.5",
+        "fade_out_seconds": "0.5-1.5",
+        "max_volume_rule": "never louder than music",
+        "cooldown_minutes": 10,
+        "shuffle": true
+      },
+      "items": [
+        {
+          "id": 1,
+          "name_en": "Distant Crow Call",
+          "description_vi": "Một tiếng kêu mờ, mềm, từ xa 20m+, 1.5s, tắt trước khi echo tan. Không phải tiếng kêu to. Xác nhận đây là rừng thật mà không làm giật mình.",
+          "automation_only": false,
+          "english_prompt": "single crow call far distance 20 metres, muffled soft low volume, 1.5 second duration, fades before echo resolves, no sharp attack, outdoor forest reverb, isolated single event not repeated",
+          "warning": null
+        },
+        {
+          "id": 2,
+          "name_en": "Wind Swell Through Bamboo Canopy",
+          "description_vi": "Swell chậm 3s — chỉ là mass leaf movement, không có cọ xát thân cây. Dâng rồi hạ đều. Mở rộng không gian âm thanh lên phía trên.",
+          "automation_only": false,
+          "english_prompt": "wind swell through bamboo canopy, mass leaf movement only no stalk rubbing, slow gradual rise over 1.5 seconds hold 0.5 seconds fall over 1.5 seconds, 3 second total duration, smooth onset and release no sudden gust, mid-distance overhead, no pitch",
+          "warning": null
+        },
+        {
+          "id": 3,
+          "name_en": "Hollow Bamboo Knock",
+          "description_vi": "Hai tiếng gõ thấp, rỗng, khi hai thân tre chạm nhau trong gió, 0.8s. Không có pitch rõ ràng. Âm thanh đặc trưng của rừng tre.",
+          "automation_only": false,
+          "english_prompt": "two hollow bamboo stalks knocking together in wind, low unpitched hollow knock, two soft impacts within 0.8 second total, no resonant musical pitch, gentle onset natural decay, mid-distance, organic not percussive",
+          "warning": null
+        },
+        {
+          "id": 4,
+          "name_en": "Raindrop on Broad Leaf",
+          "description_vi": "Một giọt mưa rơi vào lá to (lá chuối hoặc tre lớn), tap mềm + đuôi drip ngắn, 0.4s. Textural, gần gũi, không gây chú ý.",
+          "automation_only": false,
+          "english_prompt": "single raindrop hitting large broad leaf bamboo or tropical, soft tap impact, 0.4 second total, short natural drip tail, no sharp transient, close-mid distance, isolated single event quiet level",
+          "warning": null
+        },
+        {
+          "id": 5,
+          "name_en": "Very Distant Temple Bell",
+          "description_vi": "Một tiếng strike cực kỳ mờ, gần như chỉ cảm thấy hơn là nghe, decay 2–3s. Chỉ dùng 1 lần mỗi 15 phút. Đặt không gian vào văn hóa Nhật một cách tinh tế.",
+          "automation_only": false,
+          "english_prompt": "single Japanese temple bell strike extremely distant, barely audible faint presence, 2-3 second reverb decay, strike almost felt not heard, very low volume, heavy low-pass filter applied above 3kHz, outdoor humid reverb, not musical not intrusive single event",
+          "warning": "Apply EQ cut above 3kHz and reduce volume -8 dB below default to prevent competing with koto music track. Max once per 15 minutes."
+        },
+        {
+          "id": 6,
+          "name_en": "Tree Frog Call",
+          "description_vi": "Một tiếng kêu ngắn, mềm, 0.4s, mờ như từ trong bụi cây. Không phải tiếng ếch ao. Sự sống trong rừng, không đòi hỏi chú ý.",
+          "automation_only": false,
+          "english_prompt": "single tree frog call soft and short, 0.4 second duration, muffled by dense foliage, no water splash no pond context, gentle onset quick natural fade, mid-distance from within bamboo undergrowth, quiet unobtrusive level",
+          "warning": null
+        },
+        {
+          "id": 7,
+          "name_en": "Rain Intensity Micro-Swell",
+          "description_vi": "Background rain hiss tăng ~2 dB rồi trở về — không phải âm thanh mới, chỉ là texture variation. Cảm giác gió nhẹ đi qua mưa.",
+          "automation_only": true,
+          "english_prompt": "No audio file needed — volume automation only. Automate gain on background rain track (Layer 1): +2 dB over 2 seconds, hold 1 second, return to 0 dB over 2 seconds. Total duration 5 seconds. Simulates a light gust passing through the rain.",
+          "warning": null
+        },
+        {
+          "id": 8,
+          "name_en": "Bamboo Leaves Falling",
+          "description_vi": "Một nắm lá nhỏ rơi từ trên xuống, xào xạc nhẹ khi qua các tầng tre, 1.5s. Chuyển động rơi nhẹ, matched với hình ảnh.",
+          "automation_only": false,
+          "english_prompt": "small cluster of dry leaves falling through bamboo stalks and branches, gentle rustling as they pass each layer, 1.5 second duration, soft onset builds slightly mid-fall then fades, no sharp impact at end, mid-distance overhead to ground, natural dry leaf texture",
+          "warning": null
+        },
+        {
+          "id": 9,
+          "name_en": "Engawa Floor Creak",
+          "description_vi": "Một tiếng kẽo chậm, thấp của sàn gỗ co lại, 0.7s. Như ngôi nhà đang thở. Nhắc nhở người xem rằng họ đang ngồi ở đó.",
+          "automation_only": false,
+          "english_prompt": "single slow wooden floorboard creak settling, low-pitched aged wood, 0.7 second duration, gradual onset no snap no sudden crack, smooth natural decay, close foreground distance interior, isolated single creak then silence",
+          "warning": null
+        },
+        {
+          "id": 10,
+          "name_en": "Water Drip into Distant Puddle",
+          "description_vi": "Một giọt rơi vào vũng nước ngoài frame, có echo ngắn của không gian ẩm, 1.2s. Thêm chiều sâu không gian mà không lộ nguồn âm thanh.",
+          "automation_only": false,
+          "english_prompt": "single water drop falling into shallow outdoor puddle, soft impact with short wet surface ripple, 1.2 second total with damp outdoor reverb tail, no sharp transient, off-screen mid-far distance, humid environment natural space, isolated single event",
+          "warning": null
+        },
+        {
+          "id": 11,
+          "name_en": "Wind Through Hollow Bamboo",
+          "description_vi": "Tiếng thổi nhẹ qua một thân tre rỗng, tone thấp và mơ hồ, 1s. Không phải một note rõ ràng. Âm thanh đặc trưng Nhật Bản, không tonal đủ để cạnh tranh với nhạc.",
+          "automation_only": false,
+          "english_prompt": "wind passing through hollow bamboo tube or cut end, low breathy resonance, 1 second duration, ambiguous pitch no clear musical note, sounds like wind not a flute, soft onset and release, mid-distance outdoor, non-tonal airy texture only",
+          "warning": "Reject any file with a clearly identifiable musical pitch (C, G, etc.). Use only if the sound resembles wind, not a flute."
+        },
+        {
+          "id": 12,
+          "name_en": "Deeper Silence (Room Tone Dip)",
+          "description_vi": "Không có file âm thanh — chỉ là volume automation. Toàn bộ SFX bus giảm nhẹ 1 dB trong 3s rồi trở về. Cho phép nhạc nổi lên trong một tích tắc.",
+          "automation_only": true,
+          "english_prompt": "No audio file needed — volume automation only. Automate gain on entire SFX bus master: -1 dB over 1.5 seconds, immediate return over 1.5 seconds. Total duration 3 seconds. Allows music to briefly surface. Creates a moment of deeper stillness without adding any sound.",
+          "warning": null
+        }
+      ]
+    }
+  }
+}

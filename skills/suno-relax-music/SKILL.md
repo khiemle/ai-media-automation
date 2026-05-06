@@ -154,13 +154,73 @@ For long-form content (anything looped beyond a single play), additionally verif
 {{EXTENSION_NOTES — e.g., "Generate this seed, then use Suno's Extend feature 12-15× from ~3:30 of each clip to reach ~60 min of unique audio. For a 3-11 hour YouTube video, loop the 60 min in post (ffmpeg or DAW). Listeners are asleep — the loop is undetectable. The drone-style configuration above is loop-safest."}}
 ````
 
-Then save the entire block to a timestamped file under the user's working folder so it's reproducible. Use this filename pattern, written to wherever the user's outputs go (in Cowork that's the connected workspace folder; in Claude Code, save to the current working directory or a `suno-prompts/` subfolder if it exists):
+Then save **two files** with the same base filename — one `.md` and one `.json` — to the user's working folder. Use this filename pattern:
 
 ```text
 suno-prompt_{{YYYYMMDD-HHMM}}_{{function-slug}}_{{key-slug}}_{{primary-slug}}.md
+suno-prompt_{{YYYYMMDD-HHMM}}_{{function-slug}}_{{key-slug}}_{{primary-slug}}.json
 ```
 
-After saving, give the user the file path and ask whether they want to:
+The `.md` file is the human-readable prompt block as rendered above. The `.json` file is the machine-readable version of every field, defined by the canonical schema below. **Both files are always required — never save one without the other.**
+
+### Canonical JSON schema for suno-relax-music output
+
+Every output must conform exactly to this schema. String values that are Suno prompt fields must be in English. Do not add or remove top-level keys.
+
+```json
+{
+  "meta": {
+    "title": "string — human-readable track title",
+    "function": "sleep_onset | sleep_loop | meditation_active | reiki_session | chakra_session | study_focus | stress_relief",
+    "generated_date": "YYYY-MM-DD",
+    "generated_time": "HH:MM",
+    "paired_visual_file": "string filename | null"
+  },
+
+  "deliverable": {
+    "length_hours": "number — intended output e.g. 8 (not a Suno field — for post-production only)",
+    "type": "youtube_long_form | standalone_track | short_clip",
+    "loop_safe": "boolean"
+  },
+
+  "composer": {
+    "function_tag": "string — e.g. study music",
+    "key_mode": "string — e.g. D Dorian mode",
+    "bpm": "number",
+    "primary_instrument": "string",
+    "harmonic_bed": "string",
+    "textural_layer": "string | null",
+    "dynamic_rule": "string",
+    "reverb": "string",
+    "timbre": "string",
+    "loop_safety_note": "string",
+    "listener_context": "string",
+    "rationale": "string"
+  },
+
+  "suno": {
+    "model": "v4 | v4.5",
+    "custom_mode": true,
+    "instrumental": true,
+    "style_of_music": "string — full Style of Music field, ready to paste",
+    "title": "string — Title field, ready to paste",
+    "lyrics": "null | string — null means leave empty; populate only if vocal leak occurs: [Instrumental] [No Vocals] [Wordless]",
+    "exclude_styles": "string — full Exclude Styles field, ready to paste"
+  },
+
+}
+```
+
+#### JSON field rules
+
+1. **`suno.style_of_music`**, **`suno.title`**, **`suno.exclude_styles`** — always English, always the exact paste-ready string (no placeholders, no markdown formatting inside the value).
+2. **`suno.lyrics`** — set to `null` when the field should be left empty in Suno. Only populate with the fallback string `"[Instrumental] [No Vocals] [Wordless]"` if the user reports vocal leakage.
+3. **`deliverable.length_hours`** — a number, not a string. Never embed this value into any `suno.*` field.
+4. **`loop_strategy.ffmpeg_command`** — include the ready-to-run command for the specific deliverable length, or `null` if not applicable.
+5. **`qc_checklist.loop_safety`** — populate only when `deliverable.loop_safe` is `true`. Empty array `[]` otherwise.
+6. The JSON must be valid and parseable — no trailing commas, no comments inside the JSON block.
+
+After saving both files, give the user the file paths and ask whether they want to:
 
 - Generate another variant for the same brief
 - Build a sibling track in the same series (carry over key/instrument identity)

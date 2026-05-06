@@ -1,0 +1,40 @@
+{
+  "meta": {
+    "title": "Study Focus · D Dorian · Koto & Wind",
+    "function": "study_focus",
+    "generated_date": "2026-05-06",
+    "generated_time": "01:58",
+    "paired_visual_file": "output/visual_prompts/2026-05-06_soundscapes_bamboo-engawa-rain.json"
+  },
+
+  "deliverable": {
+    "length_hours": 8,
+    "type": "youtube_long_form",
+    "loop_safe": true
+  },
+
+  "composer": {
+    "function_tag": "study music",
+    "key_mode": "D Dorian mode",
+    "bpm": 70,
+    "primary_instrument": "koto",
+    "harmonic_bed": "warm analog pad",
+    "textural_layer": "wind through trees",
+    "dynamic_rule": "no crescendo, no climax",
+    "reverb": "warm hall reverb",
+    "timbre": "lush and atmospheric",
+    "loop_safety_note": "Stable harmonic centre on D. Sparse non-repeating koto motifs with long silences between phrases — no hook that can be hummed, nothing that becomes a tic on the 50th loop. Mid-texture start and end, no fade-in or fade-out. Wind layer is continuous and non-rhythmic. Safe to loop 100+ times for an 8-hour YouTube video.",
+    "listener_context": "students and focus workers wearing earbuds for 2–8 hour study sessions",
+    "rationale": "D Dorian's warm modal quality provides tonal colour without emotional narrative; koto's sparse phrasing gives the ear a gentle foreground anchor without creating a recognisable melody; wind through trees covers the loop seam and maintains the bamboo-forest atmosphere without time-of-day cues."
+  },
+
+  "suno": {
+    "model": "v4",
+    "custom_mode": true,
+    "instrumental": true,
+    "style_of_music": "study music, koto with warm analog pad, wind through trees, D Dorian mode, 70 BPM, no crescendo, no climax, warm hall reverb, lush and atmospheric, sparse non-repeating koto motifs, long silences between phrases, no vocals, no percussion, no drums, continuous ambient texture, no intro, no outro, mid-texture start, mid-texture end, stable harmonic centre, loop-friendly",
+    "title": "Study Focus · D Dorian · Koto & Wind",
+    "lyrics": null,
+    "exclude_styles": "vocals, lyrics, singing, choir words, percussion, drums, beat, kick, snare, hi-hat, bass guitar, electric guitar, distortion, brass, trumpet, saxophone, climax, drop, build-up, crescendo, EDM, pop, rock, hip hop, lo-fi beats, jazz swing, dramatic strings, trailer music, dubstep, trap, sudden volume change, hard pan, sharp transient, sibilance, white noise hiss"
+  }
+}

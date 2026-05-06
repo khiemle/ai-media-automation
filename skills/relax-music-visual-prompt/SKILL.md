@@ -397,6 +397,124 @@ Read `assets/output_template.md` for the file structure. Save to:
 
 After saving, present the prompts inline in chat as well (the user wants to copy-paste into Midjourney/Runway right away — don't make them open the file first), then mention the saved file path at the end so they have a record.
 
+### 7. Save the JSON file (always required — same base filename, .json extension)
+
+Every output **must** also produce a `.json` file alongside the `.md` file. Same directory, same base filename, different extension:
+
+```
+/Volumes/SSD/Workspace/ai-media-automation/output/visual_prompts/{YYYY-MM-DD}_{channel}_{theme-slug}.json
+```
+
+The JSON file contains every prompt from the session in a structured, machine-readable format. It is the single source of truth for any downstream automation (video pipeline, audio engine, scheduled tasks).
+
+#### Canonical JSON schema
+
+Every output must conform exactly to this schema. Do not add or remove top-level keys. All string values that are prompts must be in English. All `_vi` suffix fields are Vietnamese.
+
+```json
+{
+  "meta": {
+    "title": "string — human-readable title of this visual",
+    "theme": "string — kebab-case theme slug",
+    "channel": "asmr | soundscapes | custom",
+    "use_case": "sleep | study | meditation | stress_relief | focus",
+    "video_length_hours": "number — intended deliverable length e.g. 8",
+    "generated_date": "YYYY-MM-DD",
+    "paired_suno_file": "string filename | null"
+  },
+
+  "scene": {
+    "pov": "string — e.g. engawa porch looking into bamboo grove",
+    "time_of_day": "string — e.g. soft overcast afternoon",
+    "weather": "string — e.g. light rain",
+    "atmosphere": "string — e.g. misty, cool, quiet",
+    "visual_style": "photoreal | anime | painted | surreal",
+    "foreground_anchor": "string | null",
+    "color_palette": ["string", "string", "string"],
+    "loop_strategy": "static-cinemagraph | boomerang | crossfade"
+  },
+
+  "midjourney": {
+    "prompt": "string — full prompt text without parameters",
+    "parameters": "string — e.g. --ar 16:9 --style raw --v 6.1 --q 2",
+    "full_prompt": "string — prompt + parameters combined, ready to paste"
+  },
+
+  "runway": {
+    "prompt": "string — full motion description prompt",
+    "settings": {
+      "motion_intensity": "number 1–10",
+      "duration_seconds": 5,
+      "camera": "static | push-in | drift",
+      "loop_strategy": "string"
+    }
+  },
+
+  "sfx": {
+    "background": {
+      "description_vi": "string",
+      "english_prompt": "string — full technical spec",
+      "mix_level_db_relative_to_music": "number — e.g. -30",
+      "loop_type": "crossfade | infinite-sustain"
+    },
+
+    "midground": [
+      {
+        "name_vi": "string",
+        "description_vi": "string",
+        "interval_seconds": "string — e.g. 10-25",
+        "mix_level_db_relative_to_music": "number — e.g. -15",
+        "fade_in_seconds": "number",
+        "fade_out_seconds": "number",
+        "english_prompt": "string — full technical spec"
+      }
+    ],
+
+    "foreground": [
+      {
+        "name_vi": "string",
+        "description_vi": "string",
+        "interval_seconds": "string — e.g. 45-60",
+        "fade_in_seconds": "number",
+        "fade_out_seconds": "number",
+        "english_prompt": "string — full technical spec"
+      }
+    ],
+
+    "random_sfx": {
+      "trigger_interval_seconds": "string — e.g. 60-100",
+      "playback_rules": {
+        "fade_in_seconds": "string — e.g. 0.2-0.5",
+        "fade_out_seconds": "string — e.g. 0.5-1.5",
+        "max_volume_rule": "never louder than music",
+        "cooldown_minutes": 10,
+        "shuffle": true
+      },
+      "items": [
+        {
+          "id": "number",
+          "name_en": "string",
+          "description_vi": "string",
+          "automation_only": "boolean — true if no audio file needed, only DAW automation",
+          "english_prompt": "string — full technical spec OR automation instructions if automation_only is true",
+          "warning": "string | null — any post-processing note e.g. EQ cut above 3kHz"
+        }
+      ]
+    }
+  }
+}
+```
+
+#### Rules for the JSON file
+
+1. **All prompt strings** (`midjourney.prompt`, `runway.prompt`, `sfx.*.english_prompt`) must be in English — never Vietnamese.
+2. **All `_vi` fields** are Vietnamese — never English.
+3. `midjourney.full_prompt` = `midjourney.prompt` + `" "` + `midjourney.parameters` — always populate this as the ready-to-paste combined string.
+4. For automation-only SFX items, set `automation_only: true` and write the automation instructions as the `english_prompt` value.
+5. `color_palette` must be an array of 2–4 strings (colour names or hex codes).
+6. `video_length_hours` is a number, not a string — e.g. `8`, not `"8 hours"`.
+7. The JSON file must be valid, parseable JSON — no trailing commas, no comments inside the JSON block itself.
+
 ---
 
 ## Conversation style
