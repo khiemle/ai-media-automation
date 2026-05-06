@@ -1,0 +1,5 @@
+video_types:
+  loop:
+    workflow_id: "45c6012f-6993-4c34-85bd-cea416b04598"
+    prompt_node_id: "db5ddb6c-0d86-401e-b777-6f29d4782235"
+    image_node_id: "baa36f58-ee4d-459f-b6ff-9f040db04319"
