@@ -327,3 +327,39 @@ def animate_asset_endpoint(
     )
 
     return {"asset_id": child.id, "task_id": task.id, "invocation_id": invocation_id}
+
+
+# ── Upscale to 4K with Topaz API ─────────────────────────────────────────────
+
+class UpscaleBody(BaseModel):
+    upscale_model: str = "topaz-sharpen-ai"
+
+
+@router.post("/assets/{asset_id}/upscale")
+def upscale_asset_to_4k(
+    asset_id: int,
+    body: UpscaleBody,
+    db: Session = Depends(get_db),
+    _user=Depends(require_editor_or_admin),
+):
+    """Dispatch 4K upscale for a VideoAsset via Topaz API."""
+    from console.backend.models.video_asset import VideoAsset
+    from console.backend.tasks.upscale_tasks import upscale_to_4k_task
+
+    asset = db.get(VideoAsset, asset_id)
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+
+    if asset.upscale_status in ("pending", "processing"):
+        raise HTTPException(status_code=409, detail="Upscale already in progress")
+
+    task = upscale_to_4k_task.apply_async(
+        args=[asset_id, body.upscale_model],
+        queue="render_q",
+    )
+
+    asset.upscale_task_id = task.id
+    asset.upscale_status = "pending"
+    db.commit()
+
+    return {"task_id": task.id, "asset_id": asset_id}
