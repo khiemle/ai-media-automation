@@ -1,5 +1,5 @@
 video_types:
   loop:
-    workflow_id: "c87d72b3-a11c-469e-bb8f-8b886ef0f1dd"
+    workflow_id: "22ba66fd-c68d-4f06-b956-adb1556cdc4a"
     prompt_node_id: "db5ddb6c-0d86-401e-b777-6f29d4782235"
     image_node_id: "baa36f58-ee4d-459f-b6ff-9f040db04319"
