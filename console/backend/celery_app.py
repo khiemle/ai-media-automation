@@ -17,6 +17,7 @@ celery_app = Celery(
         "console.backend.tasks.youtube_short_render_task",
         "console.backend.tasks.youtube_upload_task",
         "console.backend.tasks.runway_task",
+        "console.backend.tasks.upscale_tasks",
     ],
 )
 
@@ -37,6 +38,7 @@ celery_app.conf.update(
         "console.backend.tasks.youtube_short_render_task.*": {"queue": "render_q"},
         "console.backend.tasks.youtube_upload_task.*": {"queue": "upload_q"},
         "console.backend.tasks.runway_task.*": {"queue": "render_q"},
+        "console.backend.tasks.upscale_tasks.*": {"queue": "render_q"},
         "tasks.animate_workflow": {"queue": "render_q"},
         "tasks.recover_pending_runway": {"queue": "render_q"},
     },
