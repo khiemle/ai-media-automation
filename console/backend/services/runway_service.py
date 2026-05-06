@@ -86,10 +86,10 @@ class RunwayService:
         return {"status": status, "output_url": output_url}
 
     def test_connection(self) -> dict:
-        """Probe the dev API. 404 = auth OK, 401/403 = bad key."""
+        """Probe the dev API with a dummy UUID. 404 = auth OK, 401/403 = bad key."""
         try:
             resp = requests.get(
-                f"{RUNWAY_API_BASE}/workflow_invocations/ping",
+                f"{RUNWAY_API_BASE}/workflow_invocations/00000000-0000-0000-0000-000000000000",
                 headers=self._headers(),
                 timeout=10,
             )
