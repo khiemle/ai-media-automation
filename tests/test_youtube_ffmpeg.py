@@ -430,18 +430,24 @@ def test_render_landscape_sfx_layer_no_ss_when_start_s_is_zero(tmp_path):
 
 
 # ── _nvenc_available ───────────────────────────────────────────────────────────
+# The implementation does a real encode probe (not encoder listing).
+# It returns True only when returncode==0 AND stderr is empty.
 
-def test_nvenc_available_returns_true_when_h264_nvenc_in_ffmpeg_output():
+def test_nvenc_available_returns_true_when_encode_probe_succeeds():
     from pipeline.youtube_ffmpeg import _nvenc_available
     with patch("subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(returncode=0, stdout=" V..... h264_nvenc           NVIDIA NVENC H.264", stderr="")
+        mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
         assert _nvenc_available() is True
 
 
-def test_nvenc_available_returns_false_when_h264_nvenc_not_in_output():
+def test_nvenc_available_returns_false_when_encode_probe_has_stderr():
     from pipeline.youtube_ffmpeg import _nvenc_available
     with patch("subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(returncode=0, stdout=" V..... libx264              libx264 H.264", stderr="")
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout="",
+            stderr="Cannot load libnvidia-encode.so.1",
+        )
         assert _nvenc_available() is False
 
 

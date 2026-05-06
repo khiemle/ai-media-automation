@@ -171,10 +171,11 @@ function EditModal({ asset, niches, onClose, onSaved }) {
 }
 
 // ── Animate Modal ─────────────────────────────────────────────────────────────
+const VIDEO_TYPES = ['loop']
+
 function AnimateModal({ asset, onClose, onAnimated }) {
   const [prompt, setPrompt] = useState('')
-  const [intensity, setIntensity] = useState(2)
-  const [duration, setDuration] = useState(5)
+  const [videoType, setVideoType] = useState('loop')
   const [loading, setLoading] = useState(false)
   const [toast, setToast] = useState(null)
   const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000) }
@@ -183,7 +184,7 @@ function AnimateModal({ asset, onClose, onAnimated }) {
     if (!prompt) { showToast('Runway prompt is required', 'error'); return }
     setLoading(true)
     try {
-      await assetsApi.animateWithRunway(asset.id, { prompt, motion_intensity: intensity, duration })
+      await assetsApi.animateWithRunway(asset.id, { prompt, video_type: videoType })
       showToast('Animation queued — check back in a few minutes', 'success')
       onAnimated()
       onClose()
@@ -215,17 +216,13 @@ function AnimateModal({ asset, onClose, onAnimated }) {
             placeholder="Slow rain droplets running down glass. No camera movement. Hypnotic loop."
           />
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-[#9090a8] font-medium">Motion Intensity ({intensity}/10)</label>
-            <input type="range" min={1} max={10} value={intensity} onChange={e => setIntensity(Number(e.target.value))}
-              className="w-full accent-[#7c6af7]" />
-          </div>
-          <Select label="Duration" value={duration} onChange={e => setDuration(Number(e.target.value))}>
-            <option value={5}>5s</option>
-            <option value={10}>10s</option>
-          </Select>
-        </div>
+        <Select
+          label="Video Type"
+          value={videoType}
+          onChange={e => setVideoType(e.target.value)}
+        >
+          {VIDEO_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+        </Select>
       </div>
     </Modal>
   )
