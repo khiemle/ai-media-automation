@@ -133,6 +133,7 @@ jobs:
             suno    = @{ api_key = "${{ secrets.SUNO_API_KEY }}"; model = "V4_5" }
             sunoapi = @{ api_key = "${{ secrets.SUNO_API_KEY }}" }
             pexels  = @{ api_key = "${{ secrets.PEXELS_API_KEY }}" }
+            runway  = @{ api_key = "${{ secrets.RUNWAY_API_KEY }}" }
           }
           $text = $json | ConvertTo-Json -Depth 5
           [System.IO.File]::WriteAllText("$PWD\config\api_keys.json", $text, (New-Object System.Text.UTF8Encoding $false))

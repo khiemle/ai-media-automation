@@ -84,3 +84,19 @@ class RunwayService:
                 )
 
         return {"status": status, "output_url": output_url}
+
+    def test_connection(self) -> dict:
+        """Probe the dev API. 404 = auth OK, 401/403 = bad key."""
+        try:
+            resp = requests.get(
+                f"{RUNWAY_API_BASE}/workflow_invocations/ping",
+                headers=self._headers(),
+                timeout=10,
+            )
+            if resp.status_code in (200, 404):
+                return {"ok": True, "error": None}
+            if resp.status_code in (401, 403):
+                return {"ok": False, "error": f"Invalid API key (HTTP {resp.status_code})"}
+            return {"ok": False, "error": f"HTTP {resp.status_code}"}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}

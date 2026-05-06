@@ -49,7 +49,6 @@ export default function LLMPage() {
   const [toast,    setToast]    = useState(null)
   const [runwayConfig, setRunwayConfig] = useState(null)
   const [runwayKey, setRunwayKey] = useState('')
-  const [runwayModel, setRunwayModel] = useState('gen3-alpha')
   const [runwaySaving, setRunwaySaving] = useState(false)
   const [runwayTesting, setRunwayTesting] = useState(false)
   const [runwayTestResult, setRunwayTestResult] = useState(null)
@@ -126,7 +125,7 @@ export default function LLMPage() {
     try {
       const result = await fetchApi('/api/llm/runway', {
         method: 'PUT',
-        body: JSON.stringify({ api_key: runwayKey, model: runwayModel }),
+        body: JSON.stringify({ api_key: runwayKey }),
       })
       setRunwayConfig(result)
       setRunwayKey('')
@@ -451,15 +450,6 @@ export default function LLMPage() {
               <span className="text-xs text-[#5a5a70] font-mono">{runwayConfig.api_key_masked}</span>
             )}
           </div>
-          <Select
-            label="Model"
-            value={runwayModel}
-            onChange={e => setRunwayModel(e.target.value)}
-            options={[
-              { value: 'gen3-alpha', label: 'gen3-alpha' },
-              { value: 'gen4-turbo', label: 'gen4-turbo' },
-            ]}
-          />
           <div className="flex gap-2">
             <Button size="sm" loading={runwaySaving} onClick={handleRunwaySave}>Save</Button>
             <Button size="sm" variant="ghost" loading={runwayTesting} onClick={handleRunwayTest}>Test Connection</Button>

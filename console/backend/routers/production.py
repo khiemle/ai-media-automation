@@ -260,7 +260,9 @@ def animate_asset_endpoint(
     if asset.asset_type != "still_image":
         raise HTTPException(status_code=400, detail="Only still images can be animated")
 
-    api_key = os.environ.get("RUNWAY_API_KEY", "").strip()
+    from config import api_config as _api_config
+    _cfg = _api_config.get_config()
+    api_key = (_cfg.get("runway", {}).get("api_key") or "").strip() or os.environ.get("RUNWAY_API_KEY", "").strip()
     if not api_key:
         raise HTTPException(status_code=400, detail="RUNWAY_API_KEY not configured")
 

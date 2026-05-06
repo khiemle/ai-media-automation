@@ -21,6 +21,7 @@ _DEFAULT: dict = {
     "suno":   {"api_key": "", "model": "V4_5"},
     "pexels": {"api_key": ""},
     "kokoro": {"default_voice_en": "af_heart"},
+    "runway": {"api_key": ""},
 }
 
 

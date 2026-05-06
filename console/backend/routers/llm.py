@@ -50,49 +50,38 @@ def save_config(body: dict, _user=Depends(require_admin)):
 
 @router.get("/runway")
 def get_runway_config(_user=Depends(require_admin)):
-    """Get Runway config (masked API key + model)."""
-    api_key = (getattr(settings, "runway_api_key", None) or "").strip() or os.environ.get("RUNWAY_API_KEY", "").strip()
-    model = (getattr(settings, "runway_model", None) or "").strip() or os.environ.get("RUNWAY_MODEL", "gen3-alpha").strip()
-    
-    api_key_masked = ""
-    if api_key:
-        api_key_masked = f"rw-...{api_key[-6:]}" if len(api_key) > 6 else "set"
-    
-    return {
-        "api_key_masked": api_key_masked,
-        "model": model,
-    }
+    """Get Runway config (masked API key)."""
+    from config import api_config
+    cfg = api_config.get_config()
+    api_key = (cfg.get("runway", {}).get("api_key") or "").strip() or os.environ.get("RUNWAY_API_KEY", "").strip()
+    api_key_masked = f"key_...{api_key[-6:]}" if len(api_key) > 6 else ("set" if api_key else "")
+    return {"api_key_masked": api_key_masked}
 
 
 @router.put("/runway")
 def update_runway_config(body: dict, _user=Depends(require_admin)):
-    """Update Runway API key and model."""
+    """Persist Runway API key to config/api_keys.json."""
+    from config import api_config
     api_key = (body.get("api_key") or "").strip()
-    model = (body.get("model") or "gen3-alpha").strip()
-    
-    # In production, these would be persisted to environment or secrets manager
-    # For now, we return confirmation with masked key
-    api_key_masked = f"rw-...{api_key[-6:]}" if len(api_key) > 6 else ("set" if api_key else "")
-    
-    return {
-        "api_key_masked": api_key_masked,
-        "model": model,
-        "ok": True,
-    }
+    cfg = api_config.get_config()
+    cfg["runway"] = {"api_key": api_key}
+    api_config.save_config(cfg)
+    api_key_masked = f"key_...{api_key[-6:]}" if len(api_key) > 6 else ("set" if api_key else "")
+    return {"api_key_masked": api_key_masked, "ok": True}
 
 
 @router.post("/runway/test-connection")
 def test_runway_connection(_user=Depends(require_admin)):
     """Test Runway API key connectivity."""
-    api_key = (getattr(settings, "runway_api_key", None) or "").strip() or os.environ.get("RUNWAY_API_KEY", "").strip()
+    from config import api_config
+    cfg = api_config.get_config()
+    api_key = (cfg.get("runway", {}).get("api_key") or "").strip() or os.environ.get("RUNWAY_API_KEY", "").strip()
     if not api_key:
         return {"ok": False, "error": "RUNWAY_API_KEY not configured"}
-
     try:
-        svc = RunwayService(api_key=api_key)
-        return svc.test_connection()
+        return RunwayService(api_key=api_key).test_connection()
     except Exception as exc:
-        return {"ok": False, "error": f"Connection test failed: {exc}"}
+        return {"ok": False, "error": str(exc)}
 
 
 # ── Autofill ──────────────────────────────────────────────────────────────────
