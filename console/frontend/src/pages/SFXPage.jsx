@@ -129,6 +129,116 @@ function ImportModal({ onClose, onImported }) {
   )
 }
 
+function GenerateSFXModal({ onClose, onGenerated }) {
+  const [prompt, setPrompt] = useState('')
+  const [title, setTitle] = useState('')
+  const [titleTouched, setTitleTouched] = useState(false)
+  const [loop, setLoop] = useState(false)
+  const [duration, setDuration] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [toast, setToast] = useState(null)
+
+  const showToast = (msg, type = 'error') => {
+    setToast({ msg, type })
+    setTimeout(() => setToast(null), 4000)
+  }
+
+  const handlePromptChange = (e) => {
+    const val = e.target.value
+    setPrompt(val)
+    if (!titleTouched) setTitle(val.slice(0, 60))
+  }
+
+  const handleTitleChange = (e) => {
+    setTitle(e.target.value)
+    setTitleTouched(true)
+  }
+
+  const handleSubmit = async () => {
+    if (!prompt.trim()) {
+      showToast('Prompt is required')
+      return
+    }
+    setLoading(true)
+    try {
+      const body = {
+        text: prompt.trim(),
+        loop,
+        title: title.trim(),
+        duration_seconds: duration !== '' ? parseFloat(duration) : undefined,
+      }
+      await sfxApi.generate(body)
+      onGenerated()
+      onClose()
+    } catch (e) {
+      showToast(e.message || 'Generation failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Generate SFX"
+      width="max-w-lg"
+      footer={<>
+        <div className="flex-1" />
+        <Button variant="ghost" onClick={onClose} disabled={loading}>Cancel</Button>
+        <Button variant="primary" loading={loading} onClick={handleSubmit}>Generate</Button>
+      </>}
+    >
+      {toast && <Toast message={toast.msg} type={toast.type} />}
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-[#9090a8] font-medium">Prompt <span className="text-[#f87171]">*</span></label>
+          <textarea
+            value={prompt}
+            onChange={handlePromptChange}
+            rows={3}
+            placeholder="Crackling campfire with gentle wind and distant crickets"
+            className="w-full px-3 py-2 rounded-lg bg-[#16161a] border border-[#2a2a32] text-sm text-[#e8e8f0] resize-none focus:outline-none focus:border-[#7c6af7]"
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-[#9090a8] font-medium">Title <span className="text-[#5a5a70]">(optional)</span></label>
+          <input
+            value={title}
+            onChange={handleTitleChange}
+            placeholder="Auto-filled from prompt"
+            className="w-full px-3 py-2 rounded-lg bg-[#16161a] border border-[#2a2a32] text-sm text-[#e8e8f0] focus:outline-none focus:border-[#7c6af7]"
+          />
+        </div>
+        <div className="flex gap-4 items-end">
+          <div className="flex flex-col gap-1 flex-1">
+            <label className="text-xs text-[#9090a8] font-medium">Duration (seconds) <span className="text-[#5a5a70]">(optional, 0.5–22)</span></label>
+            <input
+              type="number"
+              min="0.5"
+              max="22"
+              step="0.5"
+              value={duration}
+              onChange={e => setDuration(e.target.value)}
+              placeholder="Let ElevenLabs decide"
+              className="w-full px-3 py-2 rounded-lg bg-[#16161a] border border-[#2a2a32] text-sm text-[#e8e8f0] focus:outline-none focus:border-[#7c6af7]"
+            />
+          </div>
+          <label className="flex items-center gap-2 pb-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={loop}
+              onChange={e => setLoop(e.target.checked)}
+              className="w-4 h-4 rounded accent-[#7c6af7]"
+            />
+            <span className="text-sm text-[#e8e8f0]">Loop</span>
+          </label>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
 export default function SFXPage() {
   const [sfxList, setSfxList] = useState([])
   const [soundTypes, setSoundTypes] = useState([])
@@ -136,6 +246,7 @@ export default function SFXPage() {
   const [filterType, setFilterType] = useState('')
   const [search, setSearch] = useState('')
   const [showImport, setShowImport] = useState(false)
+  const [showGenerate, setShowGenerate] = useState(false)
   const [playing, setPlaying] = useState(null)
   const [errorToast, setErrorToast] = useState(null)
   const audioRef = useRef(null)
@@ -266,7 +377,10 @@ export default function SFXPage() {
           <h1 className="text-xl font-bold text-[#e8e8f0]">SFX Library</h1>
           <p className="text-sm text-[#9090a8] mt-0.5">{sfxList.length} assets</p>
         </div>
-        <Button variant="primary" onClick={() => setShowImport(true)}>+ Import SFX</Button>
+        <div className="flex gap-2">
+          <Button variant="ghost" onClick={() => setShowGenerate(true)}>✨ Generate SFX</Button>
+          <Button variant="primary" onClick={() => setShowImport(true)}>+ Import SFX</Button>
+        </div>
       </div>
 
       <div className="flex gap-3">
@@ -351,6 +465,7 @@ export default function SFXPage() {
       )}
 
       {showImport && <ImportModal onClose={() => setShowImport(false)} onImported={load} />}
+      {showGenerate && <GenerateSFXModal onClose={() => setShowGenerate(false)} onGenerated={load} />}
     </div>
   )
 }
