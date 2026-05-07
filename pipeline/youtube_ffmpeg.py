@@ -390,6 +390,143 @@ def _build_sfx_pool_wav(
     return str(out_path)
 
 
+LAYER_SEED_OFFSETS = {
+    "midground":  0,
+    "foreground": 100003,
+    "random_sfx": 200003,
+}
+
+
+def _build_sound_layers_wav(
+    video,
+    db,
+    target_duration_s: int,
+    start_s: float,
+    output_dir: Path,
+) -> str | None:
+    """Render background loop + 3 scheduled SFX layers to a single temp WAV.
+
+    Replaces both _build_sfx_pool_wav and resolve_sfx_layers for the new
+    sound_layers config. Returns None if sound_layers is absent or all layers
+    resolve to nothing.
+    """
+    from console.backend.models.sfx_asset import SfxAsset
+    from pipeline.sfx_scheduler import schedule_sfx_layer
+
+    sound_layers = getattr(video, "sound_layers", None) or {}
+    if not sound_layers:
+        return None
+
+    sfx_seed = getattr(video, "sfx_seed", None) or 0
+    end_s = start_s + target_duration_s
+
+    # Collect all referenced asset IDs to load in one query
+    all_asset_ids: set[int] = set()
+    bg_config = sound_layers.get("background") or {}
+    if bg_config.get("asset_id") is not None:
+        all_asset_ids.add(int(bg_config["asset_id"]))
+    for layer_name in LAYER_SEED_OFFSETS:
+        for aid in (sound_layers.get(layer_name) or {}).get("pool", []):
+            all_asset_ids.add(int(aid))
+
+    if not all_asset_ids:
+        return None
+
+    sfx_by_id = {
+        s.id: s
+        for s in db.query(SfxAsset).filter(SfxAsset.id.in_(list(all_asset_ids))).all()
+    }
+
+    # ── Background layer ─────────────────────────────────────────────────────
+    # (path, volume, seek_s)  — seek_s is the ffmpeg -ss value for loop phase
+    bg_inputs: list[tuple[str, float, float]] = []
+    if bg_config:
+        asset_id = bg_config.get("asset_id")
+        volume = float(bg_config.get("volume", 1.0))
+        if asset_id is not None:
+            sfx = sfx_by_id.get(int(asset_id))
+            if sfx and sfx.file_path and Path(sfx.file_path).is_file() and sfx.is_loopable:
+                asset_dur = _probe_duration(sfx.file_path)
+                seek = (start_s % asset_dur) if asset_dur > 0.5 and start_s > 0 else 0.0
+                bg_inputs.append((sfx.file_path, volume, seek))
+            else:
+                logger.warning(
+                    "[SoundLayers] background asset %s not found, missing, or not loopable", asset_id
+                )
+
+    # ── Scheduled layers ─────────────────────────────────────────────────────
+    # (path, volume, local_ts_ms)
+    scheduled: list[tuple[str, float, int]] = []
+    for layer_name, seed_offset in LAYER_SEED_OFFSETS.items():
+        layer = sound_layers.get(layer_name) or {}
+        if not layer:
+            continue
+        pool_ids = [int(x) for x in layer.get("pool", [])]
+        if not pool_ids:
+            continue
+        volume = float(layer.get("volume", 1.0))
+        interval_min = float(layer.get("interval_min_s", 10))
+        interval_max = float(layer.get("interval_max_s", 25))
+        layer_seed = sfx_seed + seed_offset
+
+        events = schedule_sfx_layer(pool_ids, interval_min, interval_max, layer_seed, start_s, end_s)
+        for ts, sfx_id in events:
+            sfx = sfx_by_id.get(sfx_id)
+            if sfx and sfx.file_path and Path(sfx.file_path).is_file():
+                local_ts_ms = int((ts - start_s) * 1000)
+                scheduled.append((sfx.file_path, volume, local_ts_ms))
+
+    if not bg_inputs and not scheduled:
+        return None
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    out_path = output_dir / "sound_layers.wav"
+
+    cmd = ["ffmpeg", "-y"]
+
+    # Inputs: background (looped) then scheduled events
+    for path, _vol, seek in bg_inputs:
+        if seek > 0.5:
+            cmd += ["-ss", str(seek)]
+        cmd += ["-stream_loop", "-1", "-i", path]
+
+    for path, _vol, _ts_ms in scheduled:
+        cmd += ["-i", path]
+
+    # Filter complex
+    parts: list[str] = []
+    labels: list[str] = []
+    fi = 0
+
+    for i, (_, vol, _) in enumerate(bg_inputs):
+        parts.append(f"[{fi}:a]volume={vol}[bg{i}]")
+        labels.append(f"[bg{i}]")
+        fi += 1
+
+    for i, (_, vol, ts_ms) in enumerate(scheduled):
+        parts.append(f"[{fi}:a]volume={vol},adelay={ts_ms}|{ts_ms}[ev{i}]")
+        labels.append(f"[ev{i}]")
+        fi += 1
+
+    n = len(labels)
+    if n == 1:
+        parts.append(f"{labels[0]}apad=whole_dur={target_duration_s}[out]")
+    else:
+        mix_in = "".join(labels)
+        parts.append(f"{mix_in}amix=inputs={n}:duration=longest:normalize=0[mixed]")
+        parts.append(f"[mixed]apad=whole_dur={target_duration_s}[out]")
+
+    cmd += [
+        "-filter_complex", ";".join(parts),
+        "-map", "[out]",
+        "-t", str(target_duration_s),
+        "-ar", "44100", "-ac", "2", "-c:a", "pcm_s16le",
+        str(out_path),
+    ]
+    _run_ffmpeg(cmd, max(120, target_duration_s + 60))
+    return str(out_path)
+
+
 def _blackout_filter_chain(
     black_from_s: int | None, w: int, h: int, start_s: float, target_dur: int
 ) -> str:

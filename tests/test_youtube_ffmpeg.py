@@ -7,20 +7,22 @@ def _make_video(sfx_overrides=None, visual_asset_id=None, music_track_id=None,
                 target_duration_h=3.0, output_quality="1080p",
                 music_track_ids=None, sfx_pool=None,
                 sfx_density_seconds=None, sfx_seed=None,
-                black_from_seconds=None):
+                black_from_seconds=None, sound_layers=None):
     v = MagicMock()
     v.visual_asset_id = visual_asset_id
     v.music_track_id = music_track_id
     v.sfx_overrides = sfx_overrides
     v.target_duration_h = target_duration_h
     v.output_quality = output_quality
-    # ASMR/soundscape extension attrs — default to empty / None so existing
-    # tests don't accidentally trigger multi-music / SFX-pool / blackout paths.
     v.music_track_ids = music_track_ids if music_track_ids is not None else []
     v.sfx_pool = sfx_pool if sfx_pool is not None else []
     v.sfx_density_seconds = sfx_density_seconds
     v.sfx_seed = sfx_seed
     v.black_from_seconds = black_from_seconds
+    v.sound_layers = sound_layers
+    v.visual_asset_ids = []
+    v.visual_clip_durations_s = []
+    v.visual_loop_mode = "concat_loop"
     return v
 
 
@@ -475,3 +477,142 @@ def test_render_landscape_uses_libx264_when_nvenc_not_available(tmp_path):
     cmd = " ".join(mock_run.call_args[0][0])
     assert "libx264" in cmd
     assert "h264_nvenc" not in cmd
+
+
+# ── _build_sound_layers_wav ───────────────────────────────────────────────────
+
+def _make_sfx(id_, file_path, is_loopable=False):
+    s = MagicMock()
+    s.id = id_
+    s.file_path = file_path
+    s.is_loopable = is_loopable
+    return s
+
+
+def _make_db_with_sfx(sfx_list):
+    db = MagicMock()
+    db.query.return_value.filter.return_value.all.return_value = sfx_list
+    return db
+
+
+def test_build_sound_layers_wav_returns_none_when_no_config(tmp_path):
+    from pipeline.youtube_ffmpeg import _build_sound_layers_wav
+    video = _make_video(sound_layers=None)
+    assert _build_sound_layers_wav(video, MagicMock(), 300, 0.0, tmp_path) is None
+
+
+def test_build_sound_layers_wav_returns_none_when_empty_config(tmp_path):
+    from pipeline.youtube_ffmpeg import _build_sound_layers_wav
+    video = _make_video(sound_layers={})
+    assert _build_sound_layers_wav(video, MagicMock(), 300, 0.0, tmp_path) is None
+
+
+def test_build_sound_layers_wav_background_uses_stream_loop(tmp_path):
+    bg_file = tmp_path / "bg.wav"
+    bg_file.write_bytes(b"")
+    sfx = _make_sfx(5, str(bg_file), is_loopable=True)
+
+    video = _make_video(sfx_seed=42, sound_layers={
+        "background": {"asset_id": 5, "volume": 0.4}
+    })
+
+    with patch("pipeline.youtube_ffmpeg._run_ffmpeg") as mock_ff, \
+         patch("pipeline.youtube_ffmpeg._probe_duration", return_value=30.0):
+        from pipeline.youtube_ffmpeg import _build_sound_layers_wav
+        result = _build_sound_layers_wav(video, _make_db_with_sfx([sfx]), 300, 0.0, tmp_path)
+
+    assert result is not None
+    cmd = " ".join(mock_ff.call_args[0][0])
+    assert "-stream_loop" in cmd
+    assert str(bg_file) in cmd
+
+
+def test_build_sound_layers_wav_skips_non_loopable_background(tmp_path):
+    bg_file = tmp_path / "bg.wav"
+    bg_file.write_bytes(b"")
+    sfx = _make_sfx(5, str(bg_file), is_loopable=False)
+
+    video = _make_video(sfx_seed=42, sound_layers={
+        "background": {"asset_id": 5, "volume": 0.4}
+    })
+
+    from pipeline.youtube_ffmpeg import _build_sound_layers_wav
+    result = _build_sound_layers_wav(video, _make_db_with_sfx([sfx]), 300, 0.0, tmp_path)
+    assert result is None  # only layer was skipped → nothing to mix
+
+
+def test_build_sound_layers_wav_midground_events_use_adelay(tmp_path):
+    sfx_file = tmp_path / "mid.wav"
+    sfx_file.write_bytes(b"")
+    sfx = _make_sfx(1, str(sfx_file))
+
+    video = _make_video(sfx_seed=42, sound_layers={
+        "midground": {"pool": [1], "volume": 0.5, "interval_min_s": 10, "interval_max_s": 25}
+    })
+
+    with patch("pipeline.youtube_ffmpeg._run_ffmpeg") as mock_ff:
+        from pipeline.youtube_ffmpeg import _build_sound_layers_wav
+        result = _build_sound_layers_wav(video, _make_db_with_sfx([sfx]), 300, 0.0, tmp_path)
+
+    assert result is not None
+    cmd = " ".join(mock_ff.call_args[0][0])
+    assert "adelay=" in cmd
+
+
+def test_build_sound_layers_wav_chunk_seeks_background(tmp_path):
+    bg_file = tmp_path / "bg.wav"
+    bg_file.write_bytes(b"")
+    sfx = _make_sfx(5, str(bg_file), is_loopable=True)
+
+    video = _make_video(sfx_seed=42, sound_layers={
+        "background": {"asset_id": 5, "volume": 0.4}
+    })
+
+    with patch("pipeline.youtube_ffmpeg._run_ffmpeg") as mock_ff, \
+         patch("pipeline.youtube_ffmpeg._probe_duration", return_value=60.0):
+        from pipeline.youtube_ffmpeg import _build_sound_layers_wav
+        # start_s=90, probe=60 → seek = 90 % 60 = 30 → -ss applied
+        result = _build_sound_layers_wav(video, _make_db_with_sfx([sfx]), 300, 90.0, tmp_path)
+
+    assert result is not None
+    cmd = " ".join(mock_ff.call_args[0][0])
+    assert "-ss" in cmd
+
+
+def test_build_sound_layers_wav_all_three_scheduled_layers(tmp_path):
+    sfx_file = tmp_path / "sfx.wav"
+    sfx_file.write_bytes(b"")
+    sfx = _make_sfx(1, str(sfx_file))
+
+    video = _make_video(sfx_seed=0, sound_layers={
+        "midground":  {"pool": [1], "volume": 0.5, "interval_min_s": 10, "interval_max_s": 25},
+        "foreground": {"pool": [1], "volume": 0.7, "interval_min_s": 45, "interval_max_s": 60},
+        "random_sfx": {"pool": [1], "volume": 0.6, "interval_min_s": 60, "interval_max_s": 100},
+    })
+
+    with patch("pipeline.youtube_ffmpeg._run_ffmpeg") as mock_ff:
+        from pipeline.youtube_ffmpeg import _build_sound_layers_wav
+        result = _build_sound_layers_wav(video, _make_db_with_sfx([sfx]), 600, 0.0, tmp_path)
+
+    assert result is not None
+    # Three layers active → multiple adelay entries in filter_complex
+    cmd = " ".join(mock_ff.call_args[0][0])
+    assert cmd.count("adelay=") >= 3
+
+
+def test_build_sound_layers_wav_output_filename(tmp_path):
+    sfx_file = tmp_path / "bg.wav"
+    sfx_file.write_bytes(b"")
+    sfx = _make_sfx(5, str(sfx_file), is_loopable=True)
+
+    video = _make_video(sfx_seed=42, sound_layers={
+        "background": {"asset_id": 5, "volume": 0.4}
+    })
+
+    with patch("pipeline.youtube_ffmpeg._run_ffmpeg"), \
+         patch("pipeline.youtube_ffmpeg._probe_duration", return_value=30.0):
+        from pipeline.youtube_ffmpeg import _build_sound_layers_wav
+        result = _build_sound_layers_wav(video, _make_db_with_sfx([sfx]), 300, 0.0, tmp_path)
+
+    assert result is not None
+    assert result.endswith("sound_layers.wav")
