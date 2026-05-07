@@ -64,6 +64,151 @@ const DURATION_PRESETS = [
   { label: 'Custom', value: null },
 ]
 
+// ── Import-from-template helpers ───────────────────────────────────────────────
+
+function parseMusicJson(text) {
+  const parsed = JSON.parse(text)
+  if (!parsed.composer && !parsed.suno?.style_of_music) {
+    throw new Error('Missing required fields: composer or suno.style_of_music')
+  }
+  return parsed
+}
+
+function parseSfxJson(text) {
+  const parsed = JSON.parse(text)
+  if (!parsed.sfx) throw new Error('Missing required field: sfx')
+  return parsed
+}
+
+function buildMusicPrompt(json) {
+  const c = json.composer
+  if (c) {
+    return [
+      c.function_tag, c.key_mode,
+      c.bpm ? `${c.bpm} BPM` : null,
+      c.primary_instrument, c.harmonic_bed, c.textural_layer,
+      c.dynamic_rule, c.reverb, c.timbre,
+      'instrumental', 'no vocals',
+    ].filter(Boolean).join(', ')
+  }
+  return json.suno?.style_of_music || ''
+}
+
+function parseInterval(str) {
+  const parts = String(str || '').split('-').map(Number)
+  if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+    return { min: parts[0], max: parts[1] }
+  }
+  return { min: 10, max: 25 }
+}
+
+function collectSfxItems(sfxJson) {
+  const { sfx } = sfxJson
+  const items = []
+  if (sfx.background) {
+    items.push({
+      key: 'bg',
+      layer: 'background',
+      title: sfx.background.name_en || sfx.background.name_vi || 'Background Ambience',
+      prompt: sfx.background.english_prompt,
+      loop: true,
+      automationOnly: false,
+      intervalSeconds: null,
+      triggerInterval: null,
+    })
+  }
+  ;(sfx.midground || []).forEach((item, i) => {
+    items.push({
+      key: `mid_${i}`,
+      layer: 'midground',
+      title: item.name_en || item.name_vi || item.english_prompt.slice(0, 60),
+      prompt: item.english_prompt,
+      loop: false,
+      automationOnly: false,
+      intervalSeconds: item.interval_seconds || null,
+      triggerInterval: null,
+    })
+  })
+  ;(sfx.foreground || []).forEach((item, i) => {
+    items.push({
+      key: `fg_${i}`,
+      layer: 'foreground',
+      title: item.name_en || item.name_vi || item.english_prompt.slice(0, 60),
+      prompt: item.english_prompt,
+      loop: false,
+      automationOnly: false,
+      intervalSeconds: item.interval_seconds || null,
+      triggerInterval: null,
+    })
+  })
+  const rsfx = sfx.random_sfx || {}
+  const triggerInterval = rsfx.trigger_interval_seconds || '60-100'
+  ;(rsfx.items || []).forEach((item, i) => {
+    items.push({
+      key: `rsfx_${i}`,
+      layer: 'random_sfx',
+      title: item.name_en || item.name_vi || (item.english_prompt || '').slice(0, 60) || 'SFX',
+      prompt: item.english_prompt || '',
+      loop: false,
+      automationOnly: !!item.automation_only,
+      intervalSeconds: null,
+      triggerInterval,
+    })
+  })
+  return items
+}
+
+function assembleSoundLayers(sfxResults) {
+  const layers = {}
+  const bg = sfxResults.find(r => r.item.layer === 'background')
+  if (bg) layers.background = { asset_id: bg.assetId, volume: 0.4 }
+
+  const mids = sfxResults.filter(r => r.item.layer === 'midground')
+  if (mids.length > 0) {
+    const ivs = mids.filter(r => r.item.intervalSeconds).map(r => parseInterval(r.item.intervalSeconds))
+    layers.midground = {
+      pool: mids.map(r => r.assetId),
+      volume: 0.5,
+      interval_min_s: ivs.length ? Math.min(...ivs.map(i => i.min)) : 10,
+      interval_max_s: ivs.length ? Math.max(...ivs.map(i => i.max)) : 25,
+    }
+  }
+
+  const fgs = sfxResults.filter(r => r.item.layer === 'foreground')
+  if (fgs.length > 0) {
+    const ivs = fgs.filter(r => r.item.intervalSeconds).map(r => parseInterval(r.item.intervalSeconds))
+    layers.foreground = {
+      pool: fgs.map(r => r.assetId),
+      volume: 0.7,
+      interval_min_s: ivs.length ? Math.min(...ivs.map(i => i.min)) : 45,
+      interval_max_s: ivs.length ? Math.max(...ivs.map(i => i.max)) : 60,
+    }
+  }
+
+  const rsfxs = sfxResults.filter(r => r.item.layer === 'random_sfx')
+  if (rsfxs.length > 0) {
+    const tv = parseInterval(rsfxs[0].item.triggerInterval)
+    layers.random_sfx = {
+      pool: rsfxs.map(r => r.assetId),
+      volume: 0.6,
+      interval_min_s: tv.min,
+      interval_max_s: tv.max,
+    }
+  }
+  return layers
+}
+
+async function pollMusicTask(taskId, maxMs = 300000) {
+  const start = Date.now()
+  while (Date.now() - start < maxMs) {
+    const result = await musicApi.pollTask(taskId)
+    if (result.generation_status === 'ready') return result
+    if (result.generation_status === 'failed') throw new Error(result.error || 'Music generation failed')
+    await new Promise(res => setTimeout(res, 3000))
+  }
+  throw new Error('Music generation timed out after 5 minutes')
+}
+
 function VideoPreviewModal({ video, onClose }) {
   if (!video) return null
   return (
