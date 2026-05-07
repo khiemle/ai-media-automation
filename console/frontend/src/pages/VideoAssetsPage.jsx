@@ -203,9 +203,12 @@ function AnimateModal({ asset, onClose, onAnimated }) {
     >
       {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
       <div className="flex flex-col gap-4">
-        {asset.thumbnail_url && (
-          <img src={assetsApi.thumbnailUrl(asset.id)} alt={asset.description} className="w-full h-32 object-cover rounded-lg" />
-        )}
+        <img
+          src={assetsApi.thumbnailUrl(asset.id)}
+          alt={asset.description}
+          className="w-full h-32 object-cover rounded-lg"
+          onError={e => { e.currentTarget.style.display = 'none' }}
+        />
         <div className="flex flex-col gap-1">
           <label className="text-xs text-[#9090a8] font-medium">Runway Prompt</label>
           <textarea
@@ -588,17 +591,12 @@ export default function VideoAssetsPage() {
                   <tr key={asset.id} className="border-b border-[#2a2a32] hover:bg-[#16161a] transition-colors">
                     {/* Thumbnail */}
                     <td className="py-2.5 pr-4">
-                      {asset.thumbnail_url ? (
-                        <img
-                          src={asset.thumbnail_url}
-                          alt="thumbnail"
-                          className="w-16 h-9 object-cover rounded bg-[#0d0d0f]"
-                        />
-                      ) : (
-                        <div className="w-16 h-9 flex items-center justify-center bg-[#0d0d0f] rounded text-xl">
-                          🎬
-                        </div>
-                      )}
+                      <img
+                        src={assetsApi.thumbnailUrl(asset.id)}
+                        alt="thumbnail"
+                        className="w-16 h-9 object-cover rounded bg-[#0d0d0f]"
+                        onError={e => { e.currentTarget.style.display = 'none' }}
+                      />
                     </td>
 
                     {/* Description + keywords */}
