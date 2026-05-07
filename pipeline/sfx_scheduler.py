@@ -54,11 +54,11 @@ def schedule_sfx_layer(
     Seed-burn: advance RNG by int(start_s) steps before drawing so any
     [start_s, end_s) chunk produces non-repeating events relative to
     other chunks of the same video.
-    Returns empty list when pool_ids is empty or interval_min_s < 0 or interval_max_s <= 0.
-    interval_max_s must be positive; interval_min_s >= 0 (negative values are rejected).
+    Returns empty list when pool_ids is empty, interval_min_s <= 0, or interval_max_s <= 0.
+    interval_max_s must be positive; interval_min_s must be positive (zero is rejected).
     If interval_min_s > interval_max_s, Python's random.uniform swaps them internally; prefer passing them in correct order.
     """
-    if not pool_ids or interval_min_s < 0 or interval_max_s <= 0:
+    if not pool_ids or interval_min_s <= 0 or interval_max_s <= 0:
         return []
 
     rng = random.Random(seed)

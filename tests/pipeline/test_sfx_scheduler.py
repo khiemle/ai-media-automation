@@ -48,7 +48,11 @@ def test_sfx_layer_empty_pool_returns_empty():
     assert schedule_sfx_layer([], 10, 25, seed=42, start_s=0, end_s=120) == []
 
 
-def test_sfx_layer_zero_interval_returns_empty():
+def test_sfx_layer_zero_interval_min_returns_empty():
+    assert schedule_sfx_layer([1], 0, 25, seed=42, start_s=0, end_s=120) == []
+
+
+def test_sfx_layer_zero_max_returns_empty():
     assert schedule_sfx_layer([1], 0, 0, seed=42, start_s=0, end_s=120) == []
 
 
