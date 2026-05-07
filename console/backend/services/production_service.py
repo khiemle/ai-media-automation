@@ -2,6 +2,7 @@
 import math
 import logging
 import os
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -20,6 +21,31 @@ _ALLOWED_ASSET_EXTENSIONS = _ALLOWED_IMAGE_EXTENSIONS | _ALLOWED_VIDEO_EXTENSION
 _DEFAULT_ASSETS_DIR = Path(os.path.abspath(
     os.environ.get('ASSETS_PATH', './assets/video_db/manual')
 ))
+
+
+def generate_video_thumbnail(video_path: str) -> str | None:
+    """Extract a JPEG thumbnail from a video at the 1-second mark using ffmpeg.
+
+    Args:
+        video_path: Path to the video file.
+
+    Returns:
+        Path to the generated thumbnail file (same directory, suffix _thumb.jpg),
+        or None if ffmpeg fails or is not available.
+    """
+    p = Path(video_path)
+    thumb_path = p.parent / f"{p.stem}_thumb.jpg"
+    try:
+        result = subprocess.run(
+            ["ffmpeg", "-ss", "1", "-i", str(p), "-frames:v", "1", "-q:v", "2", str(thumb_path), "-y"],
+            capture_output=True,
+            timeout=30,
+        )
+        if result.returncode == 0 and thumb_path.is_file():
+            return str(thumb_path)
+        return None
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return None
 
 
 class ProductionService:
