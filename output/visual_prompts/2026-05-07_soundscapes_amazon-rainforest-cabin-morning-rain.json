@@ -1,0 +1,172 @@
+{
+  "meta": {
+    "title": "Amazon Rainforest — Cabin Morning Rain",
+    "theme": "amazon-rainforest-cabin-morning-rain",
+    "channel": "soundscapes",
+    "use_case": "study",
+    "video_length_hours": 3,
+    "generated_date": "2026-05-07",
+    "paired_suno_file": null
+  },
+
+  "scene": {
+    "pov": "Inside rustic wooden stilted cabin, looking out through open front, two weathered wooden pillars framing left and right edges",
+    "time_of_day": "Early morning, overcast soft light",
+    "weather": "Light tropical rain",
+    "atmosphere": "Misty, cool, quiet, humid, lush",
+    "visual_style": "photoreal",
+    "foreground_anchor": null,
+    "color_palette": ["deep forest green", "misty blue-grey", "warm honey-brown wood"],
+    "loop_strategy": "static-cinemagraph"
+  },
+
+  "midjourney": {
+    "prompt": "Interior view from inside a rustic wooden stilted jungle cabin, looking out through the wide open front towards the Amazon rainforest, two weathered wooden pillars framing the edges of the composition, centered symmetrical framing, dense tropical jungle canopy visible beyond, light tropical rain falling softly across the forest, wisps of low mist drifting at forest floor level, lush green undergrowth and giant fern fronds, overcast morning soft diffuse light, cool blue-grey atmospheric haze, no sun rays, muted palette of deep forest green and misty blue-grey and warm honey-brown wood, photorealistic, 35mm film photography, Kodak Portra 400, cinematic grain, Roger Deakins atmospheric lighting, shallow depth of field with columns sharp and forest softly focused, no people, no human figures, no objects on floor",
+    "parameters": "--ar 16:9 --style raw --v 6.1 --q 2",
+    "full_prompt": "Interior view from inside a rustic wooden stilted jungle cabin, looking out through the wide open front towards the Amazon rainforest, two weathered wooden pillars framing the edges of the composition, centered symmetrical framing, dense tropical jungle canopy visible beyond, light tropical rain falling softly across the forest, wisps of low mist drifting at forest floor level, lush green undergrowth and giant fern fronds, overcast morning soft diffuse light, cool blue-grey atmospheric haze, no sun rays, muted palette of deep forest green and misty blue-grey and warm honey-brown wood, photorealistic, 35mm film photography, Kodak Portra 400, cinematic grain, Roger Deakins atmospheric lighting, shallow depth of field with columns sharp and forest softly focused, no people, no human figures, no objects on floor --ar 16:9 --style raw --v 6.1 --q 2"
+  },
+
+  "runway": {
+    "prompt": "Locked-off tripod shot, zero camera movement throughout. Rain falls continuously in place across the jungle canopy and open air beyond the cabin, individual droplets catching the diffuse light as they descend. Wisps of low ground mist shift and rise vertically in place at forest floor level, dissipating slowly before reaching the mid-canopy. The nearest large tropical leaves tremble gently in place as rain impacts their surface, each leaf tip quivering independently. A thin trickle of rain water runs down the right wooden pillar surface in place. Nothing else moves. Meditative, unhurried, study-focus loop.",
+    "settings": {
+      "motion_intensity": 3,
+      "duration_seconds": 5,
+      "camera": "static",
+      "loop_strategy": "static-cinemagraph"
+    }
+  },
+
+  "sfx": {
+    "background": {
+      "description_vi": "Tiếng mưa rừng liên tục trên tán lá xa — lớp hiss rộng băng tần, đồng đều, không có giọt riêng lẻ nào nghe được. Người nghe cảm nhận là không khí, không phải là âm thanh. Loop crossfade vô hình.",
+      "english_prompt": "continuous tropical rainforest rain on dense canopy, broadband hiss texture, no individual drops audible, no tonal centre no pitch, uniform and unhurried, far distance 30m+, crossfade loop seamless, very quiet background level approximately -30dB relative to music, no thunder, no wind gusts",
+      "mix_level_db_relative_to_music": -30,
+      "loop_type": "crossfade"
+    },
+
+    "midground": [
+      {
+        "name_vi": "Giọt mưa từ mái nhà sàn rơi xuống gỗ",
+        "description_vi": "Tiếng giọt đơn lẻ rơi xuống sàn gỗ ẩm bên dưới mái, soft onset, 0.5–1 giây, đuôi drip ngắn. Mỗi 10–18 giây, không đều.",
+        "interval_seconds": "10-18",
+        "mix_level_db_relative_to_music": -15,
+        "fade_in_seconds": 0.2,
+        "fade_out_seconds": 0.4,
+        "english_prompt": "single rain drop falling from roofline onto wet wooden floorboard below, soft onset no sharp attack, 0.5-1 second duration, short natural drip tail, mid-distance close to 1-2m, sparse irregular events, moderate level approximately -15dB relative to music, no echo, no reverb"
+      },
+      {
+        "name_vi": "Tán lá nhiệt đới rung trong mưa",
+        "description_vi": "Cụm lá to rung lên khi mưa rơi đúng vào, tiếng xào xạc nhẹ 1.5–2 giây, mềm. Khoảng 15–25 giây một lần.",
+        "interval_seconds": "15-25",
+        "mix_level_db_relative_to_music": -14,
+        "fade_in_seconds": 0.3,
+        "fade_out_seconds": 0.5,
+        "english_prompt": "cluster of large tropical leaves rustling from rain impact, soft broad rustle no sharp transient, 1.5-2 second duration, gentle fade-in 0.3s fade-out 0.5s, mid-distance 5-10m, irregular sparse timing, moderate level -14dB relative to music"
+      },
+      {
+        "name_vi": "Mưa nhỏ lọt vào sàn gỗ gần",
+        "description_vi": "Mưa rơi lác đác lên mặt sàn gỗ hoặc lan can gần, tiếng nhỏ hơn giọt đơn, cụm 0.3–0.8 giây. Mỗi 12–20 giây.",
+        "interval_seconds": "12-20",
+        "mix_level_db_relative_to_music": -18,
+        "fade_in_seconds": 0.2,
+        "fade_out_seconds": 0.3,
+        "english_prompt": "light sporadic rain drops on rough wooden surface deck, soft patter texture, multiple small drops in quick succession 0.3-0.8 second burst, no single sharp tap, gentle fade-in out, near distance 1-3m, moderate-quiet level -18dB relative to music"
+      }
+    ],
+
+    "foreground": [],
+
+    "random_sfx": {
+      "trigger_interval_seconds": "60-100",
+      "playback_rules": {
+        "fade_in_seconds": "0.2-0.5",
+        "fade_out_seconds": "0.5-1.5",
+        "max_volume_rule": "never louder than music",
+        "cooldown_minutes": 10,
+        "shuffle": true
+      },
+      "items": [
+        {
+          "id": 1,
+          "name_en": "Distant Wind Gust Through Upper Canopy",
+          "description_vi": "Đợt gió nhẹ qua tán cây phía trên, tiếng xào xạc khối lá trải dài 4–5 giây, nổi lên rồi lặng xuống. Không kích thích, pass half-asleep test vì là texture tự nhiên dự đoán được của rừng.",
+          "automation_only": false,
+          "english_prompt": "wind gust moving through dense tropical tree canopy above, broad leaf-mass rustle swell, soft onset 1s rise, 4-5 second duration, gentle 1.5s fade-out, far distance 15m+ above, no branch creak, no individual leaves, only mass foliage movement, quiet level -20dB, no sharp attack, no thunder",
+          "warning": null
+        },
+        {
+          "id": 2,
+          "name_en": "Single Large Raindrop on Broad Tropical Leaf",
+          "description_vi": "Một giọt mưa to rơi trúng lá rừng to, tiếng tốp mềm 0.3 giây, đuôi drip ngắn. Cảm giác nghe rõ một khoảnh khắc duy nhất trong màn mưa. Hoàn toàn trong bối cảnh.",
+          "automation_only": false,
+          "english_prompt": "single large rain drop striking broad tropical leaf surface, soft percussive tap no hard attack, 0.3 second impact with short natural drip tail 0.3s, close-mid distance 3-5m, isolated single event non-repeating, quiet foreground presence -12dB relative to music, no echo, natural outdoor space",
+          "warning": null
+        },
+        {
+          "id": 3,
+          "name_en": "Rain Intensity Micro-Swell",
+          "description_vi": "Background rain tăng 2–3 dB trong 6 giây rồi trở về — như đợt mưa rào nhỏ thoáng qua. Người nghe không nghe âm thanh mới, chỉ cảm thấy không gian thở sâu hơn. Pass half-asleep test.",
+          "automation_only": true,
+          "english_prompt": "[No audio file needed — volume automation only] Automate gain on Background Rain track: current level → +2.5dB over 6 seconds → hold 4 seconds → return to original level over 6 seconds. Total event: 16 seconds.",
+          "warning": null
+        },
+        {
+          "id": 4,
+          "name_en": "Soft Distant Frog Call",
+          "description_vi": "Tiếng ếch nhỏ từ bụi cây xa trong rừng, 0.5 giây, mềm, tắt ngay. Gợi sự sống trong rừng mà không gây chú ý. Volume nhỏ và attack không sắc.",
+          "automation_only": false,
+          "english_prompt": "single small tropical frog call from jungle undergrowth, short soft vocalization 0.4-0.6 seconds, no sharp attack, muffled by foliage, far distance 15-25m, fade-in 0.3s fade-out 0.5s, quiet level -22dB relative to music, isolated single call not repeated, no echo, no musical pitch sustained",
+          "warning": null
+        },
+        {
+          "id": 5,
+          "name_en": "Water Dripping Leaf to Leaf Below Canopy",
+          "description_vi": "Nước từ tán lá cao nhỏ xuống lá bên dưới rồi xuống đất, chuỗi 2–3 giọt liên tiếp trong 1 giây. Có chiều sâu không gian, như nghe từ bên dưới tán cây.",
+          "automation_only": false,
+          "english_prompt": "rain water dripping from leaf to leaf through tropical canopy layers, 2-3 soft sequential drip sounds over 0.8-1.2 seconds, gentle soft onset each drop, short natural drip tail, mid-distance 8-12m inside forest, quiet level -20dB relative to music, no sharp impact, no echo, no resonant surface",
+          "warning": null
+        },
+        {
+          "id": 6,
+          "name_en": "Wooden Cabin Structure Settling",
+          "description_vi": "Tiếng cót két chậm, trầm của cột/sàn gỗ co giãn theo độ ẩm — 0.6–0.8 giây, một lần duy nhất. Tạo cảm giác ngôi nhà đang thở. Tiếng gỗ cót két chậm là âm thanh an toàn, không đáng sợ.",
+          "automation_only": false,
+          "english_prompt": "single slow low-pitched wooden cabin floorboard creak settling, one continuous creak 0.6-0.8 seconds, no sharp onset smooth start, natural wood resonance low frequency, slow decay, close distance 1-2m inside structure, quiet level -16dB relative to music, isolated single event, no repetition, no metallic sound",
+          "warning": null
+        },
+        {
+          "id": 7,
+          "name_en": "Distant Soft Bird Call Muffled",
+          "description_vi": "Tiếng chim rừng Amazon xa, low-pitched, mềm, bị tán lá bóng trước khi đến tai. 0.8–1 giây. Gợi sự sống nhưng không gây chú ý. Cần EQ cắt tần số cao.",
+          "automation_only": false,
+          "english_prompt": "single soft low-pitched tropical forest bird call, muffled by dense foliage, 0.8-1 second duration, gentle onset no sharp attack, fade-out natural, far distance 20-30m, very quiet -24dB relative to music, isolated single call not a sequence, no sustained pitch no tonal resonance",
+          "warning": "EQ cut above 4kHz after sourcing to remove sharp high frequencies"
+        },
+        {
+          "id": 8,
+          "name_en": "Large Tropical Leaf Falling Through Canopy",
+          "description_vi": "Chiếc lá to tách ra và rơi qua các tán lá bên dưới, tiếng xào xạc nhẹ 1.5–2 giây rồi im. Hoàn toàn trong bối cảnh, không gây bất ngờ, làm phong phú thêm cảm giác sống động.",
+          "automation_only": false,
+          "english_prompt": "single large tropical leaf detaching and falling through multi-layer canopy foliage, soft continuous rustle 1.5-2 seconds as leaf brushes leaves during descent, gradual onset no sharp attack, smooth fade-out as leaf settles, mid-distance 10-15m, quiet level -21dB relative to music, isolated single event",
+          "warning": null
+        },
+        {
+          "id": 9,
+          "name_en": "Distant Stream Water Flow Briefly Audible",
+          "description_vi": "Tiếng suối xa trong rừng thoáng nghe được 3–4 giây, như gió đổi hướng để lộ âm thanh phía sau rồi tắt. Gợi chiều sâu không gian của rừng mà không thêm âm thanh hoàn toàn mới.",
+          "automation_only": false,
+          "english_prompt": "distant small jungle stream water flow briefly audible, soft babbling water sound, gentle fade-in 0.8s, hold 3-4 seconds at very quiet level, fade-out 1s, far distance 25-40m through dense foliage, no individual splashes, smooth continuous texture, quiet level -25dB relative to music, no musical pitch",
+          "warning": null
+        },
+        {
+          "id": 10,
+          "name_en": "Low Ground Mist Ambient Reverb Shift",
+          "description_vi": "Khi sương mù nhiều hơn trong visual, reverb background layer tăng nhẹ — cảm giác không gian mở rộng ra. Pass half-asleep test vì không phải âm thanh mới, chỉ là thay đổi spatial texture.",
+          "automation_only": true,
+          "english_prompt": "[No audio file needed — reverb automation only] Automate reverb wet/dry on Background Rain track: current dry mix → +15% wet over 8 seconds → hold 10 seconds → return to original over 8 seconds. Total event: 26 seconds.",
+          "warning": null
+        }
+      ]
+    }
+  }
+}

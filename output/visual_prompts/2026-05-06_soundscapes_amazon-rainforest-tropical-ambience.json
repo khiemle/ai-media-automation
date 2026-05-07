@@ -27,7 +27,7 @@
   },
 
   "runway": {
-    "prompt": "Faint warm mist and water vapor rise slowly from the damp forest floor in soft wispy tendrils, drifting upward and dissolving gently into the canopy light. Foreground tropical ferns and broad leaves sway imperceptibly in the barest forest breath, each leaf moving independently at its own unhurried pace. Distant upper canopy foliage shimmers very slightly as warm golden light holds steady. Static camera. Meditative, slow, focus-friendly, designed to loop seamlessly.",
+    "prompt": "Locked-off tripod shot, zero camera movement throughout. Wisps of warm mist rise vertically in place from the damp forest floor, fading and dissolving before reaching the mid-canopy. Tropical fern fronds quiver very gently in place, each leaf tip trembling independently at an unhurried pace. Upper canopy leaves flicker almost imperceptibly as still golden light holds. Nothing else moves. Hypnotic, meditative, seamless loop.",
     "settings": {
       "motion_intensity": 3,
       "duration_seconds": 5,

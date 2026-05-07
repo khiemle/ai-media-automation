@@ -1,0 +1,67 @@
+{
+  "meta": {
+    "title": "Amazon Forest · Felt Piano Meditation",
+    "function": "meditation_active",
+    "generated_date": "2026-05-06",
+    "generated_time": "14:01",
+    "paired_visual_file": "2026-05-06_soundscapes_amazon-rainforest-tropical-ambience.md"
+  },
+
+  "deliverable": {
+    "length_hours": 3,
+    "type": "youtube_long_form",
+    "loop_safe": true
+  },
+
+  "composer": {
+    "function_tag": "ambient meditation music",
+    "key_mode": "F Lydian mode",
+    "bpm": 62,
+    "primary_instrument": "felt piano",
+    "harmonic_bed": "warm string ensemble pad",
+    "textural_layer": null,
+    "dynamic_rule": "flat dynamics pp-mp throughout, no crescendo, no build, no fade",
+    "reverb": "long reverb tail, intimate close-mic piano with large hall reverb",
+    "timbre": "soft analog warmth, intimate, contemplative",
+    "loop_safety_note": "Stable harmonic centre on F Lydian, sparse non-repeating melodic motifs, mid-texture start and end, no fade-in or fade-out, flat dynamic arc. Safe to loop 40-50 times for 3-hour YouTube video.",
+    "listener_context": "Viewer watching Soundscapes focus YouTube video with Amazon rainforest visuals, meditating or in mindful rest, SFX environmental layers running separately",
+    "rationale": "Felt piano's naturally short sustain combined with long reverb prevents melodic phrases from accumulating into memorable hooks. F Lydian's raised fourth creates spatial openness without harmonic tension, ideal for sustained mindfulness. Yellow Brick Cinema-style sparse phrasing keeps the music present without demanding attention."
+  },
+
+  "suno": {
+    "model": "v4",
+    "custom_mode": true,
+    "instrumental": true,
+    "style_of_music": "ambient meditation music, felt piano, warm string ensemble pad, F Lydian mode, 62 BPM, slow harmonic rhythm, long reverb tail, intimate close-mic piano, sparse non-repeating melodic phrases, no percussion, no beat, no vocals, gentle contemplative atmosphere, soft analog warmth, Yellow Brick Cinema inspired, no intro no outro mid-texture start mid-texture end",
+    "title": "Amazon Forest · Felt Piano Meditation",
+    "lyrics": null,
+    "exclude_styles": "drums, percussion, beat, bass line, rhythm section, vocals, singing, choir, choral, lyrics, EDM, electronic dance, pop, rock, jazz, blues, hip hop, trap, dubstep, orchestral swell, dramatic build, intro fanfare, outro fade, nature sounds, rain sounds, bird calls, spoken word, voice, fast tempo, upbeat, energetic, strings pizzicato, harpsichord, music box"
+  },
+
+  "qc_checklist": {
+    "high_priority": [
+      "No drumbeat, percussion, or rhythmic pulse anywhere in the track",
+      "No vocals, choir, breath, or human voice sounds",
+      "Piano phrases dissolve into reverb before repeating — no clear melodic repetition",
+      "F Lydian tonal centre maintained throughout — no sudden modulation",
+      "Flat dynamic level from start to end — no crescendo or dramatic build"
+    ],
+    "loop_safety": [
+      "Crossfade test: 5-second fade from clip-end into clip-start is inaudible",
+      "No melody you can hum after one listen",
+      "No single sonic event noticeable if it occurred every 4 minutes for 3 hours",
+      "Track starts and ends mid-texture — no intro silence or outro fade"
+    ]
+  },
+
+  "extension_strategy": {
+    "seed_generation": "Generate 3-5 variations in Suno Custom Mode, select the one that best passes QC checklist",
+    "extend_from_seconds": 200,
+    "extend_count": "10-12 times",
+    "target_unique_audio_minutes": 45,
+    "loop_target_hours": 3,
+    "ffmpeg_command": "ffmpeg -stream_loop -1 -i your_45min_track.mp3 -t 10800 -c copy amazon_forest_3h.mp3",
+    "crossfade_seconds": 5,
+    "notes": "Loop the 45-min block 3-4 times in post. Apply 5s crossfade at each loop point in DAW. Felt piano + pad configuration makes loop join inaudible for meditating listeners."
+  }
+}
