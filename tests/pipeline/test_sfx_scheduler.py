@@ -1,4 +1,4 @@
-from pipeline.sfx_scheduler import schedule_sfx
+from pipeline.sfx_scheduler import schedule_sfx, schedule_sfx_layer
 
 
 def test_same_seed_reproduces_schedule():
@@ -44,15 +44,16 @@ def test_no_density_returns_empty():
     assert schedule_sfx(pool_ids=[1], density_s=None, seed=1, start_s=0, end_s=60) == []
 
 
-from pipeline.sfx_scheduler import schedule_sfx_layer
-
-
 def test_sfx_layer_empty_pool_returns_empty():
     assert schedule_sfx_layer([], 10, 25, seed=42, start_s=0, end_s=120) == []
 
 
 def test_sfx_layer_zero_interval_returns_empty():
     assert schedule_sfx_layer([1], 0, 0, seed=42, start_s=0, end_s=120) == []
+
+
+def test_sfx_layer_negative_interval_returns_empty():
+    assert schedule_sfx_layer([1], -5, 25, seed=42, start_s=0, end_s=120) == []
 
 
 def test_sfx_layer_deterministic():
