@@ -52,6 +52,7 @@ class YoutubeVideo(Base):
     black_from_seconds:  Mapped[int | None] = mapped_column(Integer, nullable=True)
     skip_previews:       Mapped[bool] = mapped_column(Boolean, default=True, server_default="true", nullable=False)
     render_parts:        Mapped[list[dict] | None] = mapped_column(JSONB, default=list, server_default="[]")
+    sound_layers:        Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     audio_preview_path:  Mapped[str | None] = mapped_column(String(500), nullable=True)
     video_preview_path:  Mapped[str | None] = mapped_column(String(500), nullable=True)
 
