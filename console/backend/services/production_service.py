@@ -1,6 +1,7 @@
 """ProductionService — asset search, scene editing, TTS/Veo regen, start production."""
 import math
 import logging
+import mimetypes
 import os
 import subprocess
 from datetime import datetime, timezone
@@ -230,7 +231,6 @@ class ProductionService:
         return asset.file_path
 
     def get_thumbnail_path(self, asset_id: int, generate: bool) -> tuple[str, str] | None:
-        import mimetypes
         asset = self.db.query(VideoAsset).filter(VideoAsset.id == asset_id).first()
         if not asset:
             return None
@@ -250,7 +250,7 @@ class ProductionService:
             thumb_path = generate_video_thumbnail(asset.file_path)
             if thumb_path is None:
                 return None
-            if asset.thumbnail_path is None:  # race condition guard
+            if asset.thumbnail_path != thumb_path:
                 asset.thumbnail_path = thumb_path
                 self.db.commit()
             return (thumb_path, "image/jpeg")
@@ -259,7 +259,7 @@ class ProductionService:
         if asset.asset_type == 'still_image':
             if not Path(asset.file_path).is_file():
                 return None
-            if asset.thumbnail_path is None:
+            if asset.thumbnail_path != asset.file_path:
                 asset.thumbnail_path = asset.file_path
                 self.db.commit()
             media_type, _ = mimetypes.guess_type(asset.file_path)

@@ -92,6 +92,8 @@ def get_asset_thumbnail(
     if result is None:
         raise HTTPException(status_code=404, detail="No thumbnail available")
     path, media_type = result
+    if not Path(path).is_file():
+        raise HTTPException(status_code=404, detail="File not found on disk")
     return FileResponse(str(path), media_type=media_type)
 
 
