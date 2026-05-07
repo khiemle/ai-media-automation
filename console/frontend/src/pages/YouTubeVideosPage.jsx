@@ -3,11 +3,9 @@ import { youtubeVideosApi, musicApi, assetsApi, sfxApi, channelPlansApi } from '
 import { Card, Badge, Button, Input, Select, Toast, Spinner, EmptyState, Modal } from '../components/index.jsx'
 import AIAssistantPanel from '../components/AIAssistantPanel.jsx'
 import MusicPlaylistEditor from '../components/MusicPlaylistEditor.jsx'
-import SfxPoolEditor from '../components/SfxPoolEditor.jsx'
 import RenderStatePanel from '../components/RenderStatePanel.jsx'
 import PreviewApprovalGate from '../components/PreviewApprovalGate.jsx'
-import SfxPickerModal from '../components/SfxPickerModal.jsx'
-import PreviewPlayer from '../components/PreviewPlayer.jsx'
+import SoundLayersEditor from '../components/SoundLayersEditor.jsx'
 import VisualPlaylistEditor from '../components/VisualPlaylistEditor.jsx'
 import { useRenderWebSocket } from '../hooks/useRenderWebSocket.js'
 
@@ -123,21 +121,36 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
   const [autofillRunway, setAutofillRunway] = useState(null)
   const [autofilled, setAutofilled] = useState(isEdit)  // skip the auto-SEO useEffect on edit
 
-  const [sfxLayers, setSfxLayers] = useState(() => {
-    const overrides = isEdit ? (existingVideo.sfx_overrides || {}) : {}
+  const [soundLayers, setSoundLayers] = useState(() => {
+    const sl = isEdit ? (existingVideo.sound_layers || {}) : {}
     return {
-      foreground: { asset_id: overrides.foreground?.asset_id ? String(overrides.foreground.asset_id) : '', volume: overrides.foreground?.volume ?? 0.6 },
-      midground:  { asset_id: overrides.midground?.asset_id  ? String(overrides.midground.asset_id)  : '', volume: overrides.midground?.volume  ?? 0.3 },
-      background: { asset_id: overrides.background?.asset_id ? String(overrides.background.asset_id) : '', volume: overrides.background?.volume ?? 0.1 },
+      background: {
+        asset_id: sl.background?.asset_id ? String(sl.background.asset_id) : '',
+        volume: sl.background?.volume ?? 0.4,
+      },
+      midground: {
+        pool: sl.midground?.pool || [],
+        volume: sl.midground?.volume ?? 0.5,
+        interval_min_s: sl.midground?.interval_min_s ?? 10,
+        interval_max_s: sl.midground?.interval_max_s ?? 25,
+      },
+      foreground: {
+        pool: sl.foreground?.pool || [],
+        volume: sl.foreground?.volume ?? 0.7,
+        interval_min_s: sl.foreground?.interval_min_s ?? 45,
+        interval_max_s: sl.foreground?.interval_max_s ?? 60,
+      },
+      random_sfx: {
+        pool: sl.random_sfx?.pool || [],
+        volume: sl.random_sfx?.volume ?? 0.6,
+        interval_min_s: sl.random_sfx?.interval_min_s ?? 60,
+        interval_max_s: sl.random_sfx?.interval_max_s ?? 100,
+      },
     }
   })
 
-  const [sfxPickerLayer, setSfxPickerLayer] = useState(null)  // 'foreground' | 'midground' | 'background' | null
-
   // ASMR / Soundscape extras
   const [musicTrackIds, setMusicTrackIds]       = useState(isEdit ? (existingVideo.music_track_ids || []) : [])
-  const [sfxPool, setSfxPool]                   = useState(isEdit ? (existingVideo.sfx_pool || [])       : [])
-  const [sfxDensity, setSfxDensity]             = useState(isEdit ? (existingVideo.sfx_density_seconds || 60) : 60)
   const [blackFromSeconds, setBlackFromSeconds] = useState(isEdit && existingVideo.black_from_seconds != null ? String(existingVideo.black_from_seconds) : '')
   const [skipPreviews, setSkipPreviews]         = useState(isEdit ? !!existingVideo.skip_previews : false)
   const isAsmrLike = ['asmr', 'soundscape'].includes(template?.slug)
@@ -347,13 +360,16 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
         visual_asset_ids: visualAssetIds,
         visual_clip_durations_s: visualDurations,
         visual_loop_mode: visualLoopMode,
-        sfx_overrides: (sfxLayers.foreground.asset_id || sfxLayers.midground.asset_id || sfxLayers.background.asset_id)
-          ? {
-              foreground: sfxLayers.foreground.asset_id ? sfxLayers.foreground : null,
-              midground:  sfxLayers.midground.asset_id  ? sfxLayers.midground  : null,
-              background: sfxLayers.background.asset_id ? sfxLayers.background : null,
-            }
-          : null,
+        sound_layers: (() => {
+          const result = {}
+          if (soundLayers.background.asset_id)
+            result.background = { asset_id: parseInt(soundLayers.background.asset_id), volume: soundLayers.background.volume }
+          for (const key of ['midground', 'foreground', 'random_sfx']) {
+            if (soundLayers[key].pool.length > 0)
+              result[key] = { ...soundLayers[key] }
+          }
+          return Object.keys(result).length > 0 ? result : null
+        })(),
         seo_title: form.seo_title,
         seo_description: form.seo_description,
         seo_tags: form.seo_tags
@@ -362,8 +378,6 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
         output_quality: form.output_quality,
         ...(isAsmrLike ? {
           music_track_ids: musicTrackIds,
-          sfx_pool: sfxPool,
-          sfx_density_seconds: sfxPool.length > 0 ? sfxDensity : null,
           black_from_seconds: blackFromSeconds ? parseInt(blackFromSeconds, 10) : null,
           skip_previews: skipPreviews,
         } : {}),
@@ -788,85 +802,21 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
             </div>
           </section>
 
-          {/* ④ SFX LAYERS */}
+          {/* ④ SOUND LAYERS */}
           <section>
-            <div className="text-xs font-bold text-[#5a5a70] tracking-widest mb-3">④ SFX LAYERS</div>
-            <div className="flex flex-col gap-3">
-              {[
-                { key: 'foreground', label: 'Foreground', defaultVol: 0.6 },
-                { key: 'midground',  label: 'Midground',  defaultVol: 0.3 },
-                { key: 'background', label: 'Background', defaultVol: 0.1 },
-              ].map(({ key, label }) => {
-                const sfxPack = template?.sfx_pack?.[key]
-                const layerDefault = sfxList.find(s => s.id === sfxPack?.asset_id)
-                const pickedId = sfxLayers[key].asset_id
-                const pickedSfx = sfxList.find(s => String(s.id) === String(pickedId))
-                return (
-                  <div key={key} className="bg-[#0d0d0f] border border-[#2a2a32] rounded-lg p-3 flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-[#9090a8]">{label}</span>
-                      {layerDefault && !pickedId && (
-                        <span className="text-[10px] text-[#5a5a70] font-mono">template default: {layerDefault.title}</span>
-                      )}
-                    </div>
-                    {pickedId ? (
-                      <div className="flex items-center gap-2 px-2 py-1.5 bg-[#1c1c22] border border-[#2a2a32] rounded">
-                        <PreviewPlayer src={`/api/sfx/${pickedId}/stream`} kind="audio" />
-                        <button
-                          type="button"
-                          onClick={() => setSfxPickerLayer(key)}
-                          className="flex-1 text-left text-sm text-[#e8e8f0] truncate"
-                        >
-                          {pickedSfx?.title || `SFX #${pickedId}`}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setSfxLayers(prev => ({ ...prev, [key]: { ...prev[key], asset_id: '' } }))}
-                          className="text-[#f87171] text-xs px-1"
-                          aria-label={`Clear ${label}`}
-                        >×</button>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setSfxPickerLayer(key)}
-                        className="px-3 py-1.5 rounded border border-dashed border-[#2a2a32] text-xs text-[#9090a8] hover:text-[#e8e8f0] hover:border-[#7c6af7] transition-colors"
-                      >
-                        + Pick SFX
-                      </button>
-                    )}
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs text-[#5a5a70] w-16 shrink-0">Volume</span>
-                      <input
-                        type="range"
-                        min={0} max={1} step={0.05}
-                        value={sfxLayers[key].volume}
-                        onChange={e => setSfxLayers(prev => ({
-                          ...prev,
-                          [key]: { ...prev[key], volume: parseFloat(e.target.value) },
-                        }))}
-                        className="flex-1 accent-[#7c6af7]"
-                      />
-                      <span className="text-xs text-[#9090a8] font-mono w-8 text-right">
-                        {Math.round(sfxLayers[key].volume * 100)}%
-                      </span>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
+            <div className="text-xs font-bold text-[#5a5a70] tracking-widest mb-3">④ SOUND LAYERS</div>
+            <SoundLayersEditor
+              soundLayers={soundLayers}
+              sfxList={sfxList}
+              onChange={setSoundLayers}
+            />
           </section>
 
-          {/* ④b RANDOM SFX POOL + EXTRAS — asmr/soundscape only */}
+          {/* ④b EXTRAS — asmr/soundscape only */}
           {isAsmrLike && (
             <section>
-              <div className="text-xs font-bold text-[#5a5a70] tracking-widest mb-3">④b RANDOM SFX POOL</div>
-              <SfxPoolEditor
-                pool={sfxPool}
-                densitySeconds={sfxDensity}
-                onChange={({ pool, densitySeconds }) => { setSfxPool(pool); setSfxDensity(densitySeconds) }}
-              />
-              <div className="mt-4 flex flex-col gap-3">
+              <div className="text-xs font-bold text-[#5a5a70] tracking-widest mb-3">④b EXTRAS</div>
+              <div className="flex flex-col gap-3">
                 <Input
                   label="Black-out from (seconds — visual fades to black, audio continues)"
                   type="number"
@@ -902,18 +852,6 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
             </Select>
           </section>
         </div>
-
-        <SfxPickerModal
-          open={sfxPickerLayer !== null}
-          onClose={() => setSfxPickerLayer(null)}
-          selectedId={sfxPickerLayer ? sfxLayers[sfxPickerLayer].asset_id : null}
-          onSelect={(s) => {
-            setSfxLayers(prev => ({
-              ...prev,
-              [sfxPickerLayer]: { ...prev[sfxPickerLayer], asset_id: String(s.id) },
-            }))
-          }}
-        />
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-[#2a2a32] flex gap-3 justify-end">
@@ -1223,16 +1161,17 @@ export default function YouTubeVideosPage() {
             const isActive = ACTIVE_RENDER_STATES.has(v.status)
             return (
               <Card key={v.id} className="px-5 py-4">
+                <div className="flex items-start gap-4">
                 {v.thumbnail_path && (
                   <img
                     src={youtubeVideosApi.thumbnailUrl(v.id)}
                     alt="thumbnail"
-                    className="w-full rounded-t-lg mb-3 -mx-5 -mt-4"
-                    style={{ aspectRatio: '16/9', objectFit: 'cover', width: 'calc(100% + 2.5rem)' }}
+                    className="rounded flex-shrink-0 object-cover"
+                    style={{ height: 128, aspectRatio: '16/9' }}
                     onError={e => { e.target.style.display = 'none' }}
                   />
                 )}
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start justify-between gap-4 flex-1 min-w-0">
                   <div className="flex items-start gap-3 min-w-0">
                     {/* Template label chip */}
                     <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-[#2a2a32] text-[#9090a8] flex-shrink-0">
@@ -1280,6 +1219,7 @@ export default function YouTubeVideosPage() {
                       ✕
                     </button>
                   </div>
+                </div>
                 </div>
                 {isActive && (
                   <div className="mt-4">

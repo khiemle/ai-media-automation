@@ -143,7 +143,7 @@ export function Select({ label, value, onChange, options = [], placeholder, clas
 export function Modal({ open, onClose, title, children, footer, width = 'max-w-2xl' }) {
   if (!open) return null
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div className={`relative z-10 w-full ${width} mx-4 bg-[#1c1c22] border border-[#2a2a32] rounded-2xl shadow-2xl flex flex-col max-h-[90vh]`}>
         {/* Header */}

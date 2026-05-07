@@ -7,7 +7,7 @@ const unwrap = (r) => Array.isArray(r) ? r : (r?.items || [])
 const SOURCES = ['', 'midjourney', 'runway', 'veo', 'manual', 'pexels', 'stock']
 
 /**
- * VisualPickerModal — single-select visual asset picker with thumbnail grid + preview.
+ * VisualPickerModal — visual asset picker with thumbnail grid.
  *
  * Props:
  *   open           — boolean
@@ -63,34 +63,37 @@ export default function VisualPickerModal({ open, onClose, onSelect }) {
         <div className="grid grid-cols-3 gap-3 max-h-[60vh] overflow-y-auto">
           {filtered.map(a => {
             const isImage = a.asset_type === 'still_image'
-            const streamUrl = `/api/production/assets/${a.id}/stream`
+            const thumbUrl = isImage
+              ? `/api/production/assets/${a.id}/stream`
+              : `/api/production/assets/${a.id}/thumbnail`
             return (
-              <div
+              <button
                 key={a.id}
-                className="border border-[#2a2a32] rounded-lg overflow-hidden bg-[#0d0d0f] flex flex-col"
+                type="button"
+                onClick={() => { onSelect(a); onClose() }}
+                className="border border-[#2a2a32] rounded-lg overflow-hidden bg-[#0d0d0f] flex flex-col text-left hover:border-[#7c6af7] transition-colors"
               >
-                <div className="aspect-video relative bg-black flex items-center justify-center">
-                  {isImage ? (
-                    <img src={streamUrl} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <video
-                      src={streamUrl}
-                      preload="metadata"
-                      controls
-                      className="w-full h-full object-contain bg-black"
-                    />
+                <div className="aspect-video relative bg-[#0d0d0f] flex items-center justify-center">
+                  <img
+                    src={thumbUrl}
+                    alt=""
+                    loading="lazy"
+                    className="w-full h-full object-cover"
+                    onError={e => { e.target.style.display = 'none' }}
+                  />
+                  {!isImage && (
+                    <span className="absolute inset-0 flex items-center justify-center text-[#9090a8] text-xl pointer-events-none opacity-60">
+                      ▶
+                    </span>
                   )}
                 </div>
-                <div className="p-2 flex items-center gap-2">
-                  <span className="text-xs text-[#9090a8] flex-1 truncate">
+                <div className="p-2">
+                  <span className="text-xs text-[#9090a8] truncate block">
                     {a.description || `Asset #${a.id}`}
                     <span className="text-[10px] text-[#5a5a70] ml-1">· {a.source}</span>
                   </span>
-                  <Button variant="primary" size="sm" onClick={() => { onSelect(a); onClose() }}>
-                    Pick
-                  </Button>
                 </div>
-              </div>
+              </button>
             )
           })}
         </div>

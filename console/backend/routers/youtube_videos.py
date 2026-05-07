@@ -24,6 +24,7 @@ class YoutubeVideoCreate(BaseModel):
     theme: str | None = None
     music_track_id: int | None = None
     music_track_ids: list[int] | None = None
+    sound_layers: dict | None = None
     sfx_overrides: dict | None = None
     sfx_pool: list[dict] | None = None
     sfx_density_seconds: int | None = None
@@ -46,6 +47,7 @@ class YoutubeVideoUpdate(BaseModel):
     theme: str | None = None
     music_track_id: int | None = None
     music_track_ids: list[int] | None = None
+    sound_layers: dict | None = None
     sfx_overrides: dict | None = None
     sfx_pool: list[dict] | None = None
     sfx_density_seconds: int | None = None

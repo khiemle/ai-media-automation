@@ -62,6 +62,7 @@ def _video_to_dict(
         "music_track_id": v.music_track_id,
         "visual_asset_id": v.visual_asset_id,
         "parent_youtube_video_id": v.parent_youtube_video_id,
+        "sound_layers":  v.sound_layers,
         "sfx_overrides": v.sfx_overrides,
         "target_duration_h": v.target_duration_h,
         "output_quality": v.output_quality,
@@ -229,6 +230,7 @@ class YoutubeVideoService:
             music_track_ids=data.get("music_track_ids") or [],
             visual_asset_id=data.get("visual_asset_id"),
             parent_youtube_video_id=data.get("parent_youtube_video_id"),
+            sound_layers=data.get("sound_layers"),
             sfx_overrides=data.get("sfx_overrides"),
             sfx_pool=data.get("sfx_pool") or [],
             sfx_density_seconds=data.get("sfx_density_seconds"),
@@ -336,8 +338,8 @@ class YoutubeVideoService:
 
         editable_fields = [
             "title", "theme", "music_track_id", "music_track_ids", "visual_asset_id",
-            "sfx_overrides", "sfx_pool", "sfx_density_seconds", "black_from_seconds",
-            "skip_previews", "target_duration_h", "output_quality",
+            "sound_layers", "sfx_overrides", "sfx_pool", "sfx_density_seconds",
+            "black_from_seconds", "skip_previews", "target_duration_h", "output_quality",
             "seo_title", "seo_description", "seo_tags",
             "visual_asset_ids", "visual_clip_durations_s", "visual_loop_mode",
         ]

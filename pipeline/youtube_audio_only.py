@@ -44,7 +44,16 @@ def render_audio_preview(video, output_path: Path, db, start_s: float = 0.0, end
         audio_inputs.append((sound_layers_wav, 1.0, False))
 
     if not audio_inputs:
-        raise RuntimeError("No audio content to compose (no music, no SFX)")
+        logger.warning("Video %s has no music or SFX — generating silent preview", video.id)
+        cmd = [
+            "ffmpeg", "-y",
+            "-f", "lavfi", "-i", f"anullsrc=r=44100:cl=stereo",
+            "-t", str(target_dur),
+            "-ar", "44100", "-ac", "2", "-c:a", "pcm_s16le",
+            "-vn", str(output_path),
+        ]
+        _run_ffmpeg(cmd, max(60, target_dur + 30))
+        return
 
     cmd = ["ffmpeg", "-y"]
     for path, _vol, needs_loop in audio_inputs:
