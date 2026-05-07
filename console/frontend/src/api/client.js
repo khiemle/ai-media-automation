@@ -153,7 +153,10 @@ export const assetsApi = {
   delete: (id) =>
     fetchApi(`/api/production/assets/${id}`, { method: 'DELETE' }),
   streamUrl: (id) => `/api/production/assets/${id}/stream`,
-  thumbnailUrl: (id) => `/api/production/assets/${id}/thumbnail`,
+  thumbnailUrl: (id, { generate = true } = {}) =>
+    generate
+      ? `/api/production/assets/${id}/thumbnail`
+      : `/api/production/assets/${id}/thumbnail?generate=false`,
   animateWithRunway: (id, body) =>
     fetchApi(`/api/production/assets/${id}/animate`, { method: 'POST', body: JSON.stringify(body) }),
   upscaleTo4k: (id) =>
