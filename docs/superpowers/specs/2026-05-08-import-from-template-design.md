@@ -151,12 +151,14 @@ New component in `YouTubeVideosPage.jsx`. Opened by a ghost button "↓ Import T
 
 ### Trigger Button Placement
 
-In `CreationPanel`, at the top of the Music section or in the modal header action area:
+In `CreationPanel`, in the modal header actions row (alongside the existing close button):
 ```jsx
 <Button variant="ghost" size="sm" onClick={() => setShowImportTemplate(true)}>
   ↓ Import Template
 </Button>
 ```
+
+Always visible regardless of form state.
 
 ### Step 1 — Input
 
@@ -211,7 +213,9 @@ Summary panel:
 
 Buttons:
 - **"Apply to Video →"** — visible when at least one item succeeded
-  - Calls `onImported({ music_track_id, sfx_assets, sound_layers })` and closes sub-modal
+  - Calls `onImported({ music_track_id, sound_layers })` and closes sub-modal
+  - `music_track_id` is `null` if music generation failed or no music JSON was provided
+  - `sound_layers` is `{}` if no SFX JSON was provided or all SFX failed
   - Parent `CreationPanel` receives the result and sets:
     - `musicTrackIds` adds the new track id (playlist append)
     - `form.music_track_id` set to new track id (single-track selector)
