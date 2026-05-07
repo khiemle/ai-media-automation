@@ -82,6 +82,19 @@ def stream_asset(
     return FileResponse(str(path), media_type="video/mp4")
 
 
+@router.get("/assets/{asset_id}/thumbnail")
+def get_asset_thumbnail(
+    asset_id: int,
+    generate: bool = True,
+    db: Session = Depends(get_db),
+):
+    result = ProductionService(db).get_thumbnail_path(asset_id, generate=generate)
+    if result is None:
+        raise HTTPException(status_code=404, detail="No thumbnail available")
+    path, media_type = result
+    return FileResponse(str(path), media_type=media_type)
+
+
 @router.put("/assets/{asset_id}")
 def update_asset(
     asset_id: int,

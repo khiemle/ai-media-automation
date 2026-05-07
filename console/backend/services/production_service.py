@@ -229,6 +229,44 @@ class ProductionService:
             raise ValueError(f"Asset {asset_id} has no file path")
         return asset.file_path
 
+    def get_thumbnail_path(self, asset_id: int, generate: bool) -> tuple[str, str] | None:
+        import mimetypes
+        asset = self.db.query(VideoAsset).filter(VideoAsset.id == asset_id).first()
+        if not asset:
+            return None
+
+        # Serve existing thumbnail
+        if asset.thumbnail_path and Path(asset.thumbnail_path).is_file():
+            media_type, _ = mimetypes.guess_type(asset.thumbnail_path)
+            return (asset.thumbnail_path, media_type or "image/jpeg")
+
+        if not generate:
+            return None
+
+        # Lazy generation for videos
+        if asset.asset_type == 'video_clip':
+            if not Path(asset.file_path).is_file():
+                return None
+            thumb_path = generate_video_thumbnail(asset.file_path)
+            if thumb_path is None:
+                return None
+            if asset.thumbnail_path is None:  # race condition guard
+                asset.thumbnail_path = thumb_path
+                self.db.commit()
+            return (thumb_path, "image/jpeg")
+
+        # Still images serve themselves
+        if asset.asset_type == 'still_image':
+            if not Path(asset.file_path).is_file():
+                return None
+            if asset.thumbnail_path is None:
+                asset.thumbnail_path = asset.file_path
+                self.db.commit()
+            media_type, _ = mimetypes.guess_type(asset.file_path)
+            return (asset.file_path, media_type or "image/jpeg")
+
+        return None
+
     # ── Scene editing ─────────────────────────────────────────────────────────
 
     def replace_scene_asset(
