@@ -67,15 +67,19 @@ const DURATION_PRESETS = [
 // ── Import-from-template helpers ───────────────────────────────────────────────
 
 function parseMusicJson(text) {
-  const parsed = JSON.parse(text)
+  let parsed
+  try { parsed = JSON.parse(text) }
+  catch { throw new Error('Invalid JSON — check your pasted text') }
   if (!parsed.composer && !parsed.suno?.style_of_music) {
-    throw new Error('Missing required fields: composer or suno.style_of_music')
+    throw new Error('Missing required field: composer or suno.style_of_music')
   }
   return parsed
 }
 
 function parseSfxJson(text) {
-  const parsed = JSON.parse(text)
+  let parsed
+  try { parsed = JSON.parse(text) }
+  catch { throw new Error('Invalid JSON — check your pasted text') }
   if (!parsed.sfx) throw new Error('Missing required field: sfx')
   return parsed
 }
@@ -121,7 +125,7 @@ function collectSfxItems(sfxJson) {
     items.push({
       key: `mid_${i}`,
       layer: 'midground',
-      title: item.name_en || item.name_vi || item.english_prompt.slice(0, 60),
+      title: item.name_en || item.name_vi || (item.english_prompt || '').slice(0, 60),
       prompt: item.english_prompt,
       loop: false,
       automationOnly: false,
@@ -133,7 +137,7 @@ function collectSfxItems(sfxJson) {
     items.push({
       key: `fg_${i}`,
       layer: 'foreground',
-      title: item.name_en || item.name_vi || item.english_prompt.slice(0, 60),
+      title: item.name_en || item.name_vi || (item.english_prompt || '').slice(0, 60),
       prompt: item.english_prompt,
       loop: false,
       automationOnly: false,
