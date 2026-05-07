@@ -398,10 +398,8 @@ def test_render_landscape_passes_start_s_to_build_sound_layers_wav(tmp_path):
         render_landscape(_make_video(), output, MagicMock(), start_s=310.0, end_s=610.0)
 
     # _build_sound_layers_wav must be called with start_s=310.0
-    _, kwargs = mock_sl.call_args
-    args = mock_sl.call_args[0]
     # signature: (video, db, target_duration_s, start_s, output_dir)
-    assert args[3] == 310.0, f"expected start_s=310.0 forwarded to _build_sound_layers_wav, got {args[3]}"
+    assert mock_sl.call_args[0][3] == 310.0, f"expected start_s=310.0 forwarded to _build_sound_layers_wav, got {mock_sl.call_args[0][3]}"
 
 
 def test_render_landscape_sound_layers_wav_is_not_looped(tmp_path):
@@ -425,6 +423,24 @@ def test_render_landscape_sound_layers_wav_is_not_looped(tmp_path):
     wav_idx = cmd.index(str(sl_wav))
     pre_cmd = cmd[:wav_idx]
     assert "-stream_loop" not in pre_cmd, "-stream_loop must not precede the sound_layers_wav input"
+
+
+def test_render_audio_preview_calls_build_sound_layers_wav_with_start_s(tmp_path):
+    """render_audio_preview must call _build_sound_layers_wav and forward start_s."""
+    output = tmp_path / "preview.wav"
+
+    with patch("pipeline.youtube_ffmpeg._build_music_playlist_wav", return_value=None), \
+         patch("pipeline.youtube_ffmpeg._build_sound_layers_wav", return_value=None) as mock_sl:
+        from pipeline.youtube_audio_only import render_audio_preview
+        video = _make_video()
+        try:
+            render_audio_preview(video, output, MagicMock(), start_s=60.0, end_s=360.0)
+        except RuntimeError:
+            pass  # "No audio content" is expected when both helpers return None
+
+    mock_sl.assert_called_once()
+    # Fourth positional arg is start_s
+    assert mock_sl.call_args[0][3] == 60.0
 
 
 # ── _nvenc_available ───────────────────────────────────────────────────────────

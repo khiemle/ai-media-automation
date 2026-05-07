@@ -11,8 +11,8 @@ logger = logging.getLogger(__name__)
 def render_audio_preview(video, output_path: Path, db, start_s: float = 0.0, end_s: float | None = None) -> None:
     """Render audio-only preview WAV for [start_s, end_s) of the video.
 
-    Same mix as the final render — multi-music playlist + random SFX pool +
-    existing 3-layer SFX overrides. No video encoding.
+    Same mix as the final render — multi-music playlist + unified sound_layers WAV
+    (background loop + scheduled SFX). No video encoding.
     """
     if not shutil.which("ffmpeg"):
         raise RuntimeError("ffmpeg not found in PATH")
