@@ -69,3 +69,58 @@ def test_generate_thumbnail_uses_correct_ffmpeg_args(tmp_path):
     assert "-ss" in call_args
     assert "1" in call_args
     assert str(thumb) in call_args
+
+
+def test_import_image_sets_thumbnail_path_to_file_path(db, tmp_path):
+    from console.backend.services.production_service import ProductionService
+    svc = ProductionService(db)
+    result = svc.import_asset(
+        file_bytes=b"\xff\xd8\xff" + b"\x00" * 20,
+        filename="photo.jpg",
+        source="midjourney",
+        description=None,
+        keywords=None,
+        assets_dir=tmp_path,
+    )
+    assert result["thumbnail_url"] == result["file_path"]
+
+
+def test_import_video_sets_thumbnail_path_when_ffmpeg_succeeds(db, tmp_path):
+    from console.backend.services.production_service import ProductionService
+    svc = ProductionService(db)
+
+    def fake_generate(video_path):
+        thumb = Path(video_path).parent / (Path(video_path).stem + "_thumb.jpg")
+        thumb.write_bytes(b"\xff\xd8\xff")
+        return str(thumb)
+
+    with patch("console.backend.services.production_service.generate_video_thumbnail", side_effect=fake_generate):
+        result = svc.import_asset(
+            file_bytes=b"\x00\x00\x00\x18ftyp" + b"\x00" * 40,
+            filename="loop.mp4",
+            source="manual",
+            description=None,
+            keywords=None,
+            assets_dir=tmp_path,
+        )
+
+    assert result["thumbnail_url"] is not None
+    assert result["thumbnail_url"].endswith("_thumb.jpg")
+
+
+def test_import_video_thumbnail_path_none_when_ffmpeg_fails(db, tmp_path):
+    from console.backend.services.production_service import ProductionService
+    svc = ProductionService(db)
+
+    with patch("console.backend.services.production_service.generate_video_thumbnail", return_value=None):
+        result = svc.import_asset(
+            file_bytes=b"\x00\x00\x00\x18ftyp" + b"\x00" * 40,
+            filename="loop.mp4",
+            source="manual",
+            description=None,
+            keywords=None,
+            assets_dir=tmp_path,
+        )
+
+    assert result["thumbnail_url"] is None
+    assert result["id"] is not None  # upload still succeeded

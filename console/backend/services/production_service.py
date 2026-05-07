@@ -208,6 +208,13 @@ class ProductionService:
         dest = save_dir / f'asset_{row.id}{ext}'
         dest.write_bytes(file_bytes)
         row.file_path = str(dest)
+
+        # Set thumbnail_path based on asset type
+        if asset_type == 'still_image':
+            row.thumbnail_path = str(dest)
+        elif asset_type == 'video_clip':
+            row.thumbnail_path = generate_video_thumbnail(str(dest))
+
         if user_id is not None:
             self._audit(user_id, "import", "video_asset", str(row.id))
         self.db.commit()
