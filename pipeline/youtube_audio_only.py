@@ -19,8 +19,7 @@ def render_audio_preview(video, output_path: Path, db, start_s: float = 0.0, end
 
     from pipeline.youtube_ffmpeg import (
         _build_music_playlist_wav,
-        _build_sfx_pool_wav,
-        resolve_sfx_layers,
+        _build_sound_layers_wav,
         _run_ffmpeg,
     )
 
@@ -34,20 +33,15 @@ def render_audio_preview(video, output_path: Path, db, start_s: float = 0.0, end
     output_dir = output_path.parent
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Pre-render music + SFX (these are exact-duration WAVs)
-    music_wav = _build_music_playlist_wav(video, db, target_dur, output_dir)
-    sfx_wav   = _build_sfx_pool_wav(video, db, target_dur, start_s, output_dir)
-
-    # Existing 3-layer SFX (looped at runtime)
-    sfx_layers = resolve_sfx_layers(video, db)
+    # Pre-render music + sound layers (exact-duration WAVs)
+    music_wav = _build_music_playlist_wav(video, db, target_dur, output_dir, start_s=start_s)
+    sound_layers_wav = _build_sound_layers_wav(video, db, target_dur, start_s, output_dir)
 
     audio_inputs: list[tuple[str, float, bool]] = []  # (path, volume, needs_loop)
     if music_wav:
         audio_inputs.append((music_wav, 1.0, False))
-    if sfx_wav:
-        audio_inputs.append((sfx_wav, 1.0, False))
-    for path, vol in sfx_layers:
-        audio_inputs.append((path, vol, True))
+    if sound_layers_wav:
+        audio_inputs.append((sound_layers_wav, 1.0, False))
 
     if not audio_inputs:
         raise RuntimeError("No audio content to compose (no music, no SFX)")

@@ -596,19 +596,15 @@ def render_landscape(
         visual_path = resolve_visual(video, db)
         is_image = visual_path is not None and Path(visual_path).suffix.lower() in IMAGE_EXTS
 
-    # Pre-render music playlist + SFX pool to temp WAVs (separate ffmpeg passes)
+    # Pre-render music playlist + sound layers to temp WAVs (separate ffmpeg passes)
     music_wav = _build_music_playlist_wav(video, db, target_dur, output_dir, start_s=start_s)
-    sfx_wav = _build_sfx_pool_wav(video, db, target_dur, start_s, output_dir)
-
-    # Existing 3-layer SFX overrides remain additive
-    sfx_layers = resolve_sfx_layers(video, db)
+    sound_layers_wav = _build_sound_layers_wav(video, db, target_dur, start_s, output_dir)
 
     audio_inputs: list[tuple[str, float]] = []
     if music_wav:
-        audio_inputs.append((music_wav, 1.0))  # already volume-scaled internally
-    if sfx_wav:
-        audio_inputs.append((sfx_wav, 1.0))
-    audio_inputs.extend(sfx_layers)
+        audio_inputs.append((music_wav, 1.0))
+    if sound_layers_wav:
+        audio_inputs.append((sound_layers_wav, 1.0))
 
     base_vf = (
         f"scale={w}:{h}:force_original_aspect_ratio=decrease,"
@@ -644,8 +640,8 @@ def render_landscape(
     # Audio inputs
     if audio_inputs:
         for path, _ in audio_inputs:
-            # music_wav and sfx_wav are exact-duration WAVs — don't loop them
-            if path in (music_wav, sfx_wav):
+            # music_wav and sound_layers_wav are exact-duration WAVs — don't loop them
+            if path in (music_wav, sound_layers_wav):
                 cmd += ["-i", path]
             else:
                 if start_s > 0.5:

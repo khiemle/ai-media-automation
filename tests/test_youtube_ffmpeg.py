@@ -383,52 +383,48 @@ def test_build_music_playlist_wav_default_start_s_is_zero(tmp_path):
     assert "asetpts=PTS-STARTPTS" in cmd
 
 
-def test_render_landscape_sfx_layer_uses_input_side_seek(tmp_path):
-    """SFX override layer with start_s=310, file_dur=60 → effective_seek=10 → -ss 10 before -i sfx_path"""
+def test_render_landscape_passes_start_s_to_build_sound_layers_wav(tmp_path):
+    """render_landscape must forward start_s to _build_sound_layers_wav for correct chunk seek."""
     output = tmp_path / "chunk.mp4"
-    sfx_file = tmp_path / "ambient.wav"
-    sfx_file.write_bytes(b"fake")
 
     with patch("shutil.which", return_value="/usr/bin/ffmpeg"), \
          patch("pipeline.youtube_ffmpeg.resolve_visual_playlist", return_value=[]), \
          patch("pipeline.youtube_ffmpeg.resolve_visual", return_value=None), \
          patch("pipeline.youtube_ffmpeg._build_music_playlist_wav", return_value=None), \
-         patch("pipeline.youtube_ffmpeg._build_sfx_pool_wav", return_value=None), \
-         patch("pipeline.youtube_ffmpeg.resolve_sfx_layers", return_value=[(str(sfx_file), 0.5)]), \
-         patch("pipeline.youtube_ffmpeg._probe_duration", return_value=60.0), \
+         patch("pipeline.youtube_ffmpeg._build_sound_layers_wav", return_value=None) as mock_sl, \
+         patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stderr="")
+        from pipeline.youtube_ffmpeg import render_landscape
+        render_landscape(_make_video(), output, MagicMock(), start_s=310.0, end_s=610.0)
+
+    # _build_sound_layers_wav must be called with start_s=310.0
+    _, kwargs = mock_sl.call_args
+    args = mock_sl.call_args[0]
+    # signature: (video, db, target_duration_s, start_s, output_dir)
+    assert args[3] == 310.0, f"expected start_s=310.0 forwarded to _build_sound_layers_wav, got {args[3]}"
+
+
+def test_render_landscape_sound_layers_wav_is_not_looped(tmp_path):
+    """The exact-duration sound_layers_wav must be added without -stream_loop."""
+    output = tmp_path / "chunk.mp4"
+    sl_wav = tmp_path / "sound_layers.wav"
+    sl_wav.write_bytes(b"fake")
+
+    with patch("shutil.which", return_value="/usr/bin/ffmpeg"), \
+         patch("pipeline.youtube_ffmpeg.resolve_visual_playlist", return_value=[]), \
+         patch("pipeline.youtube_ffmpeg.resolve_visual", return_value=None), \
+         patch("pipeline.youtube_ffmpeg._build_music_playlist_wav", return_value=None), \
+         patch("pipeline.youtube_ffmpeg._build_sound_layers_wav", return_value=str(sl_wav)), \
          patch("subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=0, stderr="")
         from pipeline.youtube_ffmpeg import render_landscape
         render_landscape(_make_video(), output, MagicMock(), start_s=310.0, end_s=610.0)
 
     cmd = mock_run.call_args[0][0]
-    assert "-ss" in cmd
-    ss_idx = cmd.index("-ss")
-    i_idx = cmd.index(str(sfx_file))
-    assert ss_idx < i_idx, "-ss must appear before -i sfx_path"
-    assert cmd[ss_idx + 1] == "10", f"expected effective_seek=10, got {cmd[ss_idx + 1]}"
-
-
-def test_render_landscape_sfx_layer_no_ss_when_start_s_is_zero(tmp_path):
-    """SFX override layers with start_s=0 → no -ss in cmd"""
-    output = tmp_path / "chunk.mp4"
-    sfx_file = tmp_path / "ambient.wav"
-    sfx_file.write_bytes(b"fake")
-
-    with patch("shutil.which", return_value="/usr/bin/ffmpeg"), \
-         patch("pipeline.youtube_ffmpeg.resolve_visual_playlist", return_value=[]), \
-         patch("pipeline.youtube_ffmpeg.resolve_visual", return_value=None), \
-         patch("pipeline.youtube_ffmpeg._build_music_playlist_wav", return_value=None), \
-         patch("pipeline.youtube_ffmpeg._build_sfx_pool_wav", return_value=None), \
-         patch("pipeline.youtube_ffmpeg.resolve_sfx_layers", return_value=[(str(sfx_file), 0.5)]), \
-         patch("pipeline.youtube_ffmpeg._probe_duration", return_value=60.0), \
-         patch("subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(returncode=0, stderr="")
-        from pipeline.youtube_ffmpeg import render_landscape
-        render_landscape(_make_video(), output, MagicMock(), start_s=0.0, end_s=300.0)
-
-    cmd = mock_run.call_args[0][0]
-    assert "-ss" not in cmd
+    # -stream_loop must NOT appear before the sound_layers_wav -i flag
+    wav_idx = cmd.index(str(sl_wav))
+    pre_cmd = cmd[:wav_idx]
+    assert "-stream_loop" not in pre_cmd, "-stream_loop must not precede the sound_layers_wav input"
 
 
 # ── _nvenc_available ───────────────────────────────────────────────────────────
@@ -637,3 +633,21 @@ def test_build_sound_layers_wav_sfx_seed_none_uses_zero(tmp_path):
         result = _build_sound_layers_wav(video, _make_db_with_sfx([sfx]), 300, 0.0, tmp_path)
 
     assert result is not None
+
+
+def test_render_landscape_uses_build_sound_layers_wav(tmp_path):
+    """render_landscape must call _build_sound_layers_wav, not _build_sfx_pool_wav."""
+    output = tmp_path / "out.mp4"
+    video = _make_video(sound_layers={"background": {"asset_id": 1, "volume": 0.4}})
+
+    with patch("shutil.which", return_value="/usr/bin/ffmpeg"), \
+         patch("subprocess.run") as mock_run, \
+         patch("pipeline.youtube_ffmpeg._build_music_playlist_wav", return_value=None), \
+         patch("pipeline.youtube_ffmpeg._build_sound_layers_wav", return_value=None) as mock_sl, \
+         patch("pipeline.youtube_ffmpeg._build_sfx_pool_wav") as mock_old:
+        mock_run.return_value = MagicMock(returncode=0, stderr="")
+        from pipeline.youtube_ffmpeg import render_landscape
+        render_landscape(video, output, MagicMock())
+
+    mock_sl.assert_called_once()
+    mock_old.assert_not_called()
