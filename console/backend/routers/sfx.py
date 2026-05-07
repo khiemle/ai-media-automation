@@ -2,7 +2,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from config.api_config import get_config
@@ -25,7 +25,7 @@ MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50 MB
 class GenerateBody(BaseModel):
     text: str
     loop: bool = False
-    duration_seconds: float | None = None
+    duration_seconds: float | None = Field(default=None, ge=0.5, le=22.0)
     title: str = ""
 
 

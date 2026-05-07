@@ -84,3 +84,18 @@ def test_generate_sfx_elevenlabs_error_returns_502(db, tmp_path):
 
     assert resp.status_code == 502
     assert "quota exceeded" in resp.json()["detail"]
+
+
+def test_generate_sfx_loop_false_persisted(db, tmp_path):
+    mock_instance = MagicMock()
+    mock_instance.text_to_sound_effects.convert.return_value = iter([_FAKE_AUDIO])
+    mock_class = MagicMock(return_value=mock_instance)
+
+    with patch("console.backend.routers.sfx.get_config", return_value=_FAKE_CFG), \
+         patch("console.backend.routers.sfx.ElevenLabs", mock_class), \
+         patch("console.backend.services.sfx_service.SFX_DIR", tmp_path):
+        client = _make_client(db)
+        resp = client.post("/api/sfx/generate", json={"text": "gentle rain"})
+
+    assert resp.status_code == 201
+    assert resp.json()["is_loopable"] is False
