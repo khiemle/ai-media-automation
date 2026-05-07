@@ -473,7 +473,7 @@ def _build_sound_layers_wav(
         for ts, sfx_id in events:
             sfx = sfx_by_id.get(sfx_id)
             if sfx and sfx.file_path and Path(sfx.file_path).is_file():
-                local_ts_ms = int((ts - start_s) * 1000)
+                local_ts_ms = max(0, int((ts - start_s) * 1000))
                 scheduled.append((sfx.file_path, volume, local_ts_ms))
 
     if not bg_inputs and not scheduled:

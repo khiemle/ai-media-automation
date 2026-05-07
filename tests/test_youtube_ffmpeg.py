@@ -525,6 +525,7 @@ def test_build_sound_layers_wav_background_uses_stream_loop(tmp_path):
     cmd = " ".join(mock_ff.call_args[0][0])
     assert "-stream_loop" in cmd
     assert str(bg_file) in cmd
+    assert "amix" not in cmd  # single input: amix must not appear
 
 
 def test_build_sound_layers_wav_skips_non_loopable_background(tmp_path):
@@ -577,6 +578,7 @@ def test_build_sound_layers_wav_chunk_seeks_background(tmp_path):
     assert result is not None
     cmd = " ".join(mock_ff.call_args[0][0])
     assert "-ss" in cmd
+    assert "30" in cmd  # start_s=90, probe=60 → seek = 90 % 60 = 30
 
 
 def test_build_sound_layers_wav_all_three_scheduled_layers(tmp_path):
@@ -609,10 +611,29 @@ def test_build_sound_layers_wav_output_filename(tmp_path):
         "background": {"asset_id": 5, "volume": 0.4}
     })
 
-    with patch("pipeline.youtube_ffmpeg._run_ffmpeg"), \
+    with patch("pipeline.youtube_ffmpeg._run_ffmpeg") as mock_ff, \
          patch("pipeline.youtube_ffmpeg._probe_duration", return_value=30.0):
         from pipeline.youtube_ffmpeg import _build_sound_layers_wav
         result = _build_sound_layers_wav(video, _make_db_with_sfx([sfx]), 300, 0.0, tmp_path)
 
     assert result is not None
     assert result.endswith("sound_layers.wav")
+    cmd = " ".join(mock_ff.call_args[0][0])
+    assert "amix" not in cmd  # background-only is single input; amix must not appear
+
+
+def test_build_sound_layers_wav_sfx_seed_none_uses_zero(tmp_path):
+    """sfx_seed=None must not crash — defaults to 0."""
+    sfx_file = tmp_path / "mid.wav"
+    sfx_file.write_bytes(b"")
+    sfx = _make_sfx(1, str(sfx_file))
+
+    video = _make_video(sfx_seed=None, sound_layers={
+        "midground": {"pool": [1], "volume": 0.5, "interval_min_s": 10, "interval_max_s": 25}
+    })
+
+    with patch("pipeline.youtube_ffmpeg._run_ffmpeg"):
+        from pipeline.youtube_ffmpeg import _build_sound_layers_wav
+        result = _build_sound_layers_wav(video, _make_db_with_sfx([sfx]), 300, 0.0, tmp_path)
+
+    assert result is not None
