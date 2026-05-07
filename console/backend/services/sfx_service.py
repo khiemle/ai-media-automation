@@ -15,6 +15,7 @@ def _sfx_to_dict(s) -> dict:
         "sound_type":  s.sound_type,
         "duration_s":  s.duration_s,
         "usage_count": s.usage_count,
+        "is_loopable": s.is_loopable,
         "created_at":  s.created_at.isoformat() if s.created_at else None,
     }
 
@@ -49,17 +50,24 @@ class SfxService:
     def import_sfx(
         self,
         title: str,
-        sound_type: str,
+        sound_type: str | None,
         source: str,
         file_bytes: bytes,
         filename: str,
+        is_loopable: bool = False,
         sfx_dir: Path | None = None,
     ) -> dict:
         SfxAsset = self._model()
         sfx_dir = sfx_dir or SFX_DIR
         sfx_dir.mkdir(parents=True, exist_ok=True)
 
-        row = SfxAsset(title=title, sound_type=sound_type, source=source, file_path="")
+        row = SfxAsset(
+            title=title,
+            sound_type=sound_type,
+            source=source,
+            file_path="",
+            is_loopable=is_loopable,
+        )
         self.db.add(row)
         self.db.flush()
 
