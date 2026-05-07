@@ -37,3 +37,39 @@ def schedule_sfx(
         sfx_id = rng.choice(pool_ids)
         schedule.append((round(t, 3), sfx_id))
     return schedule
+
+
+def schedule_sfx_layer(
+    pool_ids: list[int],
+    interval_min_s: float,
+    interval_max_s: float,
+    seed: int,
+    start_s: float,
+    end_s: float,
+) -> list[tuple[float, int]]:
+    """
+    Build a deterministic list of (timestamp, sfx_id) events for one layer.
+
+    Gap between events = rng.uniform(interval_min_s, interval_max_s).
+    Seed-burn: advance RNG by int(start_s) steps before drawing so any
+    [start_s, end_s) chunk produces non-repeating events relative to
+    other chunks of the same video.
+    Returns empty list when pool_ids is empty or interval_min_s <= 0.
+    """
+    if not pool_ids or interval_min_s <= 0:
+        return []
+
+    rng = random.Random(seed)
+    for _ in range(int(start_s)):
+        rng.random()
+
+    schedule: list[tuple[float, int]] = []
+    t = start_s
+    while t < end_s:
+        gap = rng.uniform(interval_min_s, interval_max_s)
+        t += gap
+        if t >= end_s:
+            break
+        sfx_id = rng.choice(pool_ids)
+        schedule.append((round(t, 3), sfx_id))
+    return schedule
