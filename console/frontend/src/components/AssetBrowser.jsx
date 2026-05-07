@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Modal, Button, Input, Select, Spinner, EmptyState } from './index.jsx'
-import { fetchApi } from '../api/client.js'
+import { fetchApi, assetsApi } from '../api/client.js'
 
 const SOURCES  = ['All Sources', 'pexels', 'veo', 'manual', 'stock']
 const NICHES   = ['All Niches', 'finance', 'health', 'tech', 'lifestyle', 'education', 'entertainment', 'news']
@@ -87,17 +87,12 @@ export default function AssetBrowser({ open, onClose, onSelect, title = 'Select 
               >
                 {/* Thumbnail */}
                 <div className="bg-[#0d0d0f] aspect-[9/16] flex items-center justify-center">
-                  {asset.thumbnail_url ? (
-                    <img
-                      src={asset.thumbnail_url}
-                      alt={asset.keywords?.join(', ')}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="text-[#5a5a70] text-xs font-mono p-2 text-center">
-                      {asset.source || 'asset'}
-                    </div>
-                  )}
+                  <img
+                    src={assetsApi.thumbnailUrl(asset.id, { generate: false })}
+                    alt={asset.keywords?.join(', ')}
+                    className="w-full h-full object-cover"
+                    onError={e => { e.currentTarget.style.display = 'none' }}
+                  />
                 </div>
 
                 {/* Metadata overlay */}
