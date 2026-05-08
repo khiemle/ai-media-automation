@@ -352,6 +352,13 @@ function ImportFromTemplateModal({ onClose, onImported }) {
 
   const canNext1 = musicJson !== null || sfxJson !== null
 
+  const handleApplyDataOnly = () => {
+    const seo     = sfxJson ? extractSeoFromSfxJson(sfxJson) : null
+    const prompts = extractPromptsFromJsons(musicJson, sfxJson)
+    onImported({ music_track_id: null, sound_layers: {}, seo, prompts })
+    onClose()
+  }
+
   const handleNext1 = () => {
     if (!canNext1) return
     if (musicJson) {
@@ -779,6 +786,9 @@ function ImportFromTemplateModal({ onClose, onImported }) {
     if (step === 1) return (
       <>
         <Button variant="ghost" onClick={onClose}>Cancel</Button>
+        <Button variant="ghost" disabled={!canNext1} onClick={handleApplyDataOnly}>
+          Apply data only →
+        </Button>
         <Button variant="primary" disabled={!canNext1} onClick={handleNext1}>
           {musicJson ? 'Next: Preview Plan →' : 'Next: Generate →'}
         </Button>
