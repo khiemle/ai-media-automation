@@ -1,0 +1,139 @@
+{
+  "meta": {
+    "video_title_slug": "bamboo-engawa-rain",
+    "channel": "soundscapes",
+    "use_case": "study",
+    "video_length_hours": 8,
+    "generated_date": "2026-05-06",
+    "paired_suno_file": "suno-prompt_20260506-0158_study-focus_d-dorian_koto.json",
+    "paired_visual_file": "output/visual_prompts/2026-05-06_soundscapes_bamboo-engawa-rain.json"
+  },
+
+  "titles": {
+    "recommended": "Bamboo Forest Rain · Japanese Koto Music for Studying · 8 Hours",
+    "alternatives": [
+      "Japanese Study Music · Bamboo Rain & Koto Ambience · 8 Hours",
+      "Rainy Bamboo Forest · Koto & Nature Sounds for Focus · 8 Hours",
+      "Study with Bamboo Rain · Japanese Koto & Wind Ambience · 8 Hours",
+      "Bamboo Forest Rain Sounds · Koto Study Music · Japanese Ambience · 8 Hours"
+    ],
+    "title_notes": {
+      "primary_keywords_included": ["bamboo forest", "rain", "Japanese", "koto", "studying / study", "8 hours"],
+      "character_count_recommended": 58,
+      "separator": "·",
+      "placement_rule": "Primary keyword cluster first, duration last"
+    }
+  },
+
+  "description": {
+    "full": "Bamboo forest rain ambience with Japanese koto music — designed for studying, deep work, and focus sessions lasting 2 to 8 hours.\n\nYou are sitting on a traditional Japanese engawa porch, looking out into a dense bamboo grove on a soft, overcast afternoon. Light rain falls steadily through the bamboo canopy. Occasional drips from the eave, gentle bamboo creaks in the wind, and a distant temple bell mark the passing of time. The koto plays sparse, unhurried phrases in D Dorian — never repeating, never demanding attention.\n\nThis track is loop-safe and designed for seamless all-day playback.\n\n─────────────────────────────────────\n🎵 MUSIC\n─────────────────────────────────────\nInstrument: Koto (primary) · Warm analog pad (harmonic bed)\nMode: D Dorian · 70 BPM\nDynamic: No crescendo · No climax · No fade-in or fade-out\nMix: Warm hall reverb · Lush and atmospheric\n\n─────────────────────────────────────\n🌿 SCENE\n─────────────────────────────────────\nLocation: Traditional Japanese engawa (wooden porch)\nWeather: Soft overcast afternoon rain\nAtmosphere: Cool · Quiet · Misty · Wabi-sabi\nSounds: Rain on bamboo leaves · Eave drips · Bamboo creak · Bamboo knocks · Distant crow · Temple bell (rare)\n\n─────────────────────────────────────\n⏱ CHAPTERS\n─────────────────────────────────────\n00:00:00 – Rain begins · Koto enters\n01:00:00 – Hour 1\n02:00:00 – Hour 2\n03:00:00 – Hour 3\n04:00:00 – Hour 4\n05:00:00 – Hour 5\n06:00:00 – Hour 6\n07:00:00 – Hour 7\n08:00:00 – Hour 8 · Final phrase\n\n─────────────────────────────────────\n💡 BEST FOR\n─────────────────────────────────────\n• Studying and exam prep\n• Deep work and flow state\n• Reading and writing\n• Coding and creative work\n• Meditation and breathwork\n• Background ambience for home or café\n\n─────────────────────────────────────\n🎧 LISTENING TIPS\n─────────────────────────────────────\nBest experienced at low to medium volume with headphones or speakers. The koto is mixed as a gentle anchor — let it recede into the background while you work. The rain layer is always present; the random sounds (crow, bamboo, bell) appear every few minutes to keep the scene alive without drawing attention.\n\n─────────────────────────────────────\n📌 RELATED VIDEOS\n─────────────────────────────────────\n[Add links to other study ambience videos in your channel here]\n\n#StudyMusic #BambooForest #JapaneseMusic #KotoMusic #RainSounds #AmbientMusic #FocusMusic #StudyWithMe #DeepWork #JapaneseAmbience #RelaxingMusic #NatureSounds #StudyMusicJapanese #BambooRain #Wabisabi",
+
+    "first_3_lines": "Bamboo forest rain ambience with Japanese koto music — designed for studying, deep work, and focus sessions lasting 2 to 8 hours.\n\nYou are sitting on a traditional Japanese engawa porch, looking out into a dense bamboo grove on a soft, overcast afternoon.",
+    "description_notes": "First 3 lines appear before 'Show more' — they contain the primary keyword cluster and a scene-setting hook. Hashtags at bottom only (not mixed into body)."
+  },
+
+  "tags": {
+    "all": [
+      "study music",
+      "bamboo forest",
+      "bamboo rain",
+      "japanese study music",
+      "koto music",
+      "rain sounds for studying",
+      "ambient music for studying",
+      "focus music",
+      "deep work music",
+      "japanese ambience",
+      "nature sounds study",
+      "rain ambience",
+      "study music 8 hours",
+      "bamboo forest sounds",
+      "japanese koto",
+      "study with me",
+      "concentration music",
+      "relaxing music",
+      "japanese rain sounds",
+      "engawa ambience",
+      "wabi sabi",
+      "d dorian music",
+      "koto ambient",
+      "rain on bamboo",
+      "asian study music",
+      "calm study music",
+      "long study music",
+      "ambient rain music",
+      "zen music",
+      "japanese nature sounds",
+      "bamboo sounds",
+      "study ambience",
+      "lofi japanese",
+      "reading music",
+      "work from home music",
+      "productivity music",
+      "meditation music",
+      "background music study",
+      "8 hour study music",
+      "japanese forest ambience"
+    ],
+    "tag_notes": {
+      "total_count": 40,
+      "primary_cluster": ["study music", "bamboo forest", "koto music", "japanese study music", "rain sounds for studying"],
+      "long_tail_examples": ["study music 8 hours", "rain on bamboo", "japanese forest ambience", "bamboo rain"],
+      "placement_rule": "Most important tags first — YouTube weights earlier tags more heavily"
+    }
+  },
+
+  "thumbnail": {
+    "text_options": [
+      {
+        "main_line": "BAMBOO RAIN",
+        "sub_line": "8 HOURS · STUDY MUSIC",
+        "style_note": "White text on dark green/grey scene. Large bold main line, smaller sub line below."
+      },
+      {
+        "main_line": "JAPANESE STUDY",
+        "sub_line": "BAMBOO FOREST · 8 HRS",
+        "style_note": "Minimal. Split across two lines. No extra labels."
+      },
+      {
+        "main_line": "FOCUS",
+        "sub_line": "BAMBOO + KOTO · 8 HOURS",
+        "style_note": "Single power word. Contrast style — strong visual impact in feed."
+      }
+    ],
+    "thumbnail_notes": "The Midjourney scene (engawa porch + bamboo + rain) is naturally cinematic and dark — white or very light text will read well. Avoid yellow or orange tones that conflict with the green-grey colour palette. No clock/timer icon needed — the hour count in the sub_line is sufficient."
+  },
+
+  "pinned_comment": {
+    "text": "🎋 You're sitting on a Japanese engawa porch as rain falls quietly through a bamboo grove.\n\nThe koto plays a few phrases, then rests. The rain never stops.\n\n⏱ 8 hours · Loop-safe · No ads mid-video\n🎧 Works best at low volume with headphones\n\nTimestamps: 00:00 Hr 1 · 01:00 Hr 2 · 02:00 Hr 3 · 03:00 Hr 4 · 04:00 Hr 5 · 05:00 Hr 6 · 06:00 Hr 7 · 07:00 Hr 8",
+    "note": "Pin this as the first comment immediately after upload. Keeps the scene alive in the comments section and provides quick timestamp navigation on mobile."
+  },
+
+  "end_screen": {
+    "elements": [
+      { "type": "subscribe_button", "position": "bottom_left" },
+      { "type": "video", "label": "Watch next", "recommendation": "another study ambience video from your channel", "position": "right" },
+      { "type": "playlist", "label": "Study Music Playlist", "position": "left" }
+    ]
+  },
+
+  "cards": [
+    {
+      "timestamp": "00:01:00",
+      "type": "playlist",
+      "label": "More Study Music →"
+    }
+  ],
+
+  "chapter_markers": [
+    { "timestamp": "00:00:00", "label": "Rain begins · Koto enters" },
+    { "timestamp": "01:00:00", "label": "Hour 1" },
+    { "timestamp": "02:00:00", "label": "Hour 2" },
+    { "timestamp": "03:00:00", "label": "Hour 3" },
+    { "timestamp": "04:00:00", "label": "Hour 4" },
+    { "timestamp": "05:00:00", "label": "Hour 5" },
+    { "timestamp": "06:00:00", "label": "Hour 6" },
+    { "timestamp": "07:00:00", "label": "Hour 7" },
+    { "timestamp": "08:00:00", "label": "Hour 8 · Final phrase" }
+  ]
+}

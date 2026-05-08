@@ -162,7 +162,7 @@ For Soundscapes "city" themes (Tokyo, Paris), distant blurred silhouettes of ped
 Read `references/runway_gen4.md` and `references/cinematography.md` for the full options. Confirm:
 
 - **Camera motion** — strongly default to **STATIC** for ASMR. Soundscapes can have a 5-second imperceptible push-in OR slow parallax drift, but never both.
-- **Ambient motion elements** — what specifically should move? (rain droplets on glass, smoke from a chimney, leaves swaying, candle flicker, water ripples, distant fog drifting). List 2-4.
+- **Ambient motion elements** — what specifically should move? (rain droplets on glass, smoke from a chimney, leaves trembling in place, candle flicker, water ripples, distant fog shifting). List 2-4.
 - **Motion intensity** — 1-2/10 for ASMR sleep, 3-4/10 for Soundscapes focus.
 - **Loop strategy** — pick one:
   - **Static-cinemagraph** — most of frame frozen, only ambient elements animate. Loops perfectly. Default.
@@ -301,22 +301,159 @@ Anti-patterns to avoid (see `references/midjourney_syntax.md` §Anti-patterns):
 
 ### 3. Compose the Runway Gen-4 prompt
 
-Structure: `[explicit motion description per element] + [explicit camera-motion clause OR "static camera"] + [pacing words] + [loop hint]`
+Structure: `[camera lock directive — ALWAYS FIRST] + [motion per element with "in place" anchor] + ["Nothing else moves."] + [pacing words] + [loop hint]`
 
-Runway responds to **specific verbs and limits**. Examples that work:
-- "Rain droplets slowly run down the glass at varying speeds. Steam rises gently from the teacup, occasionally drifting left. Candle flame flickers softly. Static camera. Hypnotic, slow, sleep-friendly loop."
-- "Foreground leaves sway very slightly in a gentle breeze. Distant water ripples. Mist drifts subtly across mid-ground. Camera holds completely still. Peaceful, meditative, designed to loop seamlessly."
+#### ⚠️ Static Camera Rule — Non-Negotiable
 
-Always include:
-- One explicit "static camera" or "imperceptible 5-second push-in" clause
-- The list of moving elements with verbs and rate-of-motion adjectives
-- A loop-friendly closing phrase (e.g., "designed to loop", "hypnotic loop")
+**The camera directive MUST be the very first sentence of every Runway prompt.** Runway Gen-4 reads tokens left-to-right and weights earlier tokens more heavily. A camera clause placed at the end is frequently ignored when earlier motion language has already primed the model toward camera movement.
+
+**Always open with:**
+```
+Locked-off tripod shot, zero camera movement throughout.
+```
+Never use `Static camera` alone — it is too weak and frequently overridden by motion verbs earlier in the prompt. `Locked-off tripod` triggers Runway's cinematography vocabulary and is significantly more reliable.
+
+#### Banned verbs — these trigger camera movement in Runway
+
+Never use these words in a static-camera Runway prompt:
+
+| Banned word / phrase | Why it breaks static camera | Safe replacement |
+|---|---|---|
+| `sway` | Runway reads as camera sway | `quiver in place`, `tremble in place` |
+| `drift` | Runway reads as camera drift or pan | `rise vertically in place`, `float upward in place` |
+| `dissolve into [direction]` | Implies camera move toward subject | `fade and dissolve in place` |
+| `shimmer` (without anchor) | Can mean camera shimmer / shake | `flicker`, `shimmer in place` |
+| `flow toward` | Camera push forward | `undulate in place` |
+| `drifting upward` | Camera tilt up | `rising vertically in place` |
+| `moving independently` (no anchor) | Untethered motion → camera wander | `moving independently in place` |
+| `shift` | Runway reads as camera pan or drift | `hover in place`, `remain suspended in place` |
+| `runs down` / `runs up` / `slides down` | Triggers camera tilt down or up | `trickles vertically in place along` |
+| `across [space]` | "Across the scene/canopy/frame" triggers lateral pan | `throughout [location]` + add `, not moving laterally` |
+| `reaching toward` / `before reaching` | Implies directed camera approach or tilt | Remove directional clause; use `fading in place` |
+| `catching [light]` (without anchor) | Can trigger camera track toward light source | `lit by`, `illuminated by` |
+| `spread through` / `spreading through` | Camera follow | `suspended throughout [location] in place` |
+| `through the air` / `through the scene` | Directional camera tracking | `within the frame`, `throughout the visible space` |
+
+#### ⚠️ Directional prepositions — frequently misread as camera instructions
+
+The words **across, toward, into, through, beyond, over** are high-risk when paired with any moving element. Runway frequently interprets them as camera movement directives, even when `in place` appears later in the sentence.
+
+**Rule:** When describing where an element moves or exists, always use **static spatial references** rather than directional ones.
+
+| Problematic pattern | Why it breaks | Safe replacement |
+|---|---|---|
+| `rain falls across the scene` | "across" → lateral pan | `rain falls vertically in place throughout the frame` |
+| `mist drifts through the forest` | "through" → camera tracking forward | `mist hovers in place throughout the lower forest` |
+| `droplets catching the light as they descend` | "catching" + "descend" implies camera follow | `droplets visible in place, lit by the diffuse light above` |
+| `mist dissipating before reaching the canopy` | "reaching" → upward tilt | `mist dissipating in place at forest floor level` |
+| `water runs down the pillar` | "runs down" → tilt down | `water trickles vertically in place along the pillar surface` |
+| `light filtering through the leaves` | "through" + motion = camera push forward | `light filtered in place between the leaves` |
+
+#### Required: "in place" anchor on every moving element
+
+Every element described as moving **must** have `in place` immediately after the motion verb. This tells Runway the motion is happening within a fixed spatial position, not as camera-relative movement.
+
+Additionally, **always specify the spatial axis** (vertically / horizontally) and **the spatial bounds** (at forest floor level / within the lower third / along the pillar surface). This double-locks the motion against camera interpretation.
+
+✅ **Correct:** `Mist rises vertically in place from the forest floor, dissolving in place at mid-height.`
+❌ **Wrong:** `Mist rises slowly from the forest floor.`
+
+✅ **Correct:** `Fern fronds quiver gently in place, each tip trembling within its fixed position.`
+❌ **Wrong:** `Ferns sway in a gentle breeze.`
+
+✅ **Correct:** `Rain falls vertically in place throughout the frame, each droplet descending within its fixed column.`
+❌ **Wrong:** `Rain falls continuously across the jungle canopy.`
+
+#### Required: explicit closure sentence
+
+After listing all moving elements, always add:
+```
+Nothing else moves.
+```
+This suppresses Runway's tendency to invent additional motion (including camera motion) to fill perceived stillness.
+
+#### Self-review checklist — scan every Runway prompt before finalising
+
+Before outputting a Runway prompt, scan for each of these. If any item fails, rewrite that sentence.
+
+- [ ] Does the prompt open with `Locked-off tripod shot, zero camera movement throughout.`?
+- [ ] Does every moving element have `in place` immediately after its motion verb?
+- [ ] Does every moving element have a spatial axis (vertically / horizontally) AND spatial bounds (at forest floor level / within the frame)?
+- [ ] Is the word `across` absent, or replaced with `throughout [location]`?
+- [ ] Is the word `shift` absent?
+- [ ] Are `runs down`, `runs up`, `slides down`, `slides up` absent?
+- [ ] Are `reaching toward`, `before reaching`, `toward the` absent from motion descriptions?
+- [ ] Are `through the [space]` patterns absent?
+- [ ] Does the prompt end with `Nothing else moves.`?
+
+#### 📋 Real-world failure log — prompts that caused camera movement despite static directive
+
+These are real prompts generated by this skill that Runway still animated with camera movement. Each entry documents the exact violation and the corrected replacement. Add new entries here whenever a generated prompt fails in practice.
+
+---
+
+**Failure #1 — Amazon Rainforest Cabin (2026-05-07)**
+Scene: Rustic wooden cabin, looking out at Amazon rainforest, morning, light rain, Study/Focus.
+
+Prompt that failed:
+```
+Locked-off tripod shot, zero camera movement throughout. Rain falls continuously in place across the jungle canopy and open air beyond the cabin, individual droplets catching the diffuse light as they descend. Wisps of low ground mist shift and rise vertically in place at forest floor level, dissipating slowly before reaching the mid-canopy. The nearest large tropical leaves tremble gently in place as rain impacts their surface, each leaf tip quivering independently. A thin trickle of rain water runs down the right wooden pillar surface in place. Nothing else moves. Meditative, unhurried, study-focus loop.
+```
+
+Violations found:
+| Sentence | Violation | Why it triggered |
+|---|---|---|
+| `rain falls ... across the jungle canopy` | `across` | Lateral pan — "across" is a directional preposition |
+| `wisps of mist shift and rise` | `shift` | Camera drift — not on banned list at time of writing |
+| `dissipating before reaching the mid-canopy` | `reaching` | Upward camera tilt — "reaching toward destination" |
+| `runs down the right wooden pillar` | `runs down` | Downward camera tilt — not on banned list at time |
+| `individual droplets catching the diffuse light` | `catching` (no anchor) | Camera track toward light source |
+
+Corrected prompt:
+```
+Locked-off tripod shot, zero camera movement throughout. Rain falls vertically in place throughout the visible frame, each droplet lit by the diffuse overcast light above. Low ground mist rises vertically in place at forest floor level, dissolving in place before mid-height. Tropical leaves tremble gently in place as rain impacts their surface, each leaf tip quivering within its fixed position. Nothing else moves. Meditative, unhurried, seamless loop.
+```
+
+Lesson: Rain + mist scenes are the highest-risk for multi-violation failures because they combine directional prepositions ("across", "through") with motion verbs ("shift", "drift") and destination clauses ("before reaching"). Apply the self-review checklist line-by-line for any prompt containing rain or mist.
+
+#### Proven prompt template
+
+```
+Locked-off tripod shot, zero camera movement throughout. [Element 1] [safe-verb] vertically in place [spatial-bounds], [what it does within that position]. [Element 2] [safe-verb] gently in place [spatial-bounds], [character]. Nothing else moves. [Mood], [pacing], seamless loop.
+```
+
+**✅ Examples that work:**
+```
+Locked-off tripod shot, zero camera movement throughout. Rain droplets trickle vertically in place along the glass surface at varying speeds, each droplet within its own column. Steam rises vertically in place from the teacup, dissipating in place before leaving the upper frame. Candle flame flickers softly in place. Nothing else moves. Hypnotic, slow, sleep-friendly loop.
+```
+```
+Locked-off tripod shot, zero camera movement throughout. Wisps of warm mist rise vertically in place from the forest floor, dissolving in place at mid-height. Fern fronds quiver very gently in place, each leaf tip trembling within its fixed position. Nothing else moves. Meditative, seamless loop.
+```
+```
+Locked-off tripod shot, zero camera movement throughout. Rain falls vertically in place throughout the visible frame, each droplet lit by the diffuse overcast light above. Low ground mist rises vertically in place at forest floor level, dissolving in place before mid-height. Tropical leaves tremble gently in place as rain impacts their surface, each tip quivering within its fixed position. Nothing else moves. Meditative, unhurried, seamless loop.
+```
+
+**❌ Examples that break static camera — do not use:**
+```
+Foreground leaves sway in a gentle breeze. Mist drifts subtly across mid-ground. Camera holds completely still.
+```
+→ `sway` and `drifts` trigger camera motion; `across` triggers lateral pan; camera directive arrives too late.
+
+```
+Mist dissolving gently into the canopy light. Static camera.
+```
+→ `dissolving into` implies upward camera tilt; `Static camera` too late to override.
+
+```
+Rain falls continuously in place across the jungle canopy. Wisps of mist shift and rise. Dissipating before reaching the mid-canopy.
+```
+→ `across` triggers lateral pan; `shift` triggers drift; `reaching` triggers upward tilt. Three violations in three sentences.
 
 Then include the Runway settings as a separate block:
 ```
 Motion intensity: [1-2 for ASMR / 3-4 for Soundscapes]
 Duration: 5s (will be looped in editor)
-Camera: Static / Imperceptible push-in / Slow drift
+Camera: Locked-off / Imperceptible push-in (if not static)
 Seed: lock if user wants consistency across batch
 ```
 
