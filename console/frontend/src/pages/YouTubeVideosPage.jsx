@@ -206,8 +206,8 @@ async function pollMusicTask(taskId, maxMs = 300000) {
   const start = Date.now()
   while (Date.now() - start < maxMs) {
     const result = await musicApi.pollTask(taskId)
-    if (result.generation_status === 'ready') return result
-    if (result.generation_status === 'failed') throw new Error(result.error || 'Music generation failed')
+    if (result.state === 'SUCCESS') return result
+    if (result.state === 'FAILURE') throw new Error(result.info?.error || 'Music generation failed')
     await new Promise(res => setTimeout(res, 3000))
   }
   throw new Error('Music generation timed out after 5 minutes')
