@@ -632,27 +632,75 @@ function ImportFromTemplateModal({ onClose, onImported }) {
   )
 
   // ── Step 3 render ──────────────────────────────────────────────────────────
-  const renderStep3 = () => (
-    <div className="flex flex-col gap-2">
-      <p className="text-xs text-[#9090a8] mb-1">Generating assets — please wait…</p>
-      {genItems.map(item => (
-        <div key={item.key} className="flex flex-col py-1.5 border-b border-[#2a2a32]">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-[#e8e8f0] truncate flex-1 mr-2">
-              {item.type === 'music' ? '🎵' : '🔊'} {item.title}
-            </span>
-            {statusBadge(item.status, item.error)}
-          </div>
-          {item.status === 'generating' && item.type === 'music' && (
-            <div className="w-32 h-1.5 bg-[#2a2a32] rounded-full overflow-hidden mt-1">
-              <div className="h-full bg-[#7c6af7] rounded-full animate-pulse" style={{ width: '60%' }} />
-            </div>
+  const renderStep3 = () => {
+    const pendingCount   = genItems.filter(it => it.status === 'pending').length
+    const anyGenerating  = genItems.some(it => it.status === 'generating')
+
+    return (
+      <div className="flex flex-col gap-2">
+        {/* Header row */}
+        <div className="flex items-center justify-between pb-2 border-b border-[#2a2a32]">
+          <span className="text-xs text-[#9090a8]">
+            {anyGenerating ? 'Generating…' : pendingCount > 0 ? `${pendingCount} pending` : 'All done'}
+          </span>
+          {pendingCount > 0 && !anyGenerating && (
+            <Button variant="primary" size="sm" onClick={handleStartAll}>
+              ▶ Start All
+            </Button>
           )}
         </div>
-      ))}
-      {genItems.length === 0 && <span className="text-xs text-[#5a5a70]">Preparing…</span>}
-    </div>
-  )
+
+        {/* Item list */}
+        {genItems.map(item => {
+          const isSkipped    = item.status === 'skipped'
+          const isGenerating = item.status === 'generating'
+          const isDone       = item.status === 'done'
+          const canRemove    = item.status === 'pending' || item.status === 'failed'
+
+          return (
+            <div key={item.key} className="flex flex-col py-1.5 border-b border-[#2a2a32] last:border-0">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-[#e8e8f0] truncate flex-1">
+                  {item.type === 'music' ? '🎵' : '🔊'} {item.title}
+                </span>
+                {statusBadge(item.status, item.error)}
+                {!isSkipped && !isDone && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={isGenerating}
+                    title="Generate"
+                    onClick={() => handleGenerateItem(item)}
+                  >
+                    ▶
+                  </Button>
+                )}
+                {canRemove && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    title="Remove"
+                    onClick={() => handleRemoveItem(item.key)}
+                  >
+                    ✕
+                  </Button>
+                )}
+              </div>
+              {isGenerating && item.type === 'music' && (
+                <div className="w-32 h-1.5 bg-[#2a2a32] rounded-full overflow-hidden mt-1">
+                  <div className="h-full bg-[#7c6af7] rounded-full animate-pulse" style={{ width: '60%' }} />
+                </div>
+              )}
+            </div>
+          )
+        })}
+
+        {genItems.length === 0 && (
+          <span className="text-xs text-[#5a5a70]">No items — go back and load a JSON file.</span>
+        )}
+      </div>
+    )
+  }
 
   // ── Step 4 render ──────────────────────────────────────────────────────────
   const renderStep4 = () => {
@@ -735,9 +783,13 @@ function ImportFromTemplateModal({ onClose, onImported }) {
         </Button>
       </>
     )
-    if (step === 3) return (
-      <Button variant="ghost" disabled>Generating… please wait</Button>
-    )
+    if (step === 3) {
+      const anyGenerating = genItems.some(it => it.status === 'generating')
+      const anyPending    = genItems.some(it => it.status === 'pending')
+      if (anyGenerating) return <Button variant="ghost" disabled>Generating… please wait</Button>
+      if (anyPending)    return <Button variant="primary" onClick={handleStartAll}>▶ Start All</Button>
+      return <Button variant="primary" onClick={() => setStep(4)}>Next →</Button>
+    }
     return (
       <>
         <Button variant="ghost" onClick={onClose}>Close</Button>
@@ -746,8 +798,9 @@ function ImportFromTemplateModal({ onClose, onImported }) {
     )
   }
 
+  const blockClose = step === 3 && genItems.some(it => it.status === 'generating')
   return (
-    <Modal open onClose={step === 3 ? undefined : onClose} title={STEP_TITLES[step]} width="max-w-2xl"
+    <Modal open onClose={blockClose ? undefined : onClose} title={STEP_TITLES[step]} width="max-w-2xl"
       footer={footer()}
     >
       <div className="py-1 max-h-[60vh] overflow-y-auto">
