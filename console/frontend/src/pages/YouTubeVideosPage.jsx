@@ -8,6 +8,7 @@ import PreviewApprovalGate from '../components/PreviewApprovalGate.jsx'
 import SoundLayersEditor from '../components/SoundLayersEditor.jsx'
 import VisualPlaylistEditor from '../components/VisualPlaylistEditor.jsx'
 import { useRenderWebSocket } from '../hooks/useRenderWebSocket.js'
+import PreviewPlayer from '../components/PreviewPlayer.jsx'
 
 const ACTIVE_RENDER_STATES = new Set([
   'audio_preview_rendering',
@@ -270,6 +271,7 @@ function ImportFromTemplateModal({ onClose, onImported }) {
 
   // ── Step 4 ─────────────────────────────────────────────────────────────────
   const [finalLayers, setFinalLayers] = useState({})
+  const [regenStatus, setRegenStatus] = useState({})   // key → 'regenerating'
 
   // ── Step 1 helpers ─────────────────────────────────────────────────────────
   const loadJsonFromText = (text, parser, setJson, setError) => {
@@ -416,6 +418,46 @@ function ImportFromTemplateModal({ onClose, onImported }) {
   const handleApply = () => {
     onImported({ music_track_id: genMusicId, sound_layers: finalLayers })
     onClose()
+  }
+
+  const handleRegenSfx = async (genItem) => {
+    setRegenStatus(s => ({ ...s, [genItem.key]: 'regenerating' }))
+    try {
+      const asset = await sfxApi.generate({
+        text:  genItem.sfxItem.prompt,
+        loop:  genItem.sfxItem.loop,
+        title: genItem.title,
+      })
+      setGenSfxResults(prev => {
+        const next = [...prev.filter(r => r.item.key !== genItem.key), { item: genItem.sfxItem, assetId: asset.id }]
+        setFinalLayers(assembleSoundLayers(next))
+        return next
+      })
+      setGenItems(prev => prev.map(it => it.key === genItem.key ? { ...it, status: 'done', error: null } : it))
+      setRegenStatus(s => { const n = { ...s }; delete n[genItem.key]; return n })
+    } catch (e) {
+      setGenItems(prev => prev.map(it => it.key === genItem.key ? { ...it, status: 'failed', error: String(e.message || e).slice(0, 100) } : it))
+      setRegenStatus(s => { const n = { ...s }; delete n[genItem.key]; return n })
+    }
+  }
+
+  const handleRegenMusic = async () => {
+    setRegenStatus(s => ({ ...s, music: 'regenerating' }))
+    try {
+      const plan = JSON.parse(planJson)
+      const resp = await musicApi.elevenlabsCompose({
+        composition_plan: plan,
+        title: musicJson?.meta?.title || 'Music Track',
+        niches: [], moods: [], genres: [],
+      })
+      await pollMusicTask(resp.task_id)
+      setGenMusicId(resp.track_id)
+      setGenItems(prev => prev.map(it => it.type === 'music' ? { ...it, status: 'done', error: null } : it))
+      setRegenStatus(s => { const n = { ...s }; delete n.music; return n })
+    } catch (e) {
+      setGenItems(prev => prev.map(it => it.type === 'music' ? { ...it, status: 'failed', error: String(e.message || e).slice(0, 100) } : it))
+      setRegenStatus(s => { const n = { ...s }; delete n.music; return n })
+    }
   }
 
   // ── Status badge helper ────────────────────────────────────────────────────
@@ -565,27 +607,61 @@ function ImportFromTemplateModal({ onClose, onImported }) {
 
   // ── Step 4 render ──────────────────────────────────────────────────────────
   const renderStep4 = () => {
-    const musicItem = genItems.find(it => it.type === 'music')
-    const sfxDone   = genSfxResults.length
-    const sfxFailed = genItems.filter(it => it.type === 'sfx' && it.status === 'failed').length
     const sfxSkipped = genItems.filter(it => it.status === 'skipped').length
+    const sfxFailed  = genItems.filter(it => it.type === 'sfx' && it.status === 'failed').length
+    const sfxDone    = genSfxResults.length
+
     return (
-      <div className="flex flex-col gap-3">
-        {musicItem && (
-          <div className={`text-sm ${musicItem.status === 'done' ? 'text-[#34d399]' : 'text-[#f87171]'}`}>
-            {musicItem.status === 'done' ? '✓' : '✗'} Music: {musicItem.title}
-          </div>
-        )}
-        {(sfxDone > 0 || sfxFailed > 0) && (
-          <div className="text-sm text-[#e8e8f0]">
-            {sfxDone > 0 && <span className="text-[#34d399]">✓ {sfxDone} / {sfxDone + sfxFailed} SFX saved</span>}
-            {sfxFailed > 0 && <span className="text-[#f87171] ml-2">✗ {sfxFailed} failed</span>}
-            {sfxSkipped > 0 && <span className="text-[#5a5a70] ml-2">⊘ {sfxSkipped} skipped</span>}
-          </div>
-        )}
-        {!canApply && (
-          <p className="text-sm text-[#f87171]">Nothing to apply — all items failed.</p>
-        )}
+      <div className="flex flex-col gap-2">
+        {/* Summary strip */}
+        <div className="flex flex-wrap gap-3 pb-2 mb-1 border-b border-[#2a2a32] text-xs">
+          {genItems.find(it => it.type === 'music') && (
+            <span className={genMusicId ? 'text-[#34d399]' : 'text-[#f87171]'}>
+              {genMusicId ? '✓ Music saved' : '✗ Music failed'}
+            </span>
+          )}
+          {(sfxDone > 0 || sfxFailed > 0) && (
+            <span className="text-[#34d399]">✓ {sfxDone} / {sfxDone + sfxFailed} SFX saved</span>
+          )}
+          {sfxFailed > 0 && <span className="text-[#f87171]">✗ {sfxFailed} failed</span>}
+          {sfxSkipped > 0 && <span className="text-[#5a5a70]">⊘ {sfxSkipped} skipped</span>}
+          {!canApply && <span className="text-[#f87171]">Nothing to apply — all items failed.</span>}
+        </div>
+
+        {/* Per-item rows */}
+        {genItems.map(item => {
+          const isRegen   = regenStatus[item.key] === 'regenerating'
+          const sfxAssetId = item.type === 'sfx'
+            ? genSfxResults.find(r => r.item.key === item.key)?.assetId
+            : null
+          const audioSrc  = item.type === 'music' && genMusicId
+            ? musicApi.streamUrl(genMusicId)
+            : sfxAssetId != null
+            ? sfxApi.streamUrl(sfxAssetId)
+            : null
+          const canRegen  = item.status !== 'skipped'
+
+          return (
+            <div key={item.key} className="flex items-center gap-2 py-1.5 border-b border-[#2a2a32] last:border-0">
+              <span className="text-sm text-[#e8e8f0] truncate flex-1">
+                {item.type === 'music' ? '🎵' : '🔊'} {item.title}
+              </span>
+              {audioSrc && !isRegen && <PreviewPlayer src={audioSrc} kind="audio" />}
+              {isRegen ? <Spinner size={14} /> : statusBadge(item.status, item.error)}
+              {canRegen && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={isRegen}
+                  title="Regenerate"
+                  onClick={() => item.type === 'music' ? handleRegenMusic() : handleRegenSfx(item)}
+                >
+                  ↺
+                </Button>
+              )}
+            </div>
+          )
+        })}
       </div>
     )
   }
@@ -756,6 +832,7 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
     }
     setShowImportTemplate(false)
     showToast('Template imported', 'success')
+    sfxApi.list().then(d => setSfxList(d.items || d || []))
   }
 
   const handleMusicUpload = async () => {
