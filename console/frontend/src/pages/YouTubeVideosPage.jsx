@@ -260,7 +260,7 @@ export function extractSeoFromSeoJson(seoJson) {
     seo_title:         titles.recommended                          || null,
     seo_description:   desc.full                                   || null,
     seo_tags:          Array.isArray(tags.all) ? tags.all.join(', ') : null,
-    target_duration_h: meta.video_length_hours                     || null,
+    target_duration_h: meta.video_length_hours                     ?? null,
   }
 }
 

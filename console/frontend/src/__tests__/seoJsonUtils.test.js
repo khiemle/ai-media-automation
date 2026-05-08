@@ -34,6 +34,11 @@ describe('parseSeoJson', () => {
     const partial = { description: { full: 'Some description' } }
     expect(() => parseSeoJson(JSON.stringify(partial))).not.toThrow()
   })
+
+  it('accepts JSON that has titles.recommended even without description.full', () => {
+    const partial = { titles: { recommended: 'Some Title' } }
+    expect(() => parseSeoJson(JSON.stringify(partial))).not.toThrow()
+  })
 })
 
 describe('extractSeoFromSeoJson', () => {
