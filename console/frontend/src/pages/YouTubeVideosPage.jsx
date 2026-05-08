@@ -314,6 +314,10 @@ function ImportFromTemplateModal({ onClose, onImported }) {
   const [sfxJsonError,   setSfxJsonError]   = useState(null)
   const [sfxMode,        setSfxMode]        = useState('file')
   const [sfxPaste,       setSfxPaste]       = useState('')
+  const [seoJson,        setSeoJson]        = useState(null)
+  const [seoJsonError,   setSeoJsonError]   = useState(null)
+  const [seoMode,        setSeoMode]        = useState('file')
+  const [seoPaste,       setSeoPaste]       = useState('')
 
   // ── Step 2 ─────────────────────────────────────────────────────────────────
   const [compPrompt,  setCompPrompt]  = useState('')
@@ -360,6 +364,16 @@ function ImportFromTemplateModal({ onClose, onImported }) {
     reader.readAsText(file)
   }
 
+  const handleSeoFile = (e) => {
+    const file = e.target.files?.[0]; if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      try { setSeoJson(parseSeoJson(ev.target.result)); setSeoJsonError(null) }
+      catch (e) { setSeoJson(null); setSeoJsonError(e.message) }
+    }
+    reader.readAsText(file)
+  }
+
   const sfxBadge = sfxJson ? (() => {
     const items = collectSfxItems(sfxJson)
     const bg  = items.filter(i => i.layer === 'background').length
@@ -371,10 +385,10 @@ function ImportFromTemplateModal({ onClose, onImported }) {
     return `${total} sounds (${bg} bg, ${mid} mid, ${fg} fg, ${rsfx} random${skip > 0 ? `, ${skip} skipped` : ''})`
   })() : null
 
-  const canNext1 = musicJson !== null || sfxJson !== null
+  const canNext1 = musicJson !== null || sfxJson !== null || seoJson !== null
 
   const handleApplyDataOnly = () => {
-    const seo     = sfxJson ? extractSeoFromSfxJson(sfxJson) : null
+    const seo     = seoJson ? extractSeoFromSeoJson(seoJson) : sfxJson ? extractSeoFromSfxJson(sfxJson) : null
     const prompts = extractPromptsFromJsons(musicJson, sfxJson)
     onImported({ music_track_id: null, sound_layers: {}, seo, prompts })
     onClose()
@@ -479,7 +493,8 @@ function ImportFromTemplateModal({ onClose, onImported }) {
 
   const handleApply = () => {
     const prompts = extractPromptsFromJsons(musicJson, sfxJson)
-    onImported({ music_track_id: genMusicId, sound_layers: finalLayers, seo: sfxJson ? extractSeoFromSfxJson(sfxJson) : null, prompts })
+    const seo     = seoJson ? extractSeoFromSeoJson(seoJson) : sfxJson ? extractSeoFromSfxJson(sfxJson) : null
+    onImported({ music_track_id: genMusicId, sound_layers: finalLayers, seo, prompts })
     onClose()
   }
 
