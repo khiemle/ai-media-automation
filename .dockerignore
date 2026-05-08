@@ -7,6 +7,7 @@ node_modules/
 console/frontend/node_modules/
 console/frontend/dist/
 console/frontend/.vite/
+console/frontend/package-lock.json
 
 # Python
 __pycache__/

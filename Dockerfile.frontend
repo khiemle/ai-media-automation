@@ -2,7 +2,7 @@
 FROM node:22-alpine AS builder
 WORKDIR /app
 COPY console/frontend/package*.json ./
-RUN npm install -g npm@11 && npm ci
+RUN npm install
 COPY console/frontend/ ./
 RUN npm run build
 
