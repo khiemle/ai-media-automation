@@ -1,13 +1,5 @@
 import { describe, it, expect } from 'vitest'
-
-// Inline stubs — will be replaced by real imports in Task 2
-function parseSeoJson(text) {
-  throw new Error('not implemented')
-}
-
-function extractSeoFromSeoJson(seoJson) {
-  throw new Error('not implemented')
-}
+import { parseSeoJson, extractSeoFromSeoJson } from '../pages/YouTubeVideosPage.jsx'
 
 const VALID_SEO_JSON = {
   meta: { video_title_slug: 'bamboo-engawa-rain', channel: 'soundscapes', video_length_hours: 8 },

@@ -243,6 +243,27 @@ function extractSeoFromSfxJson(sfxJson) {
   }
 }
 
+export function parseSeoJson(text) {
+  const data = JSON.parse(text)
+  if (!data.titles?.recommended && !data.description?.full) {
+    throw new Error('Not a valid SEO JSON — missing titles.recommended or description.full')
+  }
+  return data
+}
+
+export function extractSeoFromSeoJson(seoJson) {
+  const titles = seoJson.titles      || {}
+  const desc   = seoJson.description || {}
+  const tags   = seoJson.tags        || {}
+  const meta   = seoJson.meta        || {}
+  return {
+    seo_title:         titles.recommended                          || null,
+    seo_description:   desc.full                                   || null,
+    seo_tags:          Array.isArray(tags.all) ? tags.all.join(', ') : null,
+    target_duration_h: meta.video_length_hours                     || null,
+  }
+}
+
 function extractPromptsFromJsons(musicJson, sfxJson) {
   const result = {}
   if (musicJson)                        result.music      = buildMusicPrompt(musicJson)
