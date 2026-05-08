@@ -30,7 +30,7 @@ describe('parseSeoJson', () => {
   })
 
   it('throws on invalid JSON syntax', () => {
-    expect(() => parseSeoJson('not json')).toThrow()
+    expect(() => parseSeoJson('not json')).toThrow(SyntaxError)
   })
 
   it('throws when titles.recommended and description.full are both absent', () => {
