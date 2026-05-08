@@ -154,12 +154,7 @@ def resolve_sfx_layers(video, db) -> list[tuple[str, float]]:
         try:
             asset = db.get(SfxAsset, int(asset_id))
             if asset and asset.file_path and Path(asset.file_path).is_file():
-                if layer_name == "background" and not asset.is_loopable:
-                    logger.warning(
-                        "SFX asset %s skipped for background layer — is_loopable=False", asset_id
-                    )
-                else:
-                    results.append((asset.file_path, volume))
+                results.append((asset.file_path, volume))
             else:
                 logger.warning("SFX asset %s not found or missing file on disk", asset_id)
         except Exception as exc:
@@ -451,14 +446,9 @@ def _build_sound_layers_wav(
         if asset_id is not None:
             sfx = sfx_by_id.get(int(asset_id))
             if sfx and sfx.file_path and Path(sfx.file_path).is_file():
-                if not sfx.is_loopable:
-                    logger.warning(
-                        "[SoundLayers] background asset %s skipped — is_loopable=False", asset_id
-                    )
-                else:
-                    asset_dur = _probe_duration(sfx.file_path)
-                    seek = (start_s % asset_dur) if asset_dur > 0.5 and start_s > 0 else 0.0
-                    bg_inputs.append((sfx.file_path, volume, seek))
+                asset_dur = _probe_duration(sfx.file_path)
+                seek = (start_s % asset_dur) if asset_dur > 0.5 and start_s > 0 else 0.0
+                bg_inputs.append((sfx.file_path, volume, seek))
             else:
                 logger.warning(
                     "[SoundLayers] background asset %s not found or missing file", asset_id
