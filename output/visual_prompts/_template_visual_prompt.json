@@ -1,0 +1,61 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "YYYY-MM-DD",
+  "generated_by": "relax-music-visual-prompt skill",
+
+  "meta": {
+    "title": "",
+    "channel": "",
+    "theme": "",
+    "loop_strategy": "static_cinemagraph | reverse_crossfade | crossfade_loop | single_clip",
+    "target_duration_hours": "",
+    "paired_suno_prompt": ""
+  },
+
+  "scene_spec": {
+    "subject": "",
+    "pov": "beside_subject | inside_out_window | cozy_interior | floating_contemplative",
+    "foreground_anchor": "",
+    "time_of_day": "pre-dawn | morning | golden_hour | dusk | night | 3am",
+    "weather": "",
+    "light_direction": "",
+    "color_palette": [],
+    "visual_style": "photoreal_cinematic | anime_ghibli | painted_matte | surreal",
+    "lens_mm": 50,
+    "depth_of_field": "shallow | medium-shallow | medium | deep",
+    "people": false,
+    "motion_intensity": 2
+  },
+
+  "midjourney": {
+    "prompt": "",
+    "parameters": {
+      "ar": "16:9",
+      "style": "raw",
+      "v": "6.1",
+      "q": 2
+    }
+  },
+
+  "runway_gen4": {
+    "prompt": "",
+    "settings": {
+      "motion_intensity": 2,
+      "duration_seconds": 5,
+      "camera": "static | imperceptible_push_in | slow_drift",
+      "seed": null,
+      "lock_seed_after_approval": true
+    }
+  },
+
+  "creative_brief": "",
+
+  "loop_editor": {
+    "import_clip_duration_seconds": 5,
+    "nle": ["DaVinci Resolve", "Premiere Pro"],
+    "technique": "reverse_crossfade | crossfade_loop",
+    "crossfade_frames": "12-18",
+    "audio_target_lufs": -14,
+    "loop_to_hours": ""
+  }
+}

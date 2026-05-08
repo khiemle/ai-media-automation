@@ -445,13 +445,13 @@ def _build_sound_layers_wav(
         volume = float(bg_config.get("volume", 1.0))
         if asset_id is not None:
             sfx = sfx_by_id.get(int(asset_id))
-            if sfx and sfx.file_path and Path(sfx.file_path).is_file() and sfx.is_loopable:
+            if sfx and sfx.file_path and Path(sfx.file_path).is_file():
                 asset_dur = _probe_duration(sfx.file_path)
                 seek = (start_s % asset_dur) if asset_dur > 0.5 and start_s > 0 else 0.0
                 bg_inputs.append((sfx.file_path, volume, seek))
             else:
                 logger.warning(
-                    "[SoundLayers] background asset %s not found, missing, or not loopable", asset_id
+                    "[SoundLayers] background asset %s not found or missing file", asset_id
                 )
 
     # ── Scheduled layers ─────────────────────────────────────────────────────

@@ -1,0 +1,212 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-05-05",
+  "generated_by": "relax-music-visual-prompt skill",
+
+  "meta": {
+    "title": "Mountain Waterfall ASMR",
+    "channel": "ASMR / Meditation / Focus",
+    "theme": "Mountain Waterfall — Nature Ambience",
+    "loop_strategy": "static_cinemagraph",
+    "target_duration_hours": "1-3",
+    "paired_suno_prompt": "suno-prompt_20260505-1430_meditation_e-phrygian_shakuhachi.md"
+  },
+
+  "scene_spec": {
+    "subject": "Powerful mountain waterfall cascading over mossy granite into a still forest pool",
+    "pov": "Eye-level beside the waterfall — viewer seated on mossy rocks at the water's edge",
+    "foreground_anchor": "Wet mossy rocks + broad fern fronds in soft bokeh",
+    "time_of_day": "pre-dawn",
+    "weather": "Low-lying mist drifting over pool, cool moist air, water spray catching first light",
+    "light_direction": "Volumetric god-rays filtering from upper-left through dense forest canopy",
+    "color_palette": ["deep forest green", "cool blue-grey mist", "warm amber light accents", "slate granite"],
+    "visual_style": "photoreal_cinematic",
+    "lens_mm": 50,
+    "depth_of_field": "medium-shallow",
+    "people": false,
+    "motion_intensity": 2
+  },
+
+  "midjourney": {
+    "prompt": "A powerful mountain waterfall cascading over ancient mossy granite boulders into a still forest pool, viewer eye-level at the water's edge, wet mossy rocks and lush fern fronds filling the immediate foreground in soft bokeh, early morning pre-dawn light, low-lying mist drifting slowly across the pool surface, volumetric god-rays filtering through dense forest canopy from upper-left, water mist and spray catching the first morning light, deep forest greens and cool blue-grey mist tones with warm amber light accents, 35mm cinematic nature photography, Kodak Portra 400 film grain, Roger Deakins lighting, shot on Arri Alexa Mini LF, photorealistic, no people, no human figures",
+    "parameters": {
+      "ar": "16:9",
+      "style": "raw",
+      "v": "6.1",
+      "q": 2
+    }
+  },
+
+  "runway_gen4": {
+    "prompt": "Water streams cascade continuously down the granite cliff face, individual rivulets shifting and reforming slowly. Mist drifts left across the pool surface, wisping and dissolving at the edges. The nearest fern fronds sway almost imperceptibly in the cool damp air rising from the waterfall spray. Water droplets glisten on the mossy rocks as morning light catches them softly. Static camera — no movement whatsoever. Slow, hypnotic, meditative. Designed to loop seamlessly as a static cinemagraph — only ambient elements animate.",
+    "settings": {
+      "motion_intensity": 2,
+      "duration_seconds": 5,
+      "camera": "static",
+      "seed": null,
+      "lock_seed_after_approval": true
+    }
+  },
+
+  "creative_brief": "The viewer sits at the edge of a mountain waterfall pool, deep inside an ancient temperate forest. It is the first twenty minutes of morning — that narrow window when pre-dawn light begins filtering through the canopy and the mist above the water is still thick and unhurried. Wet mossy granite and broad fern fronds fill the foreground, still heavy with overnight damp, grounding the viewer in the physical space. The waterfall anchors the mid-ground: its motion is constant, irregular, and inherently soothing. Volumetric god-rays enter from the upper-left, catching the fine spray and turning it into drifting light.",
+
+  "loop_editor": {
+    "import_clip_duration_seconds": 5,
+    "nle": ["DaVinci Resolve", "Premiere Pro"],
+    "technique": "reverse_crossfade",
+    "crossfade_frames": "12-18",
+    "audio_target_lufs": -14,
+    "loop_to_hours": "1-3"
+  },
+
+  "sfx": {
+    "background": {
+      "description_vi": "Tiếng thác nước núi liên tục — tiếng nước chảy mạnh tạo thành tấm nền broadband noise trắng tự nhiên, phủ đầy toàn bộ spectrum tần số từ bass thấp đến hiss cao. Đây là 'sự im lặng có tiếng' của cảnh thác nước — không tông nhạc, không nhịp điệu rõ ràng, không có điểm nào nổi bật. Loop crossfade vô hạn, không bao giờ tắt. Đây là layer quan trọng nhất — nếu thiếu layer này cả soundscape sẽ nghe rỗng.",
+      "english_prompt": "Mountain waterfall continuous broadband water noise, powerful cascading water over granite, full-spectrum white noise texture with strong low-frequency rumble and natural high-frequency mist hiss, no tonal centre, no rhythmic pattern, no individual stream distinguishable, steady uniform density without surges or pauses, mid-distance 5-8 metres from viewer, natural outdoor reverb from canyon walls, loop-safe infinite sustain, mix level approximately -18dB relative to music track",
+      "mix_level_db_relative_to_music": -18,
+      "loop_type": "crossfade"
+    },
+
+    "midground": [
+      {
+        "name_vi": "Suối nhỏ chảy qua đá gần hồ",
+        "description_vi": "Tiếng nước chảy nhỏ qua kẽ đá gần chỗ ngồi, cách ~3–5 mét — tiếng babbling nhẹ, ngắt quãng tự nhiên, không đều. Bổ sung chiều sâu cho tiếng thác chính. Xuất hiện mỗi 12–18 giây.",
+        "interval_seconds": "12-18",
+        "mix_level_db_relative_to_music": -16,
+        "fade_in_seconds": 0.3,
+        "fade_out_seconds": 0.8,
+        "english_prompt": "small secondary stream trickling over mossy rocks near a still pool, 3-5 metres distance, gentle irregular babbling water sound, soft onset no sharp attack, 1.5-2.5 second duration, natural fade-out as water settles between rocks, no rhythmic pattern, not melodic, mid-distance outdoor reverb, isolated single event non-repeating within 12 seconds, mix level approximately -16dB relative to music"
+      },
+      {
+        "name_vi": "Tiếng chim núi sáng sớm từ xa",
+        "description_vi": "Một con chim núi từ xa 20–30 mét trong rừng, 1–2 tiếng ngắn rồi im. Giọng mềm và bị tán cây lọc. Gợi cảm giác bình minh đang bắt đầu. Xuất hiện mỗi 15–20 giây.",
+        "interval_seconds": "15-20",
+        "mix_level_db_relative_to_music": -15,
+        "fade_in_seconds": 0.2,
+        "fade_out_seconds": 0.6,
+        "english_prompt": "single mountain forest bird call at dawn, 1-2 short notes only, far distance 20-30 metres, muffled through forest canopy and waterfall mist, soft onset no sharp attack, 0.7-1.0 second duration, short natural decay, not melodic not a song, not a common recognisable species call, sparse isolated event non-repeating within 15 seconds, outdoor reverb partially masked by waterfall background, mix level approximately -15dB relative to music"
+      },
+      {
+        "name_vi": "Giọt nước nhỏ từ rêu đá xuống mặt hồ",
+        "description_vi": "Nước đọng trên đá rêu hoặc dương xỉ nhỏ xuống mặt hồ gần bờ — tiếng 'tính' mềm, 0.3–0.5 giây, rồi gợn sóng nhỏ tắt dần. Rất tự nhiên, không gây giật mình. Xuất hiện mỗi 20–28 giây.",
+        "interval_seconds": "20-28",
+        "mix_level_db_relative_to_music": -14,
+        "fade_in_seconds": 0.05,
+        "fade_out_seconds": 0.5,
+        "english_prompt": "single water droplet dripping from mossy overhanging fern frond into still pool surface near bank, soft liquid impact with small ripple spread, 0.3-0.5 second duration including short ripple decay, gentle onset no hard attack, natural water resonance tail, close proximity 1-2 metres, isolated single drop non-repeating within 20 seconds, no thunder no rain context, not a hard metallic drip, mix level approximately -14dB relative to music"
+      },
+      {
+        "name_vi": "Làn gió lạnh qua dương xỉ sát mặt đất",
+        "description_vi": "Làn hơi lạnh từ thác kéo qua lớp dương xỉ và rêu gần mặt đất, 2–3 giây. Tiếng xào xạc mềm, đều. Gợi cảm giác không khí ẩm mát đặc trưng của vùng thác nước. Xuất hiện mỗi 18–25 giây.",
+        "interval_seconds": "18-25",
+        "mix_level_db_relative_to_music": -15,
+        "fade_in_seconds": 0.4,
+        "fade_out_seconds": 0.9,
+        "english_prompt": "cool mist-laden breeze drifting through low ground-level ferns and moss near a waterfall pool, gentle sustained rustle of fern fronds and broad leaves, 2-3 second duration, gradual soft onset and gradual fade, no sharp transients, no wind howl, very close proximity 1-3 metres, partially masked by waterfall background, isolated single event, mix level approximately -15dB relative to music"
+      }
+    ],
+
+    "foreground": [],
+
+    "random_sfx": {
+      "trigger_interval_seconds": "60-100",
+      "playback_rules": {
+        "fade_in_seconds": "0.2-0.5",
+        "fade_out_seconds": "0.5-1.5",
+        "max_volume_rule": "never louder than music",
+        "cooldown_minutes": 10,
+        "shuffle": true
+      },
+      "items": [
+        {
+          "id": 1,
+          "name_en": "Wind Swell Through Forest Canopy Above Waterfall",
+          "description_vi": "Làn gió lớn qua tán cây phía trên thác — toàn bộ rừng 'thở' một hơi dài 4 giây, mass-movement của hàng nghìn lá. Lên từ từ, giữ, xuống từ từ. Cảm giác không gian rừng núi bao la. Vượt qua half-asleep test vì không có điểm bắt đầu đột ngột.",
+          "automation_only": false,
+          "english_prompt": "strong wind swell through tall forest canopy above a mountain waterfall, mass leaf movement from many trees simultaneously, distance 15-25 metres high, broadband whoosh with dense layered leaf texture partially blending with waterfall noise, slow fade-in 1.5 seconds, peak hold 1 second, slow fade-out 1.5 seconds, total 4 seconds, no sharp onset no wind howl, no individual leaf distinguishable, outdoor canyon reverb, mix level approximately -12dB relative to music",
+          "warning": null
+        },
+        {
+          "id": 2,
+          "name_en": "Waterfall Flow Intensity Micro-Swell",
+          "description_vi": "Automation trên track Layer 1 (thác nước nền) — volume tăng +2dB trong 6 giây, giữ 2 giây, trở về. Như thác 'mạnh lên' một chút do luồng nước trên nguồn thay đổi. Không có sound event mới — chỉ là texture variation. Hoàn toàn vô hình với người nghe đang thiền.",
+          "automation_only": true,
+          "english_prompt": "No audio file needed — volume automation only. Automate gain on background waterfall track: Fade-in +2dB over 6 seconds → hold at peak for 2 seconds → return to original level over 6 seconds. Total duration: 14 seconds. Optionally apply subtle low-shelf boost (+1dB below 200Hz) during peak for added rumble presence.",
+          "warning": null
+        },
+        {
+          "id": 3,
+          "name_en": "Large Water Droplet Sequence from Mossy Overhang",
+          "description_vi": "Nước đọng trên vách đá rêu phía trên nhỏ xuống qua 2–3 tầng lá dương xỉ — chuỗi 3–4 âm giảm dần trong 1.5 giây. Cảm giác nước còn đọng lại từ đêm qua. Rất tự nhiên, không gây giật mình.",
+          "automation_only": false,
+          "english_prompt": "large water droplets dripping from mossy rock overhang through two to three layers of hanging fern fronds, sequence of 3-4 progressively softer impacts, each on wet fern or mossy surface, 1.5 second total duration, first drop is loudest with soft onset, each subsequent impact quieter, natural drip tails between impacts, 2-4 metres distance, no sharp hard attack, isolated non-repeating event, mix level approximately -11dB relative to music",
+          "warning": null
+        },
+        {
+          "id": 4,
+          "name_en": "Fern Frond Slow Sweep in Mist Drift",
+          "description_vi": "Làn hơi nước từ thác đẩy nhẹ một tán dương xỉ lớn theo một hướng, 2 giây — tiếng xào xạc mềm và chậm. Gợi cảm giác không gian ẩm, mát, rộng. Không pitch, không transient.",
+          "automation_only": false,
+          "english_prompt": "single large fern frond slowly sweeping through mist-laden air near a waterfall, pushed gently by waterfall spray draft, soft papery rustle texture, 2 second duration, gradual onset and gradual fade no sharp transients, no pitch or tone, very close proximity 1-2 metres, partially masked by waterfall background, isolated single event, mix level approximately -13dB relative to music",
+          "warning": null
+        },
+        {
+          "id": 5,
+          "name_en": "Distant Mountain Bird Single Wing Flutter",
+          "description_vi": "Một con chim rời cành từ xa 30+ mét — chỉ nghe tiếng vỗ cánh thoáng qua, không tiếng chim hót. Ngắn, 0.5 giây, bị không khí và rừng lọc còn rất mờ. Não nhận ra là bird activity nhưng không bị đánh thức.",
+          "automation_only": false,
+          "english_prompt": "single bird taking flight from a branch, far distance 30+ metres, only brief wing flutter sound no vocalization, heavily filtered by forest and waterfall mist, 0.4-0.6 second duration, soft onset rapid fade-out, higher frequency components absorbed by distance, isolated single event non-repeating within 10 minutes, mix level approximately -17dB relative to music",
+          "warning": null
+        },
+        {
+          "id": 6,
+          "name_en": "Single Large Drop into Still Pool Edge",
+          "description_vi": "Một giọt nước lớn rơi từ cao ~2 mét xuống phần hồ tĩnh gần bờ — tiếng 'blung' mềm và resonant, gợn sóng tắt dần 0.8 giây. Nghe sâu và thư thái. Khác với tiếng nhỏ giọt thông thường vì có phần bass resonance của mặt nước.",
+          "automation_only": false,
+          "english_prompt": "single large water drop falling approximately 2 metres into the calm edge of a still mountain pool, low-pitched soft liquid impact with resonant water body response, ripple tail fading 0.8 seconds, bass-dominant tone from pool surface resonance, gentle onset no hard attack, 1 second total duration, 1-2 metres distance at pool edge, not a hard metallic splash, isolated non-repeating event, mix level approximately -12dB relative to music",
+          "warning": null
+        },
+        {
+          "id": 7,
+          "name_en": "Submerged Stone Settling in Stream Bed",
+          "description_vi": "Đá dưới lòng suối dịch chuyển nhẹ do dòng nước — tiếng 'clunk' thấp và ngắn bị lọc qua nước, nghe như tiếng thở của đáy suối. Bass và mờ nên không gây giật mình. Gợi cảm giác cổ xưa, vĩnh cửu của dòng sông đá.",
+          "automation_only": false,
+          "english_prompt": "submerged river stone shifting and settling in a shallow mountain stream bed, single low-pitched underwater impact filtered through moving water, 0.5-0.7 second duration, very muffled and bass-dominant with high frequencies absorbed by water, soft onset no sharp attack, 3-5 metres distance, underwater reverb tail, isolated single event non-repeating, mix level approximately -16dB relative to music",
+          "warning": "Select sample recorded underwater or apply aggressive low-pass filter (cutoff 500Hz) to any above-water stone impact."
+        },
+        {
+          "id": 8,
+          "name_en": "Morning Mist Layer Presence Automation",
+          "description_vi": "Automation trên track high-frequency air layer (hoặc EQ của background waterfall) — tăng nhẹ dải 3–6kHz trong 5 giây rồi trở về. Nghe như làn sương mù sáng sớm 'dày lên' trong không khí một chút. Automation only, không có sound event. Tạo texture variation vi tế giữ sự chú ý ở mức vô thức.",
+          "automation_only": true,
+          "english_prompt": "No audio file needed — EQ automation only. On background waterfall track: automate a bell EQ node at 4kHz with Q=1.2: Fade-in +1.5dB over 5 seconds → hold for 3 seconds → return to flat over 5 seconds. Total duration: 13 seconds. Creates subtle 'mist thickening' presence without adding a new sound event.",
+          "warning": null
+        },
+        {
+          "id": 9,
+          "name_en": "Leaf Cluster Falling from Canopy Through Ferns",
+          "description_vi": "Cụm lá rời cành từ cao, rơi qua nhiều tầng tán và dương xỉ trước khi đáp xuống đất ẩm — chuỗi âm giảm dần 2 giây. Kết thúc rất mềm trên nền đất rêu. Cảm giác chu kỳ tự nhiên của rừng núi, mọi thứ đang thay đổi cực chậm.",
+          "automation_only": false,
+          "english_prompt": "small leaf cluster detaching from high branch and falling through multiple forest fern layers to mossy forest floor, 2 second duration, sequence of decreasing-volume rustles as leaves pass through each vegetation tier, ends with very soft landing on damp mossy soil, no hard impact at end, gradual overall fade trajectory, soft onset, mid-distance 5-8 metres, isolated single event non-repeating, mix level approximately -13dB relative to music",
+          "warning": null
+        },
+        {
+          "id": 10,
+          "name_en": "Distant Valley Waterfall Echo",
+          "description_vi": "Rất xa — âm vang của một thác nước nhỏ hơn cách 60–80 mét trong thung lũng, bị đá và cây hấp thụ còn lại chỉ là dư âm bass thấp, gần như dưới ngưỡng nghe. Não nhận ra như 'depth of space' — cảm giác thung lũng rộng và sâu. Không phải event, là texture.",
+          "automation_only": false,
+          "english_prompt": "very distant secondary waterfall echo from a smaller cascade 60-80 metres away in a mountain valley, low-frequency rumble barely above the noise floor, heavily filtered through air distance and rock walls, all high frequencies absorbed, 3-4 second sustained texture fading in and out, no clear onset no clear end, bass-dominant below 300Hz, extremely low mix level approximately -28dB relative to music, nearly subliminal presence",
+          "warning": "Apply aggressive low-pass filter (cutoff 300Hz) and heavy reverb. If too prominent reduce mix level further until barely audible."
+        },
+        {
+          "id": 11,
+          "name_en": "Canopy Settling After Wind",
+          "description_vi": "Sau khi gió qua (SFX #1), rừng dần yên — fade-out chậm của mass leaf movement, 3 giây, như tiếng thở ra. Pair với SFX #1 cách 8–12 giây sau. Tạo cảm giác sự kiện thiên nhiên hoàn chỉnh: gió đến → gió đi.",
+          "automation_only": false,
+          "english_prompt": "forest canopy settling after a wind swell passes over a mountain waterfall, slow fade-out of mass leaf movement partially merging with waterfall background, 3 second duration, starts at moderate level and fades to near-silence blending back into waterfall noise, broadband texture no single leaf distinguishable, gradual onset slow decay, high canopy 20+ metres distance, outdoor reverb, isolated single event pair with Wind Swell 8-12 seconds after, mix level starts at approximately -12dB fading to -25dB relative to music",
+          "warning": "Pair with SFX ID 1 (Wind Swell). Trigger this 8–12 seconds after SFX 1 begins."
+        }
+      ]
+    }
+  }
+}
