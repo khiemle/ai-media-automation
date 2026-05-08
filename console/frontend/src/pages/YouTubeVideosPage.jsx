@@ -857,6 +857,7 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
   const [autofillError, setAutofillError] = useState(null)
   const [autofillSuno, setAutofillSuno] = useState(null)
   const [autofillRunway, setAutofillRunway] = useState(null)
+  const [midjourneyPrompt, setMidjourneyPrompt] = useState(null)
   const [autofilled, setAutofilled] = useState(isEdit)  // skip the auto-SEO useEffect on edit
 
   const [soundLayers, setSoundLayers] = useState(() => {
@@ -932,7 +933,7 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
     setTimeout(() => setToast(null), 3000)
   }
 
-  const handleTemplateImported = ({ music_track_id, sound_layers, seo }) => {
+  const handleTemplateImported = ({ music_track_id, sound_layers, seo, prompts }) => {
     if (music_track_id) {
       if (isAsmrLike) {
         setMusicTrackIds(prev => prev.includes(music_track_id) ? prev : [...prev, music_track_id])
@@ -971,6 +972,9 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
         return { ...f, ...patch }
       })
     }
+    if (prompts?.music)      setAutofillSuno(prompts.music)
+    if (prompts?.visual)     setAutofillRunway(prompts.visual)
+    if (prompts?.midjourney) setMidjourneyPrompt(prompts.midjourney)
     setShowImportTemplate(false)
     showToast('Template imported', 'success')
     sfxApi.list().then(d => setSfxList(d.items || d || []))
@@ -1353,6 +1357,18 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
                   className="text-sm text-[#9090a8] file:mr-3 file:py-1 file:px-2 file:rounded file:border-0 file:bg-[#2a2a32] file:text-[#e8e8f0] file:text-xs cursor-pointer"
                 />
               </div>
+              {midjourneyPrompt && (
+                <div className="bg-[#0d0d0f] border border-[#2a2a32] rounded-lg p-3 relative">
+                  <div className="text-xs text-[#5a5a70] mb-1">Midjourney Prompt</div>
+                  <p className="text-xs text-[#9090a8] pr-10 leading-relaxed">{midjourneyPrompt}</p>
+                  <button
+                    onClick={() => navigator.clipboard.writeText(midjourneyPrompt)}
+                    className="absolute top-2 right-2 text-xs text-[#7c6af7] hover:text-[#9d8df8] px-2 py-1 bg-[#16161a] rounded"
+                  >
+                    Copy
+                  </button>
+                </div>
+              )}
               <div className="flex flex-col gap-1">
                 <div className="flex items-center justify-between">
                   <label className="text-xs text-[#9090a8] font-medium">
@@ -1473,9 +1489,7 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
               )}
               {(template?.suno_prompt_template || autofillSuno) && (
                 <div className="bg-[#0d0d0f] border border-[#2a2a32] rounded-lg p-3 relative">
-                  <div className="text-xs text-[#5a5a70] mb-1">
-                    Suno Prompt {autofillSuno ? '(AI generated)' : '(reference)'}
-                  </div>
+                  <div className="text-xs text-[#5a5a70] mb-1">Music Prompt</div>
                   <p className="text-xs text-[#9090a8] pr-10 leading-relaxed">
                     {autofillSuno || template.suno_prompt_template}
                   </p>
@@ -1575,9 +1589,7 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
               )}
               {(template?.runway_prompt_template || autofillRunway) && (
                 <div className="bg-[#0d0d0f] border border-[#2a2a32] rounded-lg p-3 relative">
-                  <div className="text-xs text-[#5a5a70] mb-1">
-                    Runway Prompt {autofillRunway ? '(AI generated)' : '(reference)'}
-                  </div>
+                  <div className="text-xs text-[#5a5a70] mb-1">Visual Prompt</div>
                   <p className="text-xs text-[#9090a8] pr-10 leading-relaxed">
                     {autofillRunway || template.runway_prompt_template}
                   </p>
