@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { youtubeVideosApi, musicApi, assetsApi, sfxApi, channelPlansApi } from '../api/client.js'
 import { Card, Badge, Button, Input, Select, Toast, Spinner, EmptyState, Modal } from '../components/index.jsx'
 import AIAssistantPanel from '../components/AIAssistantPanel.jsx'
@@ -297,6 +297,8 @@ function ImportFromTemplateModal({ onClose, onImported }) {
   const [genItems,       setGenItems]       = useState([])
   const [genMusicId,     setGenMusicId]     = useState(null)
   const [genSfxResults,  setGenSfxResults]  = useState([])
+  const genItemsRef = useRef([])
+  useEffect(() => { genItemsRef.current = genItems }, [genItems])
 
   // ── Step 4 ─────────────────────────────────────────────────────────────────
   const [finalLayers, setFinalLayers] = useState({})
@@ -348,6 +350,7 @@ function ImportFromTemplateModal({ onClose, onImported }) {
       setCompPrompt(buildMusicPrompt(musicJson))
       setStep(2)
     } else {
+      setGenItems(buildGenItemsList())
       setStep(3)
     }
   }
@@ -368,78 +371,72 @@ function ImportFromTemplateModal({ onClose, onImported }) {
   const isPlanValid = () => { try { JSON.parse(planJson); return true } catch { return false } }
   const canNext2 = planReady && isPlanValid()
 
-  // ── Step 3 generation effect ───────────────────────────────────────────────
-  useEffect(() => {
-    if (step !== 3) return
-    let cancelled = false
+  // ── Step 3 helpers ─────────────────────────────────────────────────────────
+  const buildGenItemsList = () => {
+    const items = []
+    if (musicJson && planReady) {
+      items.push({ key: 'music', type: 'music', title: musicJson.meta?.title || 'Music Track', status: 'pending', error: null })
+    }
+    if (sfxJson) {
+      collectSfxItems(sfxJson).forEach(si => items.push({
+        key: si.key, type: 'sfx', title: si.title,
+        status: si.automationOnly ? 'skipped' : 'pending',
+        error: null, sfxItem: si,
+      }))
+    }
+    return items
+  }
 
-    const upd = (key, patch) =>
-      !cancelled && setGenItems(prev => prev.map(it => it.key === key ? { ...it, ...patch } : it))
+  const handleGenerateItem = async (genItem) => {
+    setGenItems(prev => prev.map(it => it.key === genItem.key ? { ...it, status: 'generating', error: null } : it))
 
-    const run = async () => {
-      // Build item list from current state (captured at effect fire time)
-      const items = []
-      if (musicJson && planReady) {
-        items.push({ key: 'music', type: 'music', title: musicJson.meta?.title || 'Music Track', status: 'pending', error: null })
+    if (genItem.type === 'music') {
+      try {
+        const plan = JSON.parse(planJson)
+        const resp = await musicApi.elevenlabsCompose({
+          composition_plan: plan,
+          title: musicJson?.meta?.title || 'Music Track',
+          niches: [], moods: [], genres: [],
+        })
+        await pollMusicTask(resp.task_id)
+        setGenMusicId(resp.track_id)
+        setGenItems(prev => prev.map(it => it.key === 'music' ? { ...it, status: 'done' } : it))
+      } catch (e) {
+        setGenItems(prev => prev.map(it => it.key === 'music' ? { ...it, status: 'failed', error: String(e.message || e).slice(0, 100) } : it))
       }
-      if (sfxJson) {
-        collectSfxItems(sfxJson).forEach(si => items.push({
-          key: si.key, type: 'sfx', title: si.title,
-          status: si.automationOnly ? 'skipped' : 'pending',
-          error: null, sfxItem: si,
-        }))
-      }
-      if (!cancelled) setGenItems(items)
-
-      let trackId = null
-      const sfxRes = []
-
-      // Music
-      if (items.find(it => it.type === 'music')) {
-        upd('music', { status: 'generating' })
-        try {
-          const plan = JSON.parse(planJson)
-          const resp = await musicApi.elevenlabsCompose({
-            composition_plan: plan,
-            title: musicJson.meta?.title || 'Music Track',
-            niches: [], moods: [], genres: [],
-          })
-          trackId = resp.track_id
-          await pollMusicTask(resp.task_id)
-          if (!cancelled) setGenMusicId(trackId)
-          upd('music', { status: 'done' })
-        } catch (e) {
-          upd('music', { status: 'failed', error: String(e.message || e).slice(0, 100) })
-        }
-      }
-
-      // SFX — sequential
-      for (const item of items.filter(it => it.type === 'sfx' && it.status === 'pending')) {
-        if (cancelled) break
-        upd(item.key, { status: 'generating' })
-        try {
-          const asset = await sfxApi.generate({
-            text:  item.sfxItem.prompt,
-            loop:  item.sfxItem.loop,
-            title: item.title,
-          })
-          sfxRes.push({ item: item.sfxItem, assetId: asset.id })
-          upd(item.key, { status: 'done' })
-        } catch (e) {
-          upd(item.key, { status: 'failed', error: String(e.message || e).slice(0, 100) })
-        }
-      }
-
-      if (!cancelled) {
-        setGenSfxResults(sfxRes)
-        setFinalLayers(assembleSoundLayers(sfxRes))
-        setStep(4)
+    } else {
+      try {
+        const asset = await sfxApi.generate({
+          text:  genItem.sfxItem.prompt,
+          loop:  genItem.sfxItem.loop,
+          title: genItem.title,
+        })
+        setGenSfxResults(prev => {
+          const next = [...prev.filter(r => r.item.key !== genItem.key), { item: genItem.sfxItem, assetId: asset.id }]
+          setFinalLayers(assembleSoundLayers(next))
+          return next
+        })
+        setGenItems(prev => prev.map(it => it.key === genItem.key ? { ...it, status: 'done' } : it))
+      } catch (e) {
+        setGenItems(prev => prev.map(it => it.key === genItem.key ? { ...it, status: 'failed', error: String(e.message || e).slice(0, 100) } : it))
       }
     }
+  }
 
-    run()
-    return () => { cancelled = true }
-  }, [step]) // eslint-disable-line react-hooks/exhaustive-deps
+  const handleStartAll = async () => {
+    const pending = genItemsRef.current.filter(it => it.status === 'pending')
+    const musicItem = pending.find(it => it.type === 'music')
+    const sfxItems  = pending.filter(it => it.type === 'sfx')
+    if (musicItem) await handleGenerateItem(musicItem)
+    for (const item of sfxItems) {
+      if (!genItemsRef.current.find(it => it.key === item.key)) continue
+      await handleGenerateItem(item)
+    }
+  }
+
+  const handleRemoveItem = (key) => {
+    setGenItems(prev => prev.filter(it => it.key !== key))
+  }
 
   // ── Step 4 helpers ─────────────────────────────────────────────────────────
   const canApply = genMusicId !== null || genSfxResults.length > 0
@@ -733,7 +730,7 @@ function ImportFromTemplateModal({ onClose, onImported }) {
     if (step === 2) return (
       <>
         <Button variant="ghost" onClick={() => setStep(1)}>← Back</Button>
-        <Button variant="primary" disabled={!canNext2} onClick={() => setStep(3)}>
+        <Button variant="primary" disabled={!canNext2} onClick={() => { setGenItems(buildGenItemsList()); setStep(3) }}>
           Next: Generate →
         </Button>
       </>
