@@ -718,6 +718,7 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
   const [hasThumbnail, setHasThumbnail] = useState(isEdit ? !!existingVideo?.thumbnail_path : false)
   const [thumbnailGenerating, setThumbnailGenerating] = useState(false)
 
+  const [showImportTemplate, setShowImportTemplate] = useState(false)
   const [showMusicUpload, setShowMusicUpload] = useState(false)
   const [musicUploadFile, setMusicUploadFile] = useState(null)
   const [musicUploadTitle, setMusicUploadTitle] = useState('')
@@ -732,6 +733,29 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type })
     setTimeout(() => setToast(null), 3000)
+  }
+
+  const handleTemplateImported = ({ music_track_id, sound_layers }) => {
+    if (music_track_id) {
+      if (isAsmrLike) {
+        setMusicTrackIds(prev => prev.includes(music_track_id) ? prev : [...prev, music_track_id])
+      } else {
+        setForm(f => ({ ...f, music_track_id: String(music_track_id) }))
+      }
+    }
+    if (sound_layers && Object.keys(sound_layers).length > 0) {
+      setSoundLayers(prev => ({
+        ...prev,
+        background: sound_layers.background
+          ? { asset_id: String(sound_layers.background.asset_id), volume: sound_layers.background.volume }
+          : prev.background,
+        midground:  sound_layers.midground  || prev.midground,
+        foreground: sound_layers.foreground || prev.foreground,
+        random_sfx: sound_layers.random_sfx || prev.random_sfx,
+      }))
+    }
+    setShowImportTemplate(false)
+    showToast('Template imported', 'success')
   }
 
   const handleMusicUpload = async () => {
@@ -966,6 +990,13 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
             )}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowImportTemplate(true)}
+            >
+              ↓ Import Template
+            </Button>
             {!isEdit && (selectedPlan || channelPlans.length > 0) && (
               <Button
                 variant="accent"
@@ -1402,6 +1433,12 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
           </Button>
         </div>
       </div>
+      {showImportTemplate && (
+        <ImportFromTemplateModal
+          onClose={() => setShowImportTemplate(false)}
+          onImported={handleTemplateImported}
+        />
+      )}
     </div>
   )
 }
