@@ -305,7 +305,8 @@ function ImportFromTemplateModal({ onClose, onImported }) {
     const fg  = items.filter(i => i.layer === 'foreground').length
     const rsfx = items.filter(i => i.layer === 'random_sfx' && !i.automationOnly).length
     const skip = items.filter(i => i.automationOnly).length
-    return `${bg} bg, ${mid} mid, ${fg} fg, ${rsfx} random${skip ? `, ${skip} skipped` : ''}`
+    const total = bg + mid + fg + rsfx + skip
+    return `${total} sounds (${bg} bg, ${mid} mid, ${fg} fg, ${rsfx} random${skip > 0 ? `, ${skip} skipped` : ''})`
   })() : null
 
   const canNext1 = musicJson !== null || sfxJson !== null
@@ -414,6 +415,7 @@ function ImportFromTemplateModal({ onClose, onImported }) {
 
   const handleApply = () => {
     onImported({ music_track_id: genMusicId, sound_layers: finalLayers })
+    onClose()
   }
 
   // ── Status badge helper ────────────────────────────────────────────────────
@@ -508,7 +510,7 @@ function ImportFromTemplateModal({ onClose, onImported }) {
         <label className="text-xs text-[#9090a8] font-medium">Extracted Composition Prompt</label>
         <textarea
           value={compPrompt}
-          onChange={e => { setCompPrompt(e.target.value); setPlanReady(false); setPlanJson('') }}
+          readOnly
           rows={3}
           className="w-full px-3 py-2 rounded-lg bg-[#16161a] border border-[#2a2a32] text-sm text-[#e8e8f0] resize-none focus:outline-none focus:border-[#7c6af7]"
         />
@@ -543,11 +545,18 @@ function ImportFromTemplateModal({ onClose, onImported }) {
     <div className="flex flex-col gap-2">
       <p className="text-xs text-[#9090a8] mb-1">Generating assets — please wait…</p>
       {genItems.map(item => (
-        <div key={item.key} className="flex items-center justify-between py-1.5 border-b border-[#2a2a32]">
-          <span className="text-sm text-[#e8e8f0] truncate flex-1 mr-2">
-            {item.type === 'music' ? '🎵' : '🔊'} {item.title}
-          </span>
-          {statusBadge(item.status, item.error)}
+        <div key={item.key} className="flex flex-col py-1.5 border-b border-[#2a2a32]">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-[#e8e8f0] truncate flex-1 mr-2">
+              {item.type === 'music' ? '🎵' : '🔊'} {item.title}
+            </span>
+            {statusBadge(item.status, item.error)}
+          </div>
+          {item.status === 'generating' && item.type === 'music' && (
+            <div className="w-32 h-1.5 bg-[#2a2a32] rounded-full overflow-hidden mt-1">
+              <div className="h-full bg-[#7c6af7] rounded-full animate-pulse" style={{ width: '60%' }} />
+            </div>
+          )}
         </div>
       ))}
       {genItems.length === 0 && <span className="text-xs text-[#5a5a70]">Preparing…</span>}
@@ -569,7 +578,7 @@ function ImportFromTemplateModal({ onClose, onImported }) {
         )}
         {(sfxDone > 0 || sfxFailed > 0) && (
           <div className="text-sm text-[#e8e8f0]">
-            <span className="text-[#34d399]">✓ {sfxDone} SFX saved</span>
+            {sfxDone > 0 && <span className="text-[#34d399]">✓ {sfxDone} / {sfxDone + sfxFailed} SFX saved</span>}
             {sfxFailed > 0 && <span className="text-[#f87171] ml-2">✗ {sfxFailed} failed</span>}
             {sfxSkipped > 0 && <span className="text-[#5a5a70] ml-2">⊘ {sfxSkipped} skipped</span>}
           </div>
