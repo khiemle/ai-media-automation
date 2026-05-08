@@ -211,6 +211,8 @@ export const sfxApi = {
         return res.json()
       })
   },
+  generate: (body) =>
+    fetchApi('/api/sfx/generate', { method: 'POST', body: JSON.stringify(body) }),
   delete: (id) =>
     fetchApi(`/api/sfx/${id}`, { method: 'DELETE' }),
   generate: (body) =>

@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
@@ -15,11 +16,14 @@ try:
 except ImportError:
     ElevenLabs = None
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/sfx", tags=["sfx"])
 
 ALLOWED_AUDIO_EXTENSIONS = {".mp3", ".wav", ".m4a", ".ogg"}
 MEDIA_TYPES = {".mp3": "audio/mpeg", ".wav": "audio/wav", ".m4a": "audio/mp4", ".ogg": "audio/ogg"}
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50 MB
+ELEVENLABS_TEXT_MAX = 450  # ElevenLabs sound-generation hard limit
 
 
 class GenerateBody(BaseModel):
@@ -53,6 +57,7 @@ def generate_sfx_elevenlabs(
     db: Session = Depends(get_db),
     _user=Depends(require_editor_or_admin),
 ):
+    """Generate a sound effect via ElevenLabs text-to-sound-effects and save it to the SFX library."""
     if ElevenLabs is None:
         raise HTTPException(status_code=503, detail="elevenlabs package is not installed")
 
@@ -63,16 +68,28 @@ def generate_sfx_elevenlabs(
     if not key:
         raise HTTPException(status_code=503, detail="ElevenLabs API key is not configured")
 
+    text = body.text.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="text is required")
+    if len(text) > ELEVENLABS_TEXT_MAX:
+        logger.warning(
+            "SFX generate: text truncated from %d to %d chars (loop=%s)",
+            len(text), ELEVENLABS_TEXT_MAX, body.loop,
+        )
+        text = text[:ELEVENLABS_TEXT_MAX]
+
     try:
         client = ElevenLabs(api_key=key)
-        kwargs: dict = {"text": body.text, "loop": body.loop}
+        kwargs: dict = {"text": text}
+        if body.loop:
+            kwargs["loop"] = True
         if body.duration_seconds is not None:
             kwargs["duration_seconds"] = body.duration_seconds
         audio_bytes = b"".join(client.text_to_sound_effects.convert(**kwargs))
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"ElevenLabs error: {e}")
 
-    title = body.title.strip() or body.text[:60]
+    title = body.title.strip() or text[:60]
     return SfxService(db).import_sfx(
         title=title,
         sound_type=None,
