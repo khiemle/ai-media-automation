@@ -214,6 +214,35 @@ async function pollMusicTask(taskId, maxMs = 300000) {
   throw new Error('Music generation timed out after 5 minutes')
 }
 
+function extractSeoFromSfxJson(sfxJson) {
+  const meta  = sfxJson.meta  || {}
+  const scene = sfxJson.scene || {}
+
+  const descParts = [
+    scene.pov,
+    [scene.time_of_day, scene.weather].filter(Boolean).join(', '),
+    scene.atmosphere,
+  ].filter(Boolean)
+  const seoDescription = descParts.length
+    ? descParts.join('. ').replace(/\.+$/, '') + '.'
+    : null
+
+  const tagWords = [
+    ...(meta.theme || '').split('-').filter(t => t.length > 2),
+    meta.use_case,
+    meta.channel,
+  ].filter(Boolean).map(t => String(t).toLowerCase().trim())
+  const seoTags = [...new Set(tagWords)].join(', ') || null
+
+  return {
+    theme:             meta.theme              || null,
+    target_duration_h: meta.video_length_hours || null,
+    seo_title:         meta.title              || null,
+    seo_description:   seoDescription,
+    seo_tags:          seoTags,
+  }
+}
+
 function VideoPreviewModal({ video, onClose }) {
   if (!video) return null
   return (
@@ -416,7 +445,7 @@ function ImportFromTemplateModal({ onClose, onImported }) {
   const canApply = genMusicId !== null || genSfxResults.length > 0
 
   const handleApply = () => {
-    onImported({ music_track_id: genMusicId, sound_layers: finalLayers })
+    onImported({ music_track_id: genMusicId, sound_layers: finalLayers, seo: sfxJson ? extractSeoFromSfxJson(sfxJson) : null })
     onClose()
   }
 
@@ -539,7 +568,30 @@ function ImportFromTemplateModal({ onClose, onImported }) {
             className="w-full px-3 py-2 rounded-lg bg-[#16161a] border border-[#2a2a32] text-xs text-[#e8e8f0] font-mono resize-none focus:outline-none focus:border-[#7c6af7]"
           />
         )}
-        {sfxJson && <span className="text-xs text-[#34d399]">🔊 {sfxJson.meta?.title || 'SFX JSON loaded'} — {sfxBadge}</span>}
+        {sfxJson && (
+          <>
+            <span className="text-xs text-[#34d399]">🔊 {sfxJson.meta?.title || 'SFX JSON loaded'} — {sfxBadge}</span>
+            {(() => {
+              const seo = extractSeoFromSfxJson(sfxJson)
+              return (
+                <div className="pl-2 border-l-2 border-[#2a2a32] flex flex-col gap-0.5 mt-0.5">
+                  {seo.theme && (
+                    <span className="text-xs text-[#9090a8]">Theme: <span className="text-[#e8e8f0] font-mono">{seo.theme}</span></span>
+                  )}
+                  {seo.target_duration_h && (
+                    <span className="text-xs text-[#9090a8]">Duration: <span className="text-[#e8e8f0]">{seo.target_duration_h}h</span></span>
+                  )}
+                  {seo.seo_title && (
+                    <span className="text-xs text-[#9090a8]">Title: <span className="text-[#e8e8f0]">{seo.seo_title}</span></span>
+                  )}
+                  {seo.seo_tags && (
+                    <span className="text-xs text-[#9090a8]">Tags: <span className="text-[#5a5a70] font-mono">{seo.seo_tags}</span></span>
+                  )}
+                </div>
+              )
+            })()}
+          </>
+        )}
         {sfxJsonError && <span className="text-xs text-[#f87171]">{sfxJsonError}</span>}
       </div>
     </div>
@@ -811,7 +863,7 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
     setTimeout(() => setToast(null), 3000)
   }
 
-  const handleTemplateImported = ({ music_track_id, sound_layers }) => {
+  const handleTemplateImported = ({ music_track_id, sound_layers, seo }) => {
     if (music_track_id) {
       if (isAsmrLike) {
         setMusicTrackIds(prev => prev.includes(music_track_id) ? prev : [...prev, music_track_id])
@@ -829,6 +881,26 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
         foreground: sound_layers.foreground || prev.foreground,
         random_sfx: sound_layers.random_sfx || prev.random_sfx,
       }))
+    }
+    if (seo) {
+      setForm(f => {
+        const patch = {}
+        if (seo.theme)           patch.theme           = seo.theme
+        if (seo.seo_title)       patch.seo_title       = seo.seo_title
+        if (seo.seo_description) patch.seo_description = seo.seo_description
+        if (seo.seo_tags)        patch.seo_tags        = seo.seo_tags
+        if (seo.target_duration_h != null) {
+          const preset = DURATION_PRESETS.find(p => p.value === seo.target_duration_h)
+          if (preset && preset.value !== null) {
+            patch.target_duration_h = seo.target_duration_h
+            patch.isCustomDuration  = false
+          } else {
+            patch.customDuration   = String(seo.target_duration_h)
+            patch.isCustomDuration = true
+          }
+        }
+        return { ...f, ...patch }
+      })
     }
     setShowImportTemplate(false)
     showToast('Template imported', 'success')
