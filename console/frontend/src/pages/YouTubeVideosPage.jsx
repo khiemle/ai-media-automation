@@ -552,7 +552,7 @@ function ImportFromTemplateModal({ onClose, onImported }) {
   const renderStep1 = () => (
     <div className="flex flex-col gap-5">
       <p className="text-xs text-[#9090a8]">
-        Provide one or both JSON template files. Each is optional — you can import just music, just SFX, or both.
+        Provide any combination of JSON template files. Each is optional — music, SFX, and SEO are all independent.
       </p>
 
       {/* Music JSON */}
@@ -642,6 +642,56 @@ function ImportFromTemplateModal({ onClose, onImported }) {
           </>
         )}
         {sfxJsonError && <span className="text-xs text-[#f87171]">{sfxJsonError}</span>}
+      </div>
+
+      {/* SEO JSON */}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-bold text-[#5a5a70] tracking-widest">SEO JSON</span>
+          <div className="flex gap-1">
+            <button onClick={() => setSeoMode('file')}
+              className={`text-xs px-2 py-0.5 rounded border transition-colors ${seoMode==='file' ? 'bg-[#7c6af7] border-[#7c6af7] text-white' : 'bg-[#16161a] border-[#2a2a32] text-[#9090a8]'}`}>
+              File
+            </button>
+            <button onClick={() => setSeoMode('paste')}
+              className={`text-xs px-2 py-0.5 rounded border transition-colors ${seoMode==='paste' ? 'bg-[#7c6af7] border-[#7c6af7] text-white' : 'bg-[#16161a] border-[#2a2a32] text-[#9090a8]'}`}>
+              Paste
+            </button>
+          </div>
+        </div>
+        {seoMode === 'file' ? (
+          <input type="file" accept=".json"
+            onChange={handleSeoFile}
+            className="text-sm text-[#9090a8] file:mr-3 file:py-1 file:px-2 file:rounded file:border-0 file:bg-[#2a2a32] file:text-[#e8e8f0] file:text-xs cursor-pointer"
+          />
+        ) : (
+          <textarea
+            value={seoPaste}
+            onChange={e => { setSeoPaste(e.target.value); loadJsonFromText(e.target.value, parseSeoJson, setSeoJson, setSeoJsonError) }}
+            rows={4}
+            placeholder='Paste SEO JSON here…'
+            className="w-full px-3 py-2 rounded-lg bg-[#16161a] border border-[#2a2a32] text-xs text-[#e8e8f0] font-mono resize-none focus:outline-none focus:border-[#7c6af7]"
+          />
+        )}
+        {seoJson && (() => {
+          const seo = extractSeoFromSeoJson(seoJson)
+          const tagCount = seoJson.tags?.all?.length || 0
+          const titlePreview = (seo.seo_title || '').slice(0, 60) + ((seo.seo_title || '').length > 60 ? '…' : '')
+          return (
+            <>
+              <span className="text-xs text-[#34d399]">🔍 {titlePreview || 'SEO JSON loaded'}</span>
+              <div className="pl-2 border-l-2 border-[#2a2a32] flex flex-col gap-0.5 mt-0.5">
+                {seo.target_duration_h && (
+                  <span className="text-xs text-[#9090a8]">Duration: <span className="text-[#e8e8f0]">{seo.target_duration_h}h</span></span>
+                )}
+                {tagCount > 0 && (
+                  <span className="text-xs text-[#9090a8]">Tags: <span className="text-[#e8e8f0]">{tagCount} tags loaded</span></span>
+                )}
+              </div>
+            </>
+          )
+        })()}
+        {seoJsonError && <span className="text-xs text-[#f87171]">{seoJsonError}</span>}
       </div>
     </div>
   )
