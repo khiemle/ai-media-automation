@@ -243,6 +243,14 @@ function extractSeoFromSfxJson(sfxJson) {
   }
 }
 
+function extractPromptsFromJsons(musicJson, sfxJson) {
+  const result = {}
+  if (musicJson)                        result.music      = buildMusicPrompt(musicJson)
+  if (sfxJson?.runway?.prompt)          result.visual     = sfxJson.runway.prompt
+  if (sfxJson?.midjourney?.full_prompt) result.midjourney = sfxJson.midjourney.full_prompt
+  return result
+}
+
 function VideoPreviewModal({ video, onClose }) {
   if (!video) return null
   return (
@@ -442,7 +450,8 @@ function ImportFromTemplateModal({ onClose, onImported }) {
   const canApply = genMusicId !== null || genSfxResults.length > 0
 
   const handleApply = () => {
-    onImported({ music_track_id: genMusicId, sound_layers: finalLayers, seo: sfxJson ? extractSeoFromSfxJson(sfxJson) : null })
+    const prompts = extractPromptsFromJsons(musicJson, sfxJson)
+    onImported({ music_track_id: genMusicId, sound_layers: finalLayers, seo: sfxJson ? extractSeoFromSfxJson(sfxJson) : null, prompts })
     onClose()
   }
 
