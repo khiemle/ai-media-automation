@@ -73,7 +73,21 @@ def _require(kwargs: dict, name: str) -> Any:
     return kwargs[name]
 
 
-def register(server, *, client_factory):
+def register(server, *, client_factory, audit_sink=None, transport="stdio", actor_jwt_sub=None):
+    from console.mcp.audit import wrap_with_audit_log
+
+    async def _core(**kw):
+        client = client_factory()
+        return await pipeline_jobs(_client=client, **kw)
+
+    if audit_sink is not None:
+        _audit_wrapped = wrap_with_audit_log(
+            _core, tool_name="pipeline_jobs",
+            sink=audit_sink, transport=transport, actor_jwt_sub=actor_jwt_sub,
+        )
+    else:
+        _audit_wrapped = None
+
     @server.tool(name="pipeline_jobs")
     async def _pipeline_jobs(
         action: str,
@@ -83,8 +97,10 @@ def register(server, *, client_factory):
         offset: int = None,
         confirm: bool = False,
     ) -> dict:
-        client = client_factory()
-        return await pipeline_jobs(
-            action=action, _client=client,
-            job_id=job_id, status=status, limit=limit, offset=offset, confirm=confirm,
+        kw = dict(
+            action=action, job_id=job_id, status=status,
+            limit=limit, offset=offset, confirm=confirm,
         )
+        if _audit_wrapped is not None:
+            return await _audit_wrapped(**kw)
+        return await _core(**kw)

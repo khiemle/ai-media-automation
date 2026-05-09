@@ -117,7 +117,23 @@ _GATE_ACTIONS: dict = {
 }
 
 
-def register(server, *, client_factory):
+def register(server, *, client_factory, audit_sink=None, transport="stdio", actor_jwt_sub=None):
+    from console.mcp.audit import wrap_with_audit_log
+
+    async def _core(**kw):
+        client = client_factory()
+        action = kw.get("action")
+        rest = {k: v for k, v in kw.items() if k != "action"}
+        return await youtube_video(action=action, _client=client, **rest)
+
+    if audit_sink is not None:
+        _audit_wrapped = wrap_with_audit_log(
+            _core, tool_name="youtube_video",
+            sink=audit_sink, transport=transport, actor_jwt_sub=actor_jwt_sub,
+        )
+    else:
+        _audit_wrapped = None
+
     @server.tool(name="youtube_video")
     async def _youtube_video(
         action: str,
@@ -134,9 +150,13 @@ def register(server, *, client_factory):
     ) -> dict:
         client = client_factory()
         kw = {k: v for k, v in {
+            "action": action,
             "video_id": video_id, "template_id": template_id,
             "status": status, "niche": niche, "limit": limit, "offset": offset,
             "fields": fields, "payload": payload,
             "confirm": confirm, "confirm_id": confirm_id,
-        }.items() if v is not None or k == "confirm"}
-        return await youtube_video(action=action, _client=client, **kw)
+        }.items() if v is not None or k in ("confirm", "action")}
+        if _audit_wrapped is not None:
+            return await _audit_wrapped(**kw)
+        act = kw.pop("action", action)
+        return await youtube_video(action=act, _client=client, **kw)

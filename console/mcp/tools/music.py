@@ -160,7 +160,23 @@ def _is_secret(name: str) -> bool:
     return name in {"password"} or name.endswith(("_token", "_key", "_secret"))
 
 
-def register(server, *, client_factory):
+def register(server, *, client_factory, audit_sink=None, transport="stdio", actor_jwt_sub=None):
+    from console.mcp.audit import wrap_with_audit_log
+
+    async def _core(**kw):
+        client = client_factory()
+        action = kw.get("action")
+        rest = {k: v for k, v in kw.items() if k != "action"}
+        return await music(action=action, _client=client, **rest)
+
+    if audit_sink is not None:
+        _audit_wrapped = wrap_with_audit_log(
+            _core, tool_name="music",
+            sink=audit_sink, transport=transport, actor_jwt_sub=actor_jwt_sub,
+        )
+    else:
+        _audit_wrapped = None
+
     @server.tool(name="music")
     async def _music(
         action: str,
@@ -183,6 +199,9 @@ def register(server, *, client_factory):
     ) -> dict:
         client = client_factory()
         kw = {k: v for k, v in locals().items()
-              if k not in ("client", "action", "client_factory") and v is not None}
+              if k not in ("client", "client_factory") and v is not None}
         kw.pop("kw", None)
-        return await music(action=action, _client=client, **kw)
+        if _audit_wrapped is not None:
+            return await _audit_wrapped(**kw)
+        act = kw.pop("action", action)
+        return await music(action=act, _client=client, **kw)
