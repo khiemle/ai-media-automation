@@ -6,6 +6,8 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
+from console.backend.utils.file_naming import make_unique_path
+
 MUSIC_DIR = Path(os.environ.get("MUSIC_PATH", "./assets/music"))
 
 
@@ -250,7 +252,7 @@ Respond with JSON only."""
         self.db.flush()  # get track.id before writing file
 
         MUSIC_DIR.mkdir(parents=True, exist_ok=True)
-        dest = MUSIC_DIR / f"{track.id}{extension}"
+        dest = make_unique_path(title, extension, MUSIC_DIR)
         dest.write_bytes(file_bytes)
 
         from pipeline.music_providers import probe_audio_duration
