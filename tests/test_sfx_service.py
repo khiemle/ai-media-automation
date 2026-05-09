@@ -1,5 +1,6 @@
 import pytest
 from console.backend.services.sfx_service import SfxService
+from console.backend.utils.file_naming import make_filename
 
 
 def test_list_sfx_empty(db):
@@ -22,7 +23,8 @@ def test_import_sfx(db, tmp_path):
     assert track["id"] is not None
     assert track["title"] == "Heavy Rain"
     assert track["sound_type"] == "rain_heavy"
-    assert (tmp_path / f"sfx_{track['id']}.wav").exists()
+    expected_filename = make_filename("Heavy Rain", ".wav")
+    assert (tmp_path / expected_filename).exists()
 
 
 def test_list_sfx_filter_by_type(db, tmp_path):
@@ -39,7 +41,8 @@ def test_delete_sfx(db, tmp_path):
     svc = SfxService(db)
     fake = b"RIFF" + b"\x00" * 40
     track = svc.import_sfx("Rain", "rain_heavy", "import", fake, "r.wav", sfx_dir=tmp_path)
-    file_path = tmp_path / f"sfx_{track['id']}.wav"
+    expected_filename = make_filename("Rain", ".wav")
+    file_path = tmp_path / expected_filename
     svc.delete_sfx(track["id"])
     assert svc.list_sfx() == []
     assert not file_path.exists()

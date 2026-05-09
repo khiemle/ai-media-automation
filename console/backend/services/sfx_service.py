@@ -3,6 +3,8 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
+from console.backend.utils.file_naming import make_unique_path
+
 SFX_DIR = Path(os.environ.get("SFX_PATH", "./assets/sfx"))
 
 
@@ -72,7 +74,7 @@ class SfxService:
         self.db.flush()
 
         ext = Path(filename).suffix or ".wav"
-        dest = sfx_dir / f"sfx_{row.id}{ext}"
+        dest = make_unique_path(title, ext, sfx_dir)
         dest.write_bytes(file_bytes)
         row.file_path = str(dest)
         self.db.commit()
