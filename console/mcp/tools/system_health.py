@@ -1,6 +1,4 @@
 """system_health tool — read-only observability."""
-from __future__ import annotations
-
 from typing import Any
 
 from console.mcp.errors import ConsoleError
