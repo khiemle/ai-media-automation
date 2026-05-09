@@ -6,7 +6,7 @@ import os
 from console.mcp.auth.adapters import StdioAuth
 from console.mcp.client.console_client import ConsoleClient
 from console.mcp.server import build_server
-from console.mcp.tools import system_health, task_status, pipeline_jobs, music, sfx, visual_asset, channel_plan, channel
+from console.mcp.tools import system_health, task_status, pipeline_jobs, music, sfx, visual_asset, channel_plan, channel, youtube_video
 
 
 def main() -> None:
@@ -28,6 +28,7 @@ def main() -> None:
         lambda s: visual_asset.register(s, client_factory=client_factory),
         lambda s: channel_plan.register(s, client_factory=client_factory),
         lambda s: channel.register(s, client_factory=client_factory),
+        lambda s: youtube_video.register(s, client_factory=client_factory),
     ])
     server.run("stdio")
 

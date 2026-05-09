@@ -10,7 +10,7 @@ from fastapi import FastAPI, Header, HTTPException, Request
 
 from console.mcp.auth.adapters import ChatAuth
 from console.mcp.client.console_client import ConsoleClient
-from console.mcp.tools import system_health, task_status, pipeline_jobs, music, sfx, visual_asset, channel_plan, channel
+from console.mcp.tools import system_health, task_status, pipeline_jobs, music, sfx, visual_asset, channel_plan, channel, youtube_video
 
 
 def attach(app: FastAPI) -> None:
@@ -26,6 +26,7 @@ def attach(app: FastAPI) -> None:
             {"name": "visual_asset", "description": "background video/image library + Runway animate + Topaz upscale"},
             {"name": "channel_plan", "description": "channel plan CRUD + JSON import + AI helpers (SEO, prompts, autofill, ask)"},
             {"name": "channel", "description": "channel CRUD + template defaults + credential status"},
+            {"name": "youtube_video", "description": "youtube video lifecycle (CRUD + render gates)"},
         ]}
 
     @app.post("/mcp/call")
@@ -56,6 +57,8 @@ def attach(app: FastAPI) -> None:
             return await channel_plan.channel_plan(_client=client, **args)
         elif tool_name == "channel":
             return await channel.channel(_client=client, **args)
+        elif tool_name == "youtube_video":
+            return await youtube_video.youtube_video(_client=client, **args)
         raise HTTPException(status_code=404, detail=f"unknown tool {tool_name}")
 
 
