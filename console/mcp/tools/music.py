@@ -10,17 +10,24 @@ async def music(*, action: str, _client: Any, **kw: Any) -> dict:
     """Music library + generation.
 
     Actions:
-      - list_templates                          (R)
-      - list_tracks  [niche, limit, offset]     (R)
-      - get          {track_id}                 (R)
-      - stream_url   {track_id}                 (R)  → returns URL string
-      - generate     {prompt, duration_s, ...}  (W async, confirm=true)
-      - upload       {file_path, title, ...}    (W, confirm=true)
-      - update       {track_id, fields}         (W, confirm=true)
-      - delete       {track_id}                 (W destructive)
-      - elevenlabs_plan    {prompt, ...}        (R)  pure LLM call, no side effects
-      - elevenlabs_compose {plan_id}            (W async, confirm=true)
-      - get_task     {task_id}                  (R)
+      - list_templates                                      (R)
+      - list_tracks  [niche, limit, offset]                 (R)
+      - get          {track_id}                             (R)
+      - stream_url   {track_id}                             (R)  → returns URL string
+      - generate     {idea, niches?, moods?, genres?,
+                      provider?, is_vocal?, title?,
+                      expand_only?}                         (W async, confirm=true)
+      - update       {track_id, fields}                     (W, confirm=true)
+      - delete       {track_id}                             (W destructive)
+      - elevenlabs_plan    {input, music_length_ms?}        (R)  pure LLM call, no side effects
+      - elevenlabs_compose {composition_plan, title?,
+                            niches?, moods?, genres?,
+                            output_format?,
+                            respect_sections_durations?}    (W async, confirm=true)
+      - get_task     {task_id}                              (R)
+
+    Note: upload (POST /api/music/upload) requires multipart/form-data with a binary
+    file field; it cannot be called via JSON and is not supported by this tool.
     """
     try:
         if action == "list_templates":
@@ -39,32 +46,35 @@ async def music(*, action: str, _client: Any, **kw: Any) -> dict:
             return _ok(await _client.get(f"/api/music/tasks/{taskid}"))
 
         # elevenlabs_plan is read-only-ish (LLM plan generation, no DB side effects)
+        # Backend: ElevenLabsPlanBody { input: str, music_length_ms: int = 60000 }
         if action == "elevenlabs_plan":
             return _ok(await _client.post("/api/music/elevenlabs/plan",
-                                          json=_pick(kw, {"prompt", "duration_s", "style"})))
+                                          json=_pick(kw, {"input", "music_length_ms"})))
 
+        # Backend: GenerateBody { idea, niches, moods, genres, provider, is_vocal, title, expand_only }
         if action == "generate":
             return await _confirmed_async(
-                kw, summary=f"generate music: {kw.get('prompt', '')!r}",
+                kw, summary=f"generate music: {kw.get('idea', '')!r}",
                 task_kind="music_generate",
                 run=lambda: _client.post("/api/music/generate",
-                                         json=_pick(kw, {"prompt", "duration_s", "style", "niche", "voice"})),
+                                         json=_pick(kw, {"idea", "niches", "moods", "genres",
+                                                          "provider", "is_vocal", "title", "expand_only"})),
             )
+        # Backend: ElevenLabsComposeBody { composition_plan, title, niches, moods, genres,
+        #                                   output_format, respect_sections_durations }
         if action == "elevenlabs_compose":
             return await _confirmed_async(
-                kw, summary=f"elevenlabs compose plan {kw.get('plan_id')}",
+                kw, summary=f"elevenlabs compose",
                 task_kind="music_elevenlabs_compose",
                 run=lambda: _client.post("/api/music/elevenlabs/compose",
-                                         json=_pick(kw, {"plan_id"})),
-            )
-        if action == "upload":
-            return await _confirmed_sync(
-                kw, summary=f"upload music track {kw.get('title')!r}",
-                run=lambda: _client.post("/api/music/upload",
-                                         json=_pick(kw, {"file_path", "title", "niche", "tags"})),
+                                         json=_pick(kw, {"composition_plan", "title", "niches",
+                                                          "moods", "genres", "output_format",
+                                                          "respect_sections_durations"})),
             )
         if action == "update":
             tid = _require(kw, "track_id")
+            # Backend: UpdateBody { title, niches, moods, genres, is_vocal, is_favorite,
+            #                       volume, quality_score } — all optional
             return await _confirmed_sync(
                 kw, summary=f"update music track {tid}",
                 run=lambda: _client.put(f"/api/music/{tid}", json=kw.get("fields") or {}),
@@ -182,16 +192,25 @@ def register(server, *, client_factory, audit_sink=None, transport="stdio", acto
         action: str,
         track_id: int = None,
         task_id: str = None,
-        plan_id: int = None,
-        prompt: str = None,
-        duration_s: int = None,
-        style: str = None,
-        niche: str = None,
-        voice: str = None,
-        file_path: str = None,
+        # generate fields (GenerateBody)
+        idea: str = None,
+        niches: list = None,
+        moods: list = None,
+        genres: list = None,
+        provider: str = None,
+        is_vocal: bool = None,
         title: str = None,
-        tags: list = None,
+        expand_only: bool = None,
+        # elevenlabs_plan fields (ElevenLabsPlanBody)
+        input: str = None,
+        music_length_ms: int = None,
+        # elevenlabs_compose fields (ElevenLabsComposeBody)
+        composition_plan: dict = None,
+        output_format: str = None,
+        respect_sections_durations: bool = None,
+        # update fields
         fields: dict = None,
+        # common
         confirm: bool = False,
         confirm_id: int = None,
         limit: int = None,

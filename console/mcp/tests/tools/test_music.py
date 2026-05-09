@@ -41,17 +41,29 @@ async def test_stream_url_returns_url():
 async def test_generate_returns_task_envelope():
     client = AsyncMock()
     client.post.return_value = {"task_id": "music-1"}
-    out = await music(action="generate", prompt="forest dawn", duration_s=480, confirm=True, _client=client)
+    out = await music(action="generate", idea="forest dawn", provider="lyria-clip", confirm=True, _client=client)
     assert out["ok"] is True
     assert out["task_id"] == "music-1"
     assert out["task_kind"] == "music_generate"
-    client.post.assert_awaited_once()
+    # Verify the body sent matches GenerateBody schema
+    call_kwargs = client.post.call_args
+    body = call_kwargs.kwargs.get("json") or call_kwargs.args[1] if len(call_kwargs.args) > 1 else call_kwargs.kwargs["json"]
+    assert "idea" in body
+    assert body["idea"] == "forest dawn"
+    assert "provider" in body
+    assert body["provider"] == "lyria-clip"
+    # Old wrong fields must not be present
+    assert "prompt" not in body
+    assert "duration_s" not in body
+    assert "style" not in body
+    assert "niche" not in body
+    assert "voice" not in body
 
 
 @pytest.mark.asyncio
 async def test_generate_requires_confirm():
     client = AsyncMock()
-    out = await music(action="generate", prompt="x", duration_s=60, _client=client)
+    out = await music(action="generate", idea="x", _client=client)
     assert out["ok"] is False
     assert out["needs_confirmation"] is True
 
@@ -82,12 +94,32 @@ async def test_update():
 @pytest.mark.asyncio
 async def test_elevenlabs_plan_and_compose():
     client = AsyncMock()
-    client.post.return_value = {"plan_id": 1, "sections": []}
-    out = await music(action="elevenlabs_plan", prompt="rain", _client=client)
-    client.post.assert_awaited_with("/api/music/elevenlabs/plan", json={"prompt": "rain"})
+    client.post.return_value = {"composition_plan": {"sections": []}}
+    # ElevenLabsPlanBody: { input: str, music_length_ms: int = 60000 }
+    out = await music(action="elevenlabs_plan", input="rain soundscape", music_length_ms=30000, _client=client)
+    client.post.assert_awaited_with(
+        "/api/music/elevenlabs/plan",
+        json={"input": "rain soundscape", "music_length_ms": 30000},
+    )
 
     client.post.reset_mock()
     client.post.return_value = {"task_id": "elv-1"}
-    out = await music(action="elevenlabs_compose", plan_id=1, confirm=True, _client=client)
-    client.post.assert_awaited_with("/api/music/elevenlabs/compose", json={"plan_id": 1})
+    # ElevenLabsComposeBody: { composition_plan, title, niches, moods, genres, output_format, respect_sections_durations }
+    plan = {"sections": [{"start": 0, "end": 30000}]}
+    out = await music(
+        action="elevenlabs_compose",
+        composition_plan=plan,
+        title="Rain Track",
+        niches=["sleep"],
+        confirm=True,
+        _client=client,
+    )
+    call_kwargs = client.post.call_args
+    body = call_kwargs.kwargs.get("json") or call_kwargs.args[1] if len(call_kwargs.args) > 1 else call_kwargs.kwargs["json"]
+    assert "composition_plan" in body
+    assert body["composition_plan"] == plan
+    assert "title" in body
+    assert body["title"] == "Rain Track"
+    # old wrong field must not be present
+    assert "plan_id" not in body
     assert out["task_kind"] == "music_elevenlabs_compose"

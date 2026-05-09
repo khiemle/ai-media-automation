@@ -75,7 +75,7 @@ async def test_full_make_a_video_flow():
 
     # 3. Music — list, generate, poll until ready
     await music.music(action="list_tracks", _client=client)
-    out = await music.music(action="generate", prompt="forest dawn", duration_s=480, confirm=True, _client=client)
+    out = await music.music(action="generate", idea="forest dawn", provider="lyria-clip", confirm=True, _client=client)
     assert out["ok"] is True and out["task_id"] == "music-1"
     out = await task_status.task_status(task_id="music-1", _client=client)
     assert out["status"] == "SUCCESS"
