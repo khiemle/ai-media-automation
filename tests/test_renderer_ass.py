@@ -18,7 +18,7 @@ def test_renderer_burns_ass_when_no_srt(tmp_path):
          patch("subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=0)
         # Create the output file that ffmpeg would normally create
-        (tmp_path / "video_final.mp4").write_bytes(b"fake final")
+        (tmp_path / "final.mp4").write_bytes(b"fake final")
         from pipeline.renderer import render_final
         render_final(raw_video_path=raw)
     cmd = mock_run.call_args.args[0]
@@ -37,7 +37,7 @@ def test_renderer_prefers_srt_over_ass(tmp_path):
          patch("pipeline.renderer._check_subtitles_filter", return_value=True), \
          patch("subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=0)
-        (tmp_path / "video_final.mp4").write_bytes(b"fake final")
+        (tmp_path / "final.mp4").write_bytes(b"fake final")
         from pipeline.renderer import render_final
         render_final(raw_video_path=raw, srt_path=srt_file)
     cmd = mock_run.call_args.args[0]
@@ -54,7 +54,7 @@ def test_renderer_skips_empty_ass(tmp_path):
          patch("pipeline.renderer._check_subtitles_filter", return_value=True), \
          patch("subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=0)
-        (tmp_path / "video_final.mp4").write_bytes(b"fake final")
+        (tmp_path / "final.mp4").write_bytes(b"fake final")
         from pipeline.renderer import render_final
         render_final(raw_video_path=raw)
     cmd = mock_run.call_args.args[0]
@@ -69,7 +69,7 @@ def test_renderer_no_subtitle_when_neither_file_exists(tmp_path):
          patch("pipeline.renderer._check_subtitles_filter", return_value=True), \
          patch("subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=0)
-        (tmp_path / "video_final.mp4").write_bytes(b"fake final")
+        (tmp_path / "final.mp4").write_bytes(b"fake final")
         from pipeline.renderer import render_final
         render_final(raw_video_path=raw)
     cmd = mock_run.call_args.args[0]
@@ -82,7 +82,7 @@ def test_renderer_moviepy_fallback_when_libass_unavailable(tmp_path):
     raw = _make_raw(tmp_path)
     srt_file = tmp_path / "captions.srt"
     srt_file.write_text("1\n00:00:00,000 --> 00:00:01,000\nHello world\n")
-    final_path = tmp_path / "video_final.mp4"
+    final_path = tmp_path / "final.mp4"
 
     with patch("pipeline.renderer._check_nvenc", return_value=False), \
          patch("pipeline.renderer._check_subtitles_filter", return_value=False), \
@@ -109,7 +109,7 @@ def test_renderer_logs_warning_when_subtitles_filter_unavailable(tmp_path):
          patch("subprocess.run") as mock_run, \
          patch("pipeline.renderer.logger") as mock_logger:
         mock_run.return_value = MagicMock(returncode=0)
-        (tmp_path / "video_final.mp4").write_bytes(b"fake final")
+        (tmp_path / "final.mp4").write_bytes(b"fake final")
         from pipeline.renderer import render_final
         render_final(raw_video_path=raw)
     cmd = mock_run.call_args.args[0]
@@ -160,7 +160,7 @@ def test_renderer_prefers_srt_over_ass(tmp_path):
          patch("pipeline.renderer._check_subtitles_filter", return_value=True), \
          patch("subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=0)
-        (tmp_path / "video_final.mp4").write_bytes(b"fake final")
+        (tmp_path / "final.mp4").write_bytes(b"fake final")
         from pipeline.renderer import render_final
         render_final(raw_video_path=raw, srt_path=srt_file)
     cmd = mock_run.call_args.args[0]
@@ -177,7 +177,7 @@ def test_renderer_skips_empty_ass(tmp_path):
          patch("pipeline.renderer._check_subtitles_filter", return_value=True), \
          patch("subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=0)
-        (tmp_path / "video_final.mp4").write_bytes(b"fake final")
+        (tmp_path / "final.mp4").write_bytes(b"fake final")
         from pipeline.renderer import render_final
         render_final(raw_video_path=raw)
     cmd = mock_run.call_args.args[0]
@@ -192,7 +192,7 @@ def test_renderer_no_subtitle_when_neither_file_exists(tmp_path):
          patch("pipeline.renderer._check_subtitles_filter", return_value=True), \
          patch("subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=0)
-        (tmp_path / "video_final.mp4").write_bytes(b"fake final")
+        (tmp_path / "final.mp4").write_bytes(b"fake final")
         from pipeline.renderer import render_final
         render_final(raw_video_path=raw)
     cmd = mock_run.call_args.args[0]
@@ -209,7 +209,7 @@ def test_renderer_logs_warning_when_subtitles_filter_unavailable(tmp_path):
          patch("subprocess.run") as mock_run, \
          patch("pipeline.renderer.logger") as mock_logger:
         mock_run.return_value = MagicMock(returncode=0)
-        (tmp_path / "video_final.mp4").write_bytes(b"fake final")
+        (tmp_path / "final.mp4").write_bytes(b"fake final")
         from pipeline.renderer import render_final
         render_final(raw_video_path=raw)
     cmd = mock_run.call_args.args[0]

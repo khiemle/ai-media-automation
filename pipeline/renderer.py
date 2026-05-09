@@ -2,7 +2,7 @@
 Final Renderer — ffmpeg h264_nvenc GPU encode with subtitle burn-in.
 CPU fallback (libx264) when NVENC is unavailable.
 MoviePy fallback for subtitle burn-in when ffmpeg lacks libass.
-Output: video_final.mp4 at 1080×1920, 30fps, AAC 192kbps.
+Output: final.mp4 at 1080×1920, 30fps, AAC 192kbps.
 """
 import logging
 import os
@@ -187,20 +187,20 @@ def render_final(
     raw_path:       str | Path | None = None,
 ) -> Path:
     """
-    Encode raw_video.mp4 → video_final.mp4 with:
+    Encode raw_video.mp4 → final.mp4 with:
     - h264_nvenc (GPU) or libx264 (CPU fallback)
     - Subtitle burn-in from SRT
     - Final audio mix (if music not already embedded)
     - 1080×1920, 30fps, CRF 23, AAC 192k
 
-    Returns path to video_final.mp4.
+    Returns path to final.mp4.
     """
     raw_video_path = raw_video_path or raw_path
     if raw_video_path is None:
         raise TypeError("render_final() missing required argument: 'raw_video_path'")
 
     raw_path_obj = Path(raw_video_path)
-    final_path = raw_path_obj.parent / "video_final.mp4"
+    final_path = raw_path_obj.parent / "final.mp4"
 
     nvenc_available = _check_nvenc()
     codec   = "h264_nvenc" if nvenc_available else "libx264"
@@ -287,11 +287,11 @@ def render_final(
                                  "-i", str(raw_path_obj)] + cmd[cmd.index("-map"):]
                     result2 = subprocess.run(cmd_retry, capture_output=True, text=True, timeout=600)
                     if result2.returncode == 0:
-                        logger.info(f"[Renderer] video_final.mp4 → {final_path} (retry OK)")
+                        logger.info(f"[Renderer] final.mp4 → {final_path} (retry OK)")
                         return final_path
             raise RuntimeError(f"ffmpeg failed:\n{error_msg}")
 
-        logger.info(f"[Renderer] video_final.mp4 → {final_path} ({final_path.stat().st_size // 1024 // 1024}MB)")
+        logger.info(f"[Renderer] final.mp4 → {final_path} ({final_path.stat().st_size // 1024 // 1024}MB)")
         return final_path
 
     except subprocess.TimeoutExpired:
