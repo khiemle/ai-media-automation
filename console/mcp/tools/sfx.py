@@ -1,0 +1,76 @@
+"""sfx — sound effects library + generation."""
+
+from typing import Any
+
+from console.mcp.errors import ConsoleError
+from console.mcp.tools.music import (  # reuse helpers
+    _ok, _bad_action, _require, _pick,
+    _confirmed_sync, _confirmed_async, _confirmed_destructive,
+)
+
+
+async def sfx(*, action: str, _client: Any, **kw: Any) -> dict:
+    """SFX library.
+
+    Actions:
+      - list_sound_types
+      - list                   [sound_type, limit, offset]
+      - get_stream_url         {sfx_id}
+      - generate               {prompt, duration_s, sound_type}  (W async)
+      - import_file            {file_path, name, sound_type}     (W)
+      - delete                 {sfx_id} (destructive)
+    """
+    try:
+        if action == "list_sound_types":
+            return _ok(await _client.get("/api/sfx/sound-types", params={}))
+        if action == "list":
+            params = _pick(kw, {"sound_type", "limit", "offset"})
+            return _ok(await _client.get("/api/sfx", params=params))
+        if action == "get_stream_url":
+            sid = _require(kw, "sfx_id")
+            return {"ok": True, "data": {"url": f"/api/sfx/{sid}/stream"}}
+        if action == "generate":
+            return await _confirmed_async(
+                kw, summary=f"generate sfx: {kw.get('prompt')!r}",
+                task_kind="sfx_generate",
+                run=lambda: _client.post("/api/sfx/generate",
+                                         json=_pick(kw, {"prompt", "duration_s", "sound_type"})),
+            )
+        if action == "import_file":
+            return await _confirmed_sync(
+                kw, summary=f"import sfx file {kw.get('file_path')!r}",
+                run=lambda: _client.post("/api/sfx/import",
+                                         json=_pick(kw, {"file_path", "name", "sound_type"})),
+            )
+        if action == "delete":
+            sid = _require(kw, "sfx_id")
+            return await _confirmed_destructive(
+                kw, id_arg="sfx_id",
+                summary=f"DELETE sfx {sid}",
+                run=lambda: _client.delete(f"/api/sfx/{sid}"),
+            )
+        return _bad_action(action)
+    except ConsoleError as e:
+        return e.to_envelope()
+
+
+def register(server, *, client_factory):
+    @server.tool(name="sfx")
+    async def _sfx(
+        action: str,
+        sfx_id: int = None,
+        sound_type: str = None,
+        prompt: str = None,
+        duration_s: int = None,
+        file_path: str = None,
+        name: str = None,
+        limit: int = None,
+        offset: int = None,
+        confirm: bool = False,
+        confirm_id: int = None,
+    ) -> dict:
+        client = client_factory()
+        kw = {k: v for k, v in locals().items()
+              if k not in ("client", "action", "client_factory") and v is not None}
+        kw.pop("kw", None)
+        return await sfx(action=action, _client=client, **kw)

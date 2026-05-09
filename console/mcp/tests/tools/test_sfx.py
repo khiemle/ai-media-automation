@@ -1,0 +1,51 @@
+import pytest
+from unittest.mock import AsyncMock
+
+from console.mcp.tools.sfx import sfx
+
+
+@pytest.mark.asyncio
+async def test_list_sound_types():
+    client = AsyncMock()
+    client.get.return_value = ["wind", "rain", "fire"]
+    out = await sfx(action="list_sound_types", _client=client)
+    client.get.assert_awaited_once_with("/api/sfx/sound-types", params={})
+
+
+@pytest.mark.asyncio
+async def test_list_with_filters():
+    client = AsyncMock()
+    client.get.return_value = []
+    await sfx(action="list", sound_type="wind", limit=20, _client=client)
+    client.get.assert_awaited_once_with("/api/sfx", params={"sound_type": "wind", "limit": 20})
+
+
+@pytest.mark.asyncio
+async def test_stream_url():
+    client = AsyncMock()
+    out = await sfx(action="get_stream_url", sfx_id=3, _client=client)
+    assert out["data"]["url"] == "/api/sfx/3/stream"
+
+
+@pytest.mark.asyncio
+async def test_generate_async():
+    client = AsyncMock()
+    client.post.return_value = {"task_id": "sfx-1"}
+    out = await sfx(action="generate", prompt="thunder", duration_s=4, confirm=True, _client=client)
+    assert out["task_kind"] == "sfx_generate"
+    assert out["task_id"] == "sfx-1"
+
+
+@pytest.mark.asyncio
+async def test_import_file():
+    client = AsyncMock()
+    client.post.return_value = {"id": 9, "name": "x"}
+    out = await sfx(action="import_file", file_path="/tmp/x.wav", name="x", confirm=True, _client=client)
+    client.post.assert_awaited_once_with("/api/sfx/import", json={"file_path": "/tmp/x.wav", "name": "x"})
+
+
+@pytest.mark.asyncio
+async def test_delete_destructive():
+    client = AsyncMock()
+    out = await sfx(action="delete", sfx_id=9, confirm=True, confirm_id=9, _client=client)
+    client.delete.assert_awaited_once_with("/api/sfx/9")
