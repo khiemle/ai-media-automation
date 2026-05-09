@@ -174,3 +174,8 @@ def health():
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "env": settings.ENV,
     }
+
+
+# MCP sub-app for chat surface
+from console.mcp.mount import attach as _attach_mcp
+_attach_mcp(app)
