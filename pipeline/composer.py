@@ -47,7 +47,9 @@ def compose_video(script_id: int) -> tuple[Path, bool]:
     video  = script_json.get("video", {})
 
     # Output directory per script
-    out_dir = Path(OUTPUT_PATH) / f"script_{script_id}"
+    from console.backend.utils.file_naming import make_unique_path
+    script_title = (script.topic or f"script-{script_id}").strip()
+    out_dir = make_unique_path(script_title, "", Path(OUTPUT_PATH))
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # ── Phase 1: Parallel per-scene asset generation ──────────────────────────
@@ -67,7 +69,7 @@ def compose_video(script_id: int) -> tuple[Path, bool]:
                 scene_assets[idx] = _fallback_scene_assets(scenes[idx], out_dir, idx)
 
     # ── Phase 2: MoviePy assembly ─────────────────────────────────────────────
-    raw_video_path = out_dir / "raw_video.mp4"
+    raw_video_path = out_dir / "raw.mp4"
     subtitles_burned = _assemble(scenes, scene_assets, meta, video, raw_video_path, music_track_id=music_track_id)
 
     # Update output_path in DB
@@ -80,7 +82,7 @@ def compose_video(script_id: int) -> tuple[Path, bool]:
     finally:
         db.close()
 
-    logger.info(f"[Composer] raw_video.mp4 → {raw_video_path}")
+    logger.info(f"[Composer] raw.mp4 → {raw_video_path}")
     return raw_video_path, subtitles_burned
 
 
@@ -90,7 +92,7 @@ def _process_scene(scene: dict, meta: dict, video_cfg: dict, out_dir: Path, idx:
     duration = float(scene.get("duration", 5))
 
     # 1. TTS
-    audio_path = out_dir / f"audio_{idx}.wav"
+    audio_path = out_dir / f"scene-{idx}_narration.wav"
     word_timing: list[dict] | None = None
     subtitle_style = video_cfg.get("subtitle_style") or ""
     try:
@@ -127,7 +129,7 @@ def _process_scene(scene: dict, meta: dict, video_cfg: dict, out_dir: Path, idx:
         logger.warning(f"[Composer] Scene {idx} asset resolver failed: {e}")
 
     # 3. Text overlay
-    overlay_path = out_dir / f"overlay_{idx}.png"
+    overlay_path = out_dir / f"scene-{idx}_overlay.png"
     try:
         from pipeline.overlay_builder import build_overlay
         build_overlay(scene, output_path=str(overlay_path))

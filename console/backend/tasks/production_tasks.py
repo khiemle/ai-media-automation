@@ -109,9 +109,14 @@ def regenerate_tts_task(self, script_id: int, scene_index: int):
         scene = scenes[scene_index]
         meta = script.script_json.get("meta", {})
         video_cfg = script.script_json.get("video", {})
-        out_dir = Path(os.environ.get("OUTPUT_PATH", "./assets/output")) / str(script_id)
+        if script.output_path:
+            out_dir = Path(script.output_path).parent
+        else:
+            from console.backend.utils.file_naming import make_filename
+            script_title = (script.topic or f"script-{script_id}").strip()
+            out_dir = Path(os.environ.get("OUTPUT_PATH", "./assets/output")) / make_filename(script_title, "")
         out_dir.mkdir(parents=True, exist_ok=True)
-        audio_path = out_dir / f"audio_{scene_index}.wav"
+        audio_path = out_dir / f"scene-{scene_index}_narration.wav"
 
         from pipeline.tts_router import generate_tts
         generate_tts(
