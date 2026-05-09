@@ -10,7 +10,7 @@ from fastapi import FastAPI, Header, HTTPException, Request
 
 from console.mcp.auth.adapters import ChatAuth
 from console.mcp.client.console_client import ConsoleClient
-from console.mcp.tools import system_health, task_status
+from console.mcp.tools import system_health, task_status, pipeline_jobs
 
 
 def attach(app: FastAPI) -> None:
@@ -20,6 +20,7 @@ def attach(app: FastAPI) -> None:
         return {"tools": [
             {"name": "system_health", "description": "system observability"},
             {"name": "task_status", "description": "poll any task_id returned by an async-kicking tool"},
+            {"name": "pipeline_jobs", "description": "list/get/retry/cancel/get_logs/stats over the Celery job table"},
         ]}
 
     @app.post("/mcp/call")
@@ -38,6 +39,8 @@ def attach(app: FastAPI) -> None:
             return await system_health.system_health(_client=client, **args)
         elif tool_name == "task_status":
             return await task_status.task_status(_client=client, **args)
+        elif tool_name == "pipeline_jobs":
+            return await pipeline_jobs.pipeline_jobs(_client=client, **args)
         raise HTTPException(status_code=404, detail=f"unknown tool {tool_name}")
 
 
