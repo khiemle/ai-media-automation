@@ -18,7 +18,7 @@ from console.mcp.auth.adapters import HttpAuth
 from console.mcp.auth.tokens import InMemoryApiKeyRegistry
 from console.mcp.client.console_client import ConsoleClient
 from console.mcp.server import build_server
-from console.mcp.tools import system_health, task_status, pipeline_jobs
+from console.mcp.tools import system_health, task_status, pipeline_jobs, music
 
 
 def build_http_app(*, registry: InMemoryApiKeyRegistry) -> FastAPI:
@@ -42,6 +42,10 @@ def build_http_app(*, registry: InMemoryApiKeyRegistry) -> FastAPI:
             token_provider=lambda: "placeholder",
         )),
         lambda s: pipeline_jobs.register(s, client_factory=lambda: ConsoleClient(
+            base_url=os.environ.get("MCP_CONSOLE_API_BASE", "http://localhost:8080"),
+            token_provider=lambda: "placeholder",
+        )),
+        lambda s: music.register(s, client_factory=lambda: ConsoleClient(
             base_url=os.environ.get("MCP_CONSOLE_API_BASE", "http://localhost:8080"),
             token_provider=lambda: "placeholder",
         )),
@@ -78,6 +82,8 @@ def build_http_app(*, registry: InMemoryApiKeyRegistry) -> FastAPI:
             return await task_status.task_status(_client=client, **args)
         elif tool_name == "pipeline_jobs":
             return await pipeline_jobs.pipeline_jobs(_client=client, **args)
+        elif tool_name == "music":
+            return await music.music(_client=client, **args)
         raise HTTPException(status_code=404, detail=f"unknown tool {tool_name}")
 
     return app
