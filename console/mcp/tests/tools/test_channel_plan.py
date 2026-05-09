@@ -17,12 +17,12 @@ async def test_list_and_get():
 
 
 @pytest.mark.asyncio
-async def test_import_json():
+async def test_import_json_not_implemented():
     client = AsyncMock()
-    client.post.return_value = {"plan_id": 7}
-    out = await channel_plan(action="import_json", payload={"channel": "x"}, confirm=True, _client=client)
-    client.post.assert_awaited_once_with("/api/channel-plans/import", json={"channel": "x"})
-    assert out["ok"] is True
+    out = await channel_plan(action="import_json", confirm=True, _client=client)
+    assert out["ok"] is False
+    assert out["error"]["code"] == "not_implemented"
+    client.post.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -44,17 +44,54 @@ async def test_delete_destructive():
 async def test_ai_seo():
     client = AsyncMock()
     client.post.return_value = {"title": "...", "description": "...", "tags": []}
-    out = await channel_plan(action="ai_seo", plan_id=7, confirm=True, _client=client)
-    client.post.assert_awaited_once_with("/api/channel-plans/7/ai/seo", json={})
+    out = await channel_plan(action="ai_seo", plan_id=7, theme="forest rain ASMR", confirm=True, _client=client)
+    assert out["ok"] is True
+    client.post.assert_awaited_once_with(
+        "/api/channel-plans/7/ai/seo",
+        json={"theme": "forest rain ASMR", "context": ""},
+    )
 
 
 @pytest.mark.asyncio
-async def test_ai_autofill_and_prompts_and_ask():
+async def test_ai_prompts():
+    client = AsyncMock()
+    client.post.return_value = {"prompts": []}
+    out = await channel_plan(
+        action="ai_prompts", plan_id=7, theme="calm nature",
+        context="focus on birds", confirm=True, _client=client,
+    )
+    assert out["ok"] is True
+    client.post.assert_awaited_once_with(
+        "/api/channel-plans/7/ai/prompts",
+        json={"theme": "calm nature", "context": "focus on birds"},
+    )
+
+
+@pytest.mark.asyncio
+async def test_ai_autofill():
+    client = AsyncMock()
+    client.post.return_value = {"autofilled": True}
+    out = await channel_plan(action="ai_autofill", plan_id=7, theme="lo-fi study", confirm=True, _client=client)
+    assert out["ok"] is True
+    client.post.assert_awaited_once_with(
+        "/api/channel-plans/7/ai/autofill",
+        json={"theme": "lo-fi study", "context": ""},
+    )
+
+
+@pytest.mark.asyncio
+async def test_ai_seo_missing_theme():
+    """ai_seo without theme returns validation error (required field)."""
+    client = AsyncMock()
+    out = await channel_plan(action="ai_seo", plan_id=7, confirm=True, _client=client)
+    assert out["ok"] is False
+    assert out["error"]["code"] == "validation.invalid_args"
+    client.post.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_ai_ask():
     client = AsyncMock()
     client.post.return_value = {"answer": "x"}
-    await channel_plan(action="ai_autofill", plan_id=7, confirm=True, _client=client)
-    client.post.assert_awaited_with("/api/channel-plans/7/ai/autofill", json={})
-    await channel_plan(action="ai_prompts", plan_id=7, hints={"theme": "calm"}, confirm=True, _client=client)
-    client.post.assert_awaited_with("/api/channel-plans/7/ai/prompts", json={"hints": {"theme": "calm"}})
     await channel_plan(action="ai_ask", plan_id=7, question="what niche?", confirm=True, _client=client)
     client.post.assert_awaited_with("/api/channel-plans/7/ai/ask", json={"question": "what niche?"})

@@ -23,7 +23,7 @@ async def upload(*, action: str, _client: Any, **kw: Any) -> dict:
 
     Actions:
       - list_videos       [status, niche, limit, offset]      (R)
-      - set_targets       {video_id, channels: [int]}         (W)
+      - set_targets       {video_id, channel_ids: [int]}      (W)
       - upload_one        {video_id}                          (W destructive async)
       - upload_all        {filter?}                           (W destructive async)
       - delete_target     {video_id}                          (W destructive)
@@ -35,11 +35,11 @@ async def upload(*, action: str, _client: Any, **kw: Any) -> dict:
                                          params=_pick(kw, {"status", "niche", "limit", "offset"})))
         if action == "set_targets":
             vid = _require(kw, "video_id")
-            channels = _require(kw, "channels")
+            channel_ids = _require(kw, "channel_ids")
             return await _confirmed_sync(
-                kw, summary=f"set upload targets for video {vid} → channels {channels}",
+                kw, summary=f"set upload targets for video {vid} → channels {channel_ids}",
                 run=lambda: _client.put(f"/api/uploads/videos/{vid}/targets",
-                                        json={"channels": channels}),
+                                        json={"channel_ids": channel_ids}),
             )
         if action == "upload_one":
             vid = _require(kw, "video_id")
@@ -136,7 +136,7 @@ def register(server, *, client_factory, audit_sink=None, transport="stdio", acto
     async def _upload(
         action: str,
         video_id: int = None,
-        channels: list = None,
+        channel_ids: list = None,
         filter: dict = None,
         status: str = None,
         niche: str = None,
@@ -149,7 +149,7 @@ def register(server, *, client_factory, audit_sink=None, transport="stdio", acto
         client = client_factory()
         kw = {k: v for k, v in {
             "action": action,
-            "video_id": video_id, "channels": channels, "filter": filter,
+            "video_id": video_id, "channel_ids": channel_ids, "filter": filter,
             "status": status, "niche": niche, "limit": limit, "offset": offset,
             "idempotency_key": idempotency_key,
             "confirm": confirm, "confirm_id": confirm_id,

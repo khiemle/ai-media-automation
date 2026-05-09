@@ -16,8 +16,9 @@ async def sfx(*, action: str, _client: Any, **kw: Any) -> dict:
       - list_sound_types
       - list                   [sound_type, limit, offset]
       - get_stream_url         {sfx_id}
-      - generate               {prompt, duration_s, sound_type}  (W async)
-      - import_file            {file_path, name, sound_type}     (W)
+      - generate               {text, duration_seconds?, loop?}  (W sync — returns SFX row directly)
+      - import_file            **Note:** Currently broken — backend expects multipart file upload;
+                               ConsoleClient only sends JSON. See FOLLOWUPS.md.
       - delete                 {sfx_id} (destructive)
     """
     try:
@@ -30,18 +31,18 @@ async def sfx(*, action: str, _client: Any, **kw: Any) -> dict:
             sid = _require(kw, "sfx_id")
             return {"ok": True, "data": {"url": f"/api/sfx/{sid}/stream"}}
         if action == "generate":
-            return await _confirmed_async(
-                kw, summary=f"generate sfx: {kw.get('prompt')!r}",
-                task_kind="sfx_generate",
+            return await _confirmed_sync(
+                kw, summary=f"generate sfx: {kw.get('text')!r}",
                 run=lambda: _client.post("/api/sfx/generate",
-                                         json=_pick(kw, {"prompt", "duration_s", "sound_type"})),
+                                         json=_pick(kw, {"text", "duration_seconds", "loop", "title"})),
             )
         if action == "import_file":
-            return await _confirmed_sync(
-                kw, summary=f"import sfx file {kw.get('file_path')!r}",
-                run=lambda: _client.post("/api/sfx/import",
-                                         json=_pick(kw, {"file_path", "name", "sound_type"})),
-            )
+            return ConsoleError(
+                code="not_implemented",
+                message=f"action 'import_file' requires multipart upload, which ConsoleClient doesn't support yet. See FOLLOWUPS.md.",
+                retryable=False,
+                context={"action": action},
+            ).to_envelope()
         if action == "delete":
             sid = _require(kw, "sfx_id")
             return await _confirmed_destructive(
@@ -76,8 +77,10 @@ def register(server, *, client_factory, audit_sink=None, transport="stdio", acto
         action: str,
         sfx_id: int = None,
         sound_type: str = None,
-        prompt: str = None,
-        duration_s: int = None,
+        text: str = None,
+        duration_seconds: float = None,
+        loop: bool = None,
+        title: str = None,
         file_path: str = None,
         name: str = None,
         limit: int = None,

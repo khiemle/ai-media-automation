@@ -17,11 +17,14 @@ async def visual_asset(*, action: str, _client: Any, **kw: Any) -> dict:
       - get                 {asset_id}
       - stream_url          {asset_id}
       - get_thumbnail       {asset_id}
-      - upload              {file_path, title, niche, ...}
+      - upload              **Note:** Currently broken — backend expects multipart file
+                            upload; ConsoleClient only sends JSON. See FOLLOWUPS.md.
       - update              {asset_id, fields}
       - delete              {asset_id}                    (destructive)
       - animate             {asset_id, prompt}            (W async, Runway)
       - upscale             {asset_id, target}            (W async, Topaz)
+                            Note: target and model are silently ignored by the backend;
+                            the endpoint always upscales to 4K with Topaz.
     """
     try:
         if action == "list":
@@ -37,11 +40,12 @@ async def visual_asset(*, action: str, _client: Any, **kw: Any) -> dict:
             aid = _require(kw, "asset_id")
             return {"ok": True, "data": {"url": f"/api/production/assets/{aid}/thumbnail"}}
         if action == "upload":
-            return await _confirmed_sync(
-                kw, summary=f"upload visual asset {kw.get('title')!r}",
-                run=lambda: _client.post("/api/production/assets/upload",
-                                         json=_pick(kw, {"file_path", "title", "niche", "tags", "duration_s"})),
-            )
+            return ConsoleError(
+                code="not_implemented",
+                message="action 'upload' requires multipart upload, which ConsoleClient doesn't support yet. See FOLLOWUPS.md.",
+                retryable=False,
+                context={"action": action},
+            ).to_envelope()
         if action == "update":
             aid = _require(kw, "asset_id")
             return await _confirmed_sync(

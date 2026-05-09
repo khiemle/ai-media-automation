@@ -4,8 +4,8 @@ from typing import Any
 
 from console.mcp.errors import ConsoleError
 from console.mcp.tools.music import (
-    _ok, _bad_action, _require, _pick,
-    _confirmed_sync, _confirmed_async,
+    _ok, _bad_action, _require,
+    _confirmed_sync,
 )
 
 
@@ -13,27 +13,30 @@ async def youtube_thumbnail(*, action: str, _client: Any, **kw: Any) -> dict:
     """YouTube thumbnail surface.
 
     Actions:
-      - upload_image        {video_id, file_path}                    (W)
-      - generate_with_text  {video_id, text, style?, font?}          (W async)
+      - upload_image        **Note:** Currently broken — backend expects multipart
+                            image upload; ConsoleClient only sends JSON. See FOLLOWUPS.md.
+      - generate_with_text  {video_id, text, style?, font?, color?}  (W sync)
+                            Note: style, font, color are currently ignored by the backend
+                            (ThumbnailGenerateRequest only accepts `text`); they are kept
+                            in the signature for forward-compatibility.
       - get_current         {video_id}                               (R) → URL
       - get_source          {video_id}                               (R) → URL
     """
     try:
         vid = _require(kw, "video_id")
         if action == "upload_image":
-            fp = _require(kw, "file_path")
-            return await _confirmed_sync(
-                kw, summary=f"upload thumbnail image for video {vid}",
-                run=lambda: _client.post(f"/api/youtube-videos/{vid}/thumbnail-image",
-                                         json={"file_path": fp}),
-            )
+            return ConsoleError(
+                code="not_implemented",
+                message="action 'upload_image' requires multipart upload, which ConsoleClient doesn't support yet. See FOLLOWUPS.md.",
+                retryable=False,
+                context={"action": action},
+            ).to_envelope()
         if action == "generate_with_text":
             text = _require(kw, "text")
-            return await _confirmed_async(
+            return await _confirmed_sync(
                 kw, summary=f"generate thumbnail with text for video {vid}",
-                task_kind="youtube_thumbnail_generate",
                 run=lambda: _client.post(f"/api/youtube-videos/{vid}/thumbnail-generate",
-                                         json=_pick({"text": text, **kw}, {"text", "style", "font", "color"})),
+                                         json={"text": text}),
             )
         if action == "get_current":
             return {"ok": True, "data": {"url": f"/api/youtube-videos/{vid}/thumbnail"}}

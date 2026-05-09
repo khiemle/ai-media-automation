@@ -30,15 +30,13 @@ async def test_stream_and_thumbnail_urls():
 
 
 @pytest.mark.asyncio
-async def test_upload():
+async def test_upload_not_implemented():
     client = AsyncMock()
-    client.post.return_value = {"id": 9}
     out = await visual_asset(action="upload", file_path="/tmp/x.mp4", title="x",
                              niche="forest", confirm=True, _client=client)
-    client.post.assert_awaited_once_with(
-        "/api/production/assets/upload",
-        json={"file_path": "/tmp/x.mp4", "title": "x", "niche": "forest"},
-    )
+    assert out["ok"] is False
+    assert out["error"]["code"] == "not_implemented"
+    client.post.assert_not_awaited()
 
 
 @pytest.mark.asyncio

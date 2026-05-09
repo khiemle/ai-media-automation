@@ -44,6 +44,8 @@ async def youtube_video(*, action: str, _client: Any, **kw: Any) -> dict:
     try:
         # ── Reads ────────────────────────────────────────────────────────────
         if action == "list":
+            # Note: only `status` and `template_id` are read by the backend;
+            # `niche`, `limit`, and `offset` are silently ignored.
             return _ok(await _client.get("/api/youtube-videos",
                                          params=_pick(kw, {"status", "niche", "limit", "offset"})))
         if action == "get":

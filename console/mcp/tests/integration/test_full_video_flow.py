@@ -20,9 +20,9 @@ async def test_full_make_a_video_flow():
     base = "http://test"
 
     # ── Mock every endpoint the flow touches ─────────────────────────────────
-    respx.post(f"{base}/api/channel-plans/import").mock(return_value=httpx.Response(201, json={"id": 1}))
+    # channel-plans/import is not mocked — import_json is not_implemented (multipart)
     respx.post(f"{base}/api/channel-plans/1/ai/seo").mock(return_value=httpx.Response(200, json={
-        "title": "Forest Rain ASMR", "description": "...", "tags": ["asmr"]
+        "title": "Forest Rain ASMR", "description": "...", "tags": ["asmr"],
     }))
 
     respx.get(f"{base}/api/music").mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
@@ -34,17 +34,15 @@ async def test_full_make_a_video_flow():
     respx.get(f"{base}/api/sfx").mock(return_value=httpx.Response(200, json=[]))
 
     respx.get(f"{base}/api/production/assets").mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
-    respx.post(f"{base}/api/production/assets/upload").mock(return_value=httpx.Response(201, json={"id": 3}))
+    # visual_asset.upload is now not_implemented (multipart); no respx mock needed
 
     respx.post(f"{base}/api/youtube-videos").mock(return_value=httpx.Response(201, json={"id": 9}))
     respx.put(f"{base}/api/youtube-videos/9").mock(return_value=httpx.Response(200, json={"id": 9}))
 
+    # thumbnail-generate is synchronous — returns thumbnail_url directly, no task polling
     respx.post(f"{base}/api/youtube-videos/9/thumbnail-generate").mock(
-        return_value=httpx.Response(202, json={"task_id": "thumb-1"})
+        return_value=httpx.Response(200, json={"thumbnail_url": "/thumbnails/9.png"})
     )
-    respx.get(f"{base}/api/pipeline/jobs/thumb-1").mock(return_value=httpx.Response(200, json={
-        "status": "SUCCESS", "result": {"thumbnail_path": "/x.png"}, "progress": None, "error": None
-    }))
 
     respx.post(f"{base}/api/youtube-videos/9/render/audio-preview").mock(return_value=httpx.Response(202, json={"task_id": "audio-1"}))
     respx.get(f"{base}/api/pipeline/jobs/audio-1").mock(return_value=httpx.Response(200, json={"status": "SUCCESS", "result": {}, "progress": None, "error": None}))
@@ -59,18 +57,21 @@ async def test_full_make_a_video_flow():
         "status": "SUCCESS", "result": {"output_path": "/r/final.mp4", "duration_s": 28800}, "progress": None, "error": None
     }))
 
-    respx.put(f"{base}/api/uploads/videos/9/targets").mock(return_value=httpx.Response(200, json={"video_id": 9, "channels": [1]}))
+    respx.put(f"{base}/api/uploads/videos/9/targets").mock(return_value=httpx.Response(200, json={"video_id": 9, "channel_ids": [1]}))
     respx.post(f"{base}/api/uploads/videos/9/upload").mock(return_value=httpx.Response(202, json={"task_id": "up-1"}))
 
     # ── Drive the flow as an agent would ─────────────────────────────────────
     client = ConsoleClient(base_url=base, token_provider=lambda: "tok")
 
-    # 1. Import channel plan
-    out = await channel_plan.channel_plan(action="import_json", payload={"channel": "x"}, confirm=True, _client=client)
-    assert out["ok"] is True
+    # 1. Import channel plan — import_json is not_implemented (multipart); verify error envelope
+    out = await channel_plan.channel_plan(action="import_json", confirm=True, _client=client)
+    assert out["ok"] is False
+    assert out["error"]["code"] == "not_implemented"
 
-    # 2. AI SEO suggestion
-    out = await channel_plan.channel_plan(action="ai_seo", plan_id=1, confirm=True, _client=client)
+    # 2. AI SEO suggestion — theme is required by AIThemeBody
+    out = await channel_plan.channel_plan(
+        action="ai_seo", plan_id=1, theme="forest rain ASMR", confirm=True, _client=client,
+    )
     assert out["ok"] is True
 
     # 3. Music — list, generate, poll until ready
@@ -84,9 +85,8 @@ async def test_full_make_a_video_flow():
     out = await sfx.sfx(action="list", _client=client)
     assert out["ok"] is True
 
-    # 5. Visual asset — list + upload
-    await visual_asset.visual_asset(action="list", _client=client)
-    out = await visual_asset.visual_asset(action="upload", file_path="/x.mp4", title="forest", confirm=True, _client=client)
+    # 5. Visual asset — list (upload is not_implemented; skip it)
+    out = await visual_asset.visual_asset(action="list", _client=client)
     assert out["ok"] is True
 
     # 6. Create youtube video with all fields
@@ -103,14 +103,12 @@ async def test_full_make_a_video_flow():
     out = await youtube_video.youtube_video(action="create", fields=fields, confirm=True, _client=client)
     assert out["ok"] is True
 
-    # 7. Thumbnail with text
+    # 7. Thumbnail with text — endpoint is synchronous, no task polling needed
     out = await youtube_thumbnail.youtube_thumbnail(
         action="generate_with_text", video_id=9, text="DEEP SLEEP", style="bold-yellow",
         confirm=True, _client=client,
     )
-    assert out["ok"] is True and out["task_id"] == "thumb-1"
-    out = await task_status.task_status(task_id="thumb-1", _client=client)
-    assert out["status"] == "SUCCESS"
+    assert out["ok"] is True
 
     # 8. Audio preview gate
     out = await youtube_video.youtube_video(action="render_audio_preview", video_id=9, confirm=True, _client=client)
@@ -130,6 +128,6 @@ async def test_full_make_a_video_flow():
     assert out["result"]["output_path"] == "/r/final.mp4"
 
     # 11. Upload
-    await upload.upload(action="set_targets", video_id=9, channels=[1], confirm=True, _client=client)
+    await upload.upload(action="set_targets", video_id=9, channel_ids=[1], confirm=True, _client=client)
     out = await upload.upload(action="upload_one", video_id=9, confirm=True, confirm_id=9, _client=client)
     assert out["task_id"] == "up-1"

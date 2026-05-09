@@ -11,6 +11,11 @@ from typing import Any
 import httpx
 
 
+# Error codes not derived from HTTP status codes — used directly by tools:
+#   not_implemented   — action requires a capability (e.g. multipart upload) that
+#                       ConsoleClient doesn't yet support; see FOLLOWUPS.md.
+#   validation.confirm_id_mismatch — confirm_id doesn't match the expected value.
+
 _HTTP_TO_CODE: dict[int, tuple[str, bool]] = {
     400: ("validation.invalid_args", False),
     401: ("auth.unauthorized", False),

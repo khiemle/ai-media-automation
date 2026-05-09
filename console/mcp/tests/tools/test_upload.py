@@ -17,9 +17,10 @@ async def test_list_videos_with_filters():
 @pytest.mark.asyncio
 async def test_set_targets():
     c = AsyncMock()
-    c.put.return_value = {"video_id": 9, "channels": [1, 2]}
-    out = await upload(action="set_targets", video_id=9, channels=[1, 2], confirm=True, _client=c)
-    c.put.assert_awaited_once_with("/api/uploads/videos/9/targets", json={"channels": [1, 2]})
+    c.put.return_value = {"video_id": 9, "channel_ids": [1, 2]}
+    out = await upload(action="set_targets", video_id=9, channel_ids=[1, 2], confirm=True, _client=c)
+    c.put.assert_awaited_once_with("/api/uploads/videos/9/targets", json={"channel_ids": [1, 2]})
+    assert out["ok"] is True
 
 
 @pytest.mark.asyncio

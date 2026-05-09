@@ -28,20 +28,24 @@ async def test_stream_url():
 
 
 @pytest.mark.asyncio
-async def test_generate_async():
+async def test_generate_sync():
     client = AsyncMock()
-    client.post.return_value = {"task_id": "sfx-1"}
-    out = await sfx(action="generate", prompt="thunder", duration_s=4, confirm=True, _client=client)
-    assert out["task_kind"] == "sfx_generate"
-    assert out["task_id"] == "sfx-1"
+    client.post.return_value = {"id": 7, "title": "thunder crack", "file_path": "/sfx/7.mp3"}
+    out = await sfx(action="generate", text="thunder", duration_seconds=4.0, confirm=True, _client=client)
+    assert out["ok"] is True
+    client.post.assert_awaited_once_with(
+        "/api/sfx/generate",
+        json={"text": "thunder", "duration_seconds": 4.0},
+    )
 
 
 @pytest.mark.asyncio
-async def test_import_file():
+async def test_import_file_not_implemented():
     client = AsyncMock()
-    client.post.return_value = {"id": 9, "name": "x"}
     out = await sfx(action="import_file", file_path="/tmp/x.wav", name="x", confirm=True, _client=client)
-    client.post.assert_awaited_once_with("/api/sfx/import", json={"file_path": "/tmp/x.wav", "name": "x"})
+    assert out["ok"] is False
+    assert out["error"]["code"] == "not_implemented"
+    client.post.assert_not_awaited()
 
 
 @pytest.mark.asyncio
