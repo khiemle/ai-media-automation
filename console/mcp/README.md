@@ -45,6 +45,45 @@ See `docs/superpowers/specs/2026-05-09-mcp-server-design.md` for full design.
 - **HTTP/SSE**: `python -m console.mcp.http`
 - **Mounted sub-app**: handled in `console.backend.main` at `/mcp/*`
 
+### HTTP transport setup
+
+`python -m console.mcp.http` reads its API-key registry from
+`InMemoryApiKeyRegistry`, which is populated only from the `MCP_HTTP_DEV_API_KEY`
+environment variable for now. **Without that variable set, every request
+returns 401.** Production deployment will need a `DbApiKeyRegistry` reading
+from the `mcp_api_keys` table — this is a known follow-up.
+
+Required env for HTTP transport:
+- `MCP_HTTP_DEV_API_KEY` — plaintext API key clients pass in `X-API-Key`
+- `MCP_API_TOKEN` — JWT for the `mcp-system` user the registry maps to
+- `MCP_CONSOLE_API_BASE` — defaults to `http://localhost:8080`
+- `MCP_HTTP_HOST` / `MCP_HTTP_PORT` — defaults to `0.0.0.0:8765`
+
+## Operational features
+
+### Audit logging (`mcp_tool_calls`)
+
+Every tool call can be logged to `mcp_tool_calls` (PostgreSQL) with
+`{tool_name, action, args_redacted, ok, error_code, duration_ms, task_id,
+transport, actor_jwt_sub, called_at}`. Args matching `*_token`, `*_key`,
+`password` are replaced with `***` before persistence.
+
+Audit is **opt-in per transport entrypoint** — set `audit_sink=DbAuditSink()`
+when calling `<tool>.register()`. The default `None` sink means no rows are
+written. Activation in `stdio.py`/`http.py`/`mount.py` is a follow-up.
+
+### Idempotency (`MCP_IDEMPOTENCY_TTL_S`)
+
+Write-amplifying tools accept an optional `idempotency_key` argument:
+- `upload(action="upload_one", ...)`
+- `upload(action="upload_all", ...)`
+- `youtube_video(action="render_final", ...)`
+
+Same key reused within the TTL returns the cached result (no second side
+effect). Backed by Redis. TTL controlled by `MCP_IDEMPOTENCY_TTL_S` (default
+86400 = 24h). Useful for cron jobs that retry on network blips without
+double-uploading.
+
 ## Tests
 
 ```bash

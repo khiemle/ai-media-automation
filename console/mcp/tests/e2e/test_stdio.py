@@ -43,8 +43,11 @@ async def test_stdio_lists_system_health_tool(monkeypatch):
         await proc.stdin.drain()
         line = await asyncio.wait_for(proc.stdout.readline(), timeout=10)
         body = json.loads(line)
-        names = [t["name"] for t in body["result"]["tools"]]
-        assert "system_health" in names
+        names = sorted(t["name"] for t in body["result"]["tools"])
+        assert names == sorted([
+            "youtube_video", "youtube_thumbnail", "music", "sfx", "visual_asset",
+            "channel_plan", "channel", "upload", "task_status", "pipeline_jobs", "system_health",
+        ])
     finally:
         proc.terminate()
         await proc.wait()
