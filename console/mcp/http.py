@@ -18,7 +18,7 @@ from console.mcp.auth.adapters import HttpAuth
 from console.mcp.auth.tokens import InMemoryApiKeyRegistry
 from console.mcp.client.console_client import ConsoleClient
 from console.mcp.server import build_server
-from console.mcp.tools import system_health, task_status, pipeline_jobs, music, sfx
+from console.mcp.tools import system_health, task_status, pipeline_jobs, music, sfx, visual_asset
 
 
 def build_http_app(*, registry: InMemoryApiKeyRegistry) -> FastAPI:
@@ -50,6 +50,10 @@ def build_http_app(*, registry: InMemoryApiKeyRegistry) -> FastAPI:
             token_provider=lambda: "placeholder",
         )),
         lambda s: sfx.register(s, client_factory=lambda: ConsoleClient(
+            base_url=os.environ.get("MCP_CONSOLE_API_BASE", "http://localhost:8080"),
+            token_provider=lambda: "placeholder",
+        )),
+        lambda s: visual_asset.register(s, client_factory=lambda: ConsoleClient(
             base_url=os.environ.get("MCP_CONSOLE_API_BASE", "http://localhost:8080"),
             token_provider=lambda: "placeholder",
         )),
@@ -90,6 +94,8 @@ def build_http_app(*, registry: InMemoryApiKeyRegistry) -> FastAPI:
             return await music.music(_client=client, **args)
         elif tool_name == "sfx":
             return await sfx.sfx(_client=client, **args)
+        elif tool_name == "visual_asset":
+            return await visual_asset.visual_asset(_client=client, **args)
         raise HTTPException(status_code=404, detail=f"unknown tool {tool_name}")
 
     return app

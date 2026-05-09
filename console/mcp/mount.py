@@ -10,7 +10,7 @@ from fastapi import FastAPI, Header, HTTPException, Request
 
 from console.mcp.auth.adapters import ChatAuth
 from console.mcp.client.console_client import ConsoleClient
-from console.mcp.tools import system_health, task_status, pipeline_jobs, music, sfx
+from console.mcp.tools import system_health, task_status, pipeline_jobs, music, sfx, visual_asset
 
 
 def attach(app: FastAPI) -> None:
@@ -23,6 +23,7 @@ def attach(app: FastAPI) -> None:
             {"name": "pipeline_jobs", "description": "list/get/retry/cancel/get_logs/stats over the Celery job table"},
             {"name": "music", "description": "music library CRUD + AI-generate + ElevenLabs compose"},
             {"name": "sfx", "description": "sound effects library + generation"},
+            {"name": "visual_asset", "description": "background video/image library + Runway animate + Topaz upscale"},
         ]}
 
     @app.post("/mcp/call")
@@ -47,6 +48,8 @@ def attach(app: FastAPI) -> None:
             return await music.music(_client=client, **args)
         elif tool_name == "sfx":
             return await sfx.sfx(_client=client, **args)
+        elif tool_name == "visual_asset":
+            return await visual_asset.visual_asset(_client=client, **args)
         raise HTTPException(status_code=404, detail=f"unknown tool {tool_name}")
 
 
