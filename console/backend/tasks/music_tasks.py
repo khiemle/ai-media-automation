@@ -7,6 +7,7 @@ from pathlib import Path
 import requests
 
 from console.backend.celery_app import celery_app
+from console.backend.utils.file_naming import make_unique_path
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +59,7 @@ def generate_suno_music_task(self, track_id: int):
 
         # Download MP3
         MUSIC_DIR.mkdir(parents=True, exist_ok=True)
-        dest = MUSIC_DIR / f"{track_id}.mp3"
+        dest = make_unique_path(track["title"], ".mp3", MUSIC_DIR)
         resp = requests.get(audio_url, timeout=60)
         resp.raise_for_status()
         dest.write_bytes(resp.content)
@@ -105,7 +106,7 @@ def generate_lyria_music_task(self, track_id: int):
         )
 
         MUSIC_DIR.mkdir(parents=True, exist_ok=True)
-        dest = MUSIC_DIR / f"{track_id}.mp3"
+        dest = make_unique_path(track["title"], ".mp3", MUSIC_DIR)
 
         # Lyria returns PCM/WAV audio — convert to MP3 via ffmpeg for browser compatibility
         is_pcm = "pcm" in mime_type.lower() or "L16" in mime_type
@@ -177,6 +178,7 @@ def generate_elevenlabs_music_task(
     db = SessionLocal()
     try:
         svc = MusicService(db)
+        track = svc.get_track(track_id)
         provider = ElevenLabsProvider()
 
         audio_bytes = provider.compose(
@@ -187,7 +189,7 @@ def generate_elevenlabs_music_task(
 
         MUSIC_DIR.mkdir(parents=True, exist_ok=True)
         ext = _ext_for_format(output_format)
-        dest = MUSIC_DIR / f"{track_id}{ext}"
+        dest = make_unique_path(track["title"], ext, MUSIC_DIR)
         dest.write_bytes(audio_bytes)
 
         from pipeline.music_providers import probe_audio_duration
