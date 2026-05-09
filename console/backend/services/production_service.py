@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from console.backend.models.video_asset import VideoAsset
 from console.backend.models.pipeline_job import PipelineJob
 from console.backend.schemas.common import PaginatedResponse
+from console.backend.utils.file_naming import make_unique_path
 
 logger = logging.getLogger(__name__)
 
@@ -185,6 +186,7 @@ class ProductionService:
         generation_prompt: str | None = None,
         assets_dir: Path | None = None,
         user_id: int | None = None,
+        title: str | None = None,
     ) -> dict:
         ext = Path(filename).suffix.lower()
         if ext not in _ALLOWED_ASSET_EXTENSIONS:
@@ -206,7 +208,8 @@ class ProductionService:
         self.db.add(row)
         self.db.flush()
 
-        dest = save_dir / f'asset_{row.id}{ext}'
+        label = title or description or Path(filename).stem
+        dest = make_unique_path(label, ext, save_dir)
         dest.write_bytes(file_bytes)
         row.file_path = str(dest)
 

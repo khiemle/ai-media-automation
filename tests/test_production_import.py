@@ -38,7 +38,9 @@ def test_import_video_asset(db, tmp_path):
     assert result['keywords'] == []
 
 
-def test_import_asset_filename_uses_id(db, tmp_path):
+def test_import_asset_filename_uses_slug(db, tmp_path):
+    """Imported assets should use a readable slug filename, not asset_{id}.ext."""
+    from datetime import date
     svc = ProductionService(db)
     result = svc.import_asset(
         file_bytes=b'\xff\xd8\xff' + b'\x00' * 20,
@@ -48,8 +50,40 @@ def test_import_asset_filename_uses_id(db, tmp_path):
         keywords=None,
         assets_dir=tmp_path,
     )
-    expected_name = f"asset_{result['id']}.png"
-    assert Path(result['file_path']).name == expected_name
+    today = date.today().strftime('%Y%m%d')
+    # Without title or description, label falls back to filename stem "test"
+    assert Path(result['file_path']).name == f"{today}_test.png"
+
+def test_import_asset_filename_uses_title(db, tmp_path):
+    """When title is provided, the slug is derived from it."""
+    from datetime import date
+    svc = ProductionService(db)
+    result = svc.import_asset(
+        file_bytes=b'\xff\xd8\xff' + b'\x00' * 20,
+        filename='upload.png',
+        source='manual',
+        description=None,
+        keywords=None,
+        title='Rainy Window Scene',
+        assets_dir=tmp_path,
+    )
+    today = date.today().strftime('%Y%m%d')
+    assert Path(result['file_path']).name == f"{today}_rainy-window-scene.png"
+
+def test_import_asset_filename_uses_description_fallback(db, tmp_path):
+    """When no title, description is used as the label fallback."""
+    from datetime import date
+    svc = ProductionService(db)
+    result = svc.import_asset(
+        file_bytes=b'\xff\xd8\xff' + b'\x00' * 20,
+        filename='upload.png',
+        source='manual',
+        description='Dark forest path',
+        keywords=None,
+        assets_dir=tmp_path,
+    )
+    today = date.today().strftime('%Y%m%d')
+    assert Path(result['file_path']).name == f"{today}_dark-forest-path.png"
 
 
 def test_import_unsupported_extension_raises(db, tmp_path):

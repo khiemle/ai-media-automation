@@ -137,6 +137,7 @@ _ASSET_SOURCES = {'manual', 'midjourney', 'runway', 'pexels', 'veo', 'stock'}
 async def upload_asset(
     file: UploadFile = File(...),
     source: str = Form(default='manual'),
+    title: str | None = Form(default=None),
     description: str = Form(default=''),
     keywords: str = Form(default=''),
     asset_type: str = Form(default=''),
@@ -160,6 +161,7 @@ async def upload_asset(
             file_bytes=content,
             filename=file.filename or 'asset',
             source=source,
+            title=title or None,
             description=description or None,
             keywords=kw_list or None,
             asset_type=asset_type or None,
