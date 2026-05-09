@@ -1,7 +1,9 @@
 import pytest
+import fakeredis.aioredis as fakeredis
 from unittest.mock import AsyncMock
 
-from console.mcp.tools.upload import upload
+from console.mcp.idempotency import IdempotencyStore
+from console.mcp.tools.upload import upload, set_idempotency_store
 
 
 @pytest.mark.asyncio
@@ -57,3 +59,23 @@ async def test_stream_url():
     c = AsyncMock()
     out = await upload(action="stream_url", video_id=9, _client=c)
     assert out["data"]["url"] == "/api/uploads/videos/9/stream"
+
+
+# ─── Idempotency wiring tests ──────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_upload_one_idempotency_returns_cached():
+    r = fakeredis.FakeRedis()
+    set_idempotency_store(IdempotencyStore(redis=r, ttl_s=60))
+    try:
+        c = AsyncMock()
+        c.post.return_value = {"task_id": "up-1"}
+
+        out1 = await upload(action="upload_one", video_id=9, confirm=True, confirm_id=9,
+                            idempotency_key="cron-2026-05-09", _client=c)
+        out2 = await upload(action="upload_one", video_id=9, confirm=True, confirm_id=9,
+                            idempotency_key="cron-2026-05-09", _client=c)
+        assert out1 == out2
+        assert c.post.await_count == 1  # second call cached
+    finally:
+        set_idempotency_store(None)  # reset for other tests

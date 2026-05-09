@@ -3,10 +3,19 @@
 from typing import Any
 
 from console.mcp.errors import ConsoleError
+from console.mcp.idempotency import IdempotencyStore
 from console.mcp.tools.music import (
     _ok, _bad_action, _require, _pick,
     _confirmed_sync, _confirmed_async, _confirmed_destructive,
 )
+
+# Module-level idempotency store. Set via set_idempotency_store(); None disables.
+_store: "IdempotencyStore | None" = None
+
+
+def set_idempotency_store(store: "IdempotencyStore | None") -> None:
+    global _store
+    _store = store
 
 
 async def upload(*, action: str, _client: Any, **kw: Any) -> dict:
@@ -34,20 +43,36 @@ async def upload(*, action: str, _client: Any, **kw: Any) -> dict:
             )
         if action == "upload_one":
             vid = _require(kw, "video_id")
-            return await _async_destructive(
-                kw, id_arg="video_id",
-                summary=f"UPLOAD video {vid} to its targeted channels",
-                task_kind="youtube_upload",
-                run=lambda: _client.post(f"/api/uploads/videos/{vid}/upload", json={}),
-            )
+            idem = kw.get("idempotency_key")
+
+            async def run_call_one():
+                return await _async_destructive(
+                    kw, id_arg="video_id",
+                    summary=f"UPLOAD video {vid} to its targeted channels",
+                    task_kind="youtube_upload",
+                    run=lambda: _client.post(f"/api/uploads/videos/{vid}/upload", json={}),
+                )
+
+            if idem and _store is not None:
+                return await _store.run_once(key=f"upload_one:{idem}", run=run_call_one)
+            return await run_call_one()
+
         if action == "upload_all":
-            return await _async_destructive(
-                kw, id_arg=None, fixed_id="all",
-                summary=f"UPLOAD ALL with filter {kw.get('filter') or {}}",
-                task_kind="youtube_upload_all",
-                run=lambda: _client.post("/api/uploads/upload-all",
-                                         json={"filter": kw.get("filter") or {}}),
-            )
+            idem = kw.get("idempotency_key")
+
+            async def run_call_all():
+                return await _async_destructive(
+                    kw, id_arg=None, fixed_id="all",
+                    summary=f"UPLOAD ALL with filter {kw.get('filter') or {}}",
+                    task_kind="youtube_upload_all",
+                    run=lambda: _client.post("/api/uploads/upload-all",
+                                             json={"filter": kw.get("filter") or {}}),
+                )
+
+            if idem and _store is not None:
+                return await _store.run_once(key=f"upload_all:{idem}", run=run_call_all)
+            return await run_call_all()
+
         if action == "delete_target":
             vid = _require(kw, "video_id")
             return await _confirmed_destructive(
@@ -117,6 +142,7 @@ def register(server, *, client_factory, audit_sink=None, transport="stdio", acto
         niche: str = None,
         limit: int = None,
         offset: int = None,
+        idempotency_key: str = None,
         confirm: bool = False,
         confirm_id: Any = None,
     ) -> dict:
@@ -125,6 +151,7 @@ def register(server, *, client_factory, audit_sink=None, transport="stdio", acto
             "action": action,
             "video_id": video_id, "channels": channels, "filter": filter,
             "status": status, "niche": niche, "limit": limit, "offset": offset,
+            "idempotency_key": idempotency_key,
             "confirm": confirm, "confirm_id": confirm_id,
         }.items() if v is not None or k in ("confirm", "action")}
         if _audit_wrapped is not None:

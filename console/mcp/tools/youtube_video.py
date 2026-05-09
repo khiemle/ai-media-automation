@@ -3,10 +3,19 @@
 from typing import Any
 
 from console.mcp.errors import ConsoleError
+from console.mcp.idempotency import IdempotencyStore
 from console.mcp.tools.music import (
     _ok, _bad_action, _require, _pick,
     _confirmed_sync, _confirmed_async, _confirmed_destructive,
 )
+
+# Module-level idempotency store. Set via set_idempotency_store(); None disables.
+_store: "IdempotencyStore | None" = None
+
+
+def set_idempotency_store(store: "IdempotencyStore | None") -> None:
+    global _store
+    _store = store
 
 
 async def youtube_video(*, action: str, _client: Any, **kw: Any) -> dict:
@@ -77,7 +86,24 @@ async def youtube_video(*, action: str, _client: Any, **kw: Any) -> dict:
                 run=lambda: _client.delete(f"/api/youtube-videos/{vid}"),
             )
 
-        # ── Render gates ─────────────────────────────────────────────────────
+        # ── Special-case render_final for idempotency ─────────────────────
+        if action == "render_final":
+            vid = _require(kw, "video_id")
+            idem = kw.get("idempotency_key")
+            gate = _GATE_ACTIONS["render_final"]
+
+            async def run_call():
+                return await _confirmed_async(
+                    kw, summary=gate["summary"].format(vid=vid),
+                    task_kind=gate["kind"],
+                    run=lambda: _client.post(f"/api/youtube-videos/{vid}{gate['suffix']}"),
+                )
+
+            if idem and _store is not None:
+                return await _store.run_once(key=f"yt_render_final:{idem}", run=run_call)
+            return await run_call()
+
+        # ── Render gates (general path) ───────────────────────────────────
         gate = _GATE_ACTIONS.get(action)
         if gate is not None:
             vid = _require(kw, "video_id")
@@ -145,6 +171,7 @@ def register(server, *, client_factory, audit_sink=None, transport="stdio", acto
         offset: int = None,
         fields: dict = None,
         payload: dict = None,
+        idempotency_key: str = None,
         confirm: bool = False,
         confirm_id: int = None,
     ) -> dict:
@@ -154,6 +181,7 @@ def register(server, *, client_factory, audit_sink=None, transport="stdio", acto
             "video_id": video_id, "template_id": template_id,
             "status": status, "niche": niche, "limit": limit, "offset": offset,
             "fields": fields, "payload": payload,
+            "idempotency_key": idempotency_key,
             "confirm": confirm, "confirm_id": confirm_id,
         }.items() if v is not None or k in ("confirm", "action")}
         if _audit_wrapped is not None:
