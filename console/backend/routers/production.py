@@ -268,6 +268,7 @@ def animate_asset_endpoint(
     from console.backend.models.video_asset import VideoAsset
     from console.backend.tasks.runway_task import animate_workflow_task
     from console.backend.services.runway_service import RunwayService
+    from console.backend.utils.file_naming import make_filename
 
     asset = db.get(VideoAsset, asset_id)
     if not asset:
@@ -335,7 +336,8 @@ def animate_asset_endpoint(
     db.commit()
     db.refresh(child)
 
-    output_filename = f"runway_{child.id}.mp4"
+    _prompt_label = (body.prompt or "runway-clip")[:80]
+    output_filename = make_filename(_prompt_label, ".mp4")
     task = animate_workflow_task.apply_async(
         args=[child.id, invocation_id, output_filename],
         queue="render_q",

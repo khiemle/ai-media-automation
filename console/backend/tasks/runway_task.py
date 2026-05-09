@@ -73,6 +73,7 @@ def recover_pending_runway():
     """Re-queue poll tasks for any VideoAsset stuck in runway_status='pending'."""
     from console.backend.database import SessionLocal
     from console.backend.models.video_asset import VideoAsset
+    from console.backend.utils.file_naming import make_filename
     from sqlalchemy import select
 
     db = SessionLocal()
@@ -83,7 +84,8 @@ def recover_pending_runway():
         for row in rows:
             if not row.runway_invocation_id:
                 continue
-            output_filename = f"runway_{row.id}.mp4"
+            _label = (row.generation_prompt or f"runway-{row.id}")[:80]
+            output_filename = make_filename(_label, ".mp4")
             animate_workflow_task.apply_async(
                 args=[row.id, row.runway_invocation_id, output_filename],
                 countdown=5,
