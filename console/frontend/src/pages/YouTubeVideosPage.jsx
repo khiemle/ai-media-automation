@@ -944,7 +944,6 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
   const [autofillSuno, setAutofillSuno] = useState(null)
   const [autofillRunway, setAutofillRunway] = useState(null)
   const [midjourneyPrompt, setMidjourneyPrompt] = useState(null)
-  const [autofilled, setAutofilled] = useState(isEdit)  // skip the auto-SEO useEffect on edit
 
   const [soundLayers, setSoundLayers] = useState(() => {
     const sl = isEdit ? (existingVideo.sound_layers || {}) : {}
@@ -1164,24 +1163,6 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
     return () => { mounted = false }
   }, [])
 
-  useEffect(() => {
-    if (isEdit) return  // edit mode: never auto-rewrite SEO from theme
-    if (form.theme && template && !autofilled) {
-      const h = form.isCustomDuration
-        ? (parseFloat(form.customDuration) || 8)
-        : form.target_duration_h
-      const durationDisplay = h < 1 ? `${Math.round(h * 60)}min` : h
-      setForm(f => ({
-        ...f,
-        seo_title: (template.seo_title_formula || '{theme} — {duration}h')
-          .replace('{theme}', form.theme)
-          .replace('{duration}', durationDisplay),
-        seo_description: (template.seo_description_template || '')
-          .replace('{theme}', form.theme)
-          .replace('{duration}', durationDisplay),
-      }))
-    }
-  }, [form.theme, form.target_duration_h, form.customDuration, form.isCustomDuration, autofilled, isEdit])
 
   const handleAutofill = async () => {
     if (!selectedPlan || !form.theme) return
@@ -1205,7 +1186,6 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
       }))
       if (result.suno_prompt) setAutofillSuno(result.suno_prompt)
       if (result.runway_prompt) setAutofillRunway(result.runway_prompt)
-      setAutofilled(true)
       showToast('AI autofill complete', 'success')
     } catch (e) {
       setAutofillError(e.message)
@@ -1846,6 +1826,112 @@ function MakeShortModal({ video, shortTemplates, onClose, onCreated }) {
   )
 }
 
+function RegenerateThumbnailModal({ video, onClose, onDone }) {
+  const [file, setFile]             = useState(null)
+  const [text, setText]             = useState(video?.thumbnail_text || '')
+  const [previewKey, setPreviewKey] = useState(0)
+  const [hasThumbnail, setHasThumbnail] = useState(!!video?.thumbnail_path)
+  const [generating, setGenerating] = useState(false)
+  const [toast, setToast]           = useState(null)
+
+  const showToast = (msg, type = 'success') => {
+    setToast({ msg, type })
+    setTimeout(() => setToast(null), 3000)
+  }
+
+  const wordCount = text.trim() ? text.trim().split(/\s+/).filter(Boolean).length : 0
+  const canGenerate = (file || hasThumbnail) && wordCount <= 5
+
+  const handleGenerate = async () => {
+    if (!canGenerate) return
+    setGenerating(true)
+    try {
+      if (file) {
+        await youtubeVideosApi.uploadThumbnailImage(video.id, file)
+        setFile(null)
+        setHasThumbnail(true)
+      }
+      await youtubeVideosApi.generateThumbnail(video.id, text.trim() || null)
+      setPreviewKey(k => k + 1)
+      showToast('Thumbnail generated', 'success')
+    } catch (e) {
+      showToast(e.message, 'error')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  return (
+    <Modal title="Regenerate Thumbnail" onClose={onClose}>
+      {toast && (
+        <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />
+      )}
+      <div className="flex flex-col gap-4 px-1">
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-[#9090a8] font-medium">Midjourney Image</label>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={e => setFile(e.target.files?.[0] || null)}
+            className="text-sm text-[#9090a8] file:mr-3 file:py-1 file:px-2 file:rounded file:border-0 file:bg-[#2a2a32] file:text-[#e8e8f0] file:text-xs cursor-pointer"
+          />
+          {!file && !hasThumbnail && (
+            <p className="text-xs text-[#5a5a70]">No source image — upload one above.</p>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center justify-between">
+            <label className="text-xs text-[#9090a8] font-medium">
+              Thumbnail Text (optional, ≤5 words)
+            </label>
+            <span className={`text-xs font-mono ${wordCount > 5 ? 'text-[#f87171]' : 'text-[#5a5a70]'}`}>
+              {wordCount}/5
+            </span>
+          </div>
+          <Input
+            value={text}
+            onChange={e => setText(e.target.value)}
+            placeholder="e.g. DEEP FOCUS"
+          />
+        </div>
+
+        <Button
+          variant="secondary"
+          size="sm"
+          loading={generating}
+          disabled={!canGenerate}
+          onClick={handleGenerate}
+        >
+          Generate Preview
+        </Button>
+
+        {hasThumbnail && (
+          <img
+            key={previewKey}
+            src={`${youtubeVideosApi.thumbnailUrl(video.id)}?t=${previewKey}`}
+            alt="Thumbnail preview"
+            className="w-full rounded-lg border border-[#2a2a32]"
+            style={{ aspectRatio: '16/9', objectFit: 'cover' }}
+            onError={() => setHasThumbnail(false)}
+          />
+        )}
+
+        <div className="flex justify-end gap-2 pt-1">
+          <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
+          <Button
+            size="sm"
+            disabled={!hasThumbnail}
+            onClick={() => { onDone?.(); onClose() }}
+          >
+            Done
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
 export default function YouTubeVideosPage() {
   const [videos, setVideos]               = useState([])
   const [templates, setTemplates]         = useState([])
@@ -1855,6 +1941,7 @@ export default function YouTubeVideosPage() {
   const [makeShortVideo, setMakeShortVideo] = useState(null)
   const [previewVideo, setPreviewVideo] = useState(null)
   const [editingVideo, setEditingVideo] = useState(null)
+  const [regenThumbnailVideo, setRegenThumbnailVideo] = useState(null)
   const [toast, setToast]                 = useState(null)
   const [channelPlans, setChannelPlans]     = useState([])
   const [accordionOpen, setAccordionOpen]   = useState(false)
@@ -2104,6 +2191,9 @@ export default function YouTubeVideosPage() {
                         <Button variant="ghost" size="sm" onClick={() => setMakeShortVideo(v)}>
                           + Make Short
                         </Button>
+                        <Button variant="ghost" size="sm" onClick={() => setRegenThumbnailVideo(v)}>
+                          Thumbnail
+                        </Button>
                       </>
                     )}
                     <button
@@ -2164,6 +2254,15 @@ export default function YouTubeVideosPage() {
           shortTemplates={templates.filter(t => t.output_format === 'portrait_short')}
           onClose={() => setMakeShortVideo(null)}
           onCreated={() => { setMakeShortVideo(null); load() }}
+        />
+      )}
+
+      {/* Regenerate Thumbnail Modal */}
+      {regenThumbnailVideo && (
+        <RegenerateThumbnailModal
+          video={regenThumbnailVideo}
+          onClose={() => setRegenThumbnailVideo(null)}
+          onDone={load}
         />
       )}
     </div>

@@ -40,6 +40,7 @@ services:
       - ${MUSIC_PATH:-C:/render/assets/music}:/app/assets/music
       - ${ASSET_DB_PATH:-C:/render/assets/video_db}:/app/assets/video_db
       - ${SFX_PATH:-C:/render/assets/sfx}:/app/assets/sfx
+      - ${THUMBNAILS_PATH:-C:/render/assets/thumbnails}:/app/assets/thumbnails
 
   celery-worker:
     image: ghcr.io/khiemle/ai-media-automation/api:latest
@@ -56,6 +57,7 @@ services:
     volumes:
       - ./config:/app/config
       - ${OUTPUT_PATH:-C:/render/output}:/app/assets/output
+      - ${THUMBNAILS_PATH:-C:/render/assets/thumbnails}:/app/assets/thumbnails
 
   celery-beat:
     image: ghcr.io/khiemle/ai-media-automation/api:latest

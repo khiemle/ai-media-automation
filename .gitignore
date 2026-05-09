@@ -49,3 +49,4 @@ models/kokoro/voices
 .worktrees/
 nohup.out
 renders
+working
