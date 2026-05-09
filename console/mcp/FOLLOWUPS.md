@@ -15,9 +15,17 @@ Deferred items from the final code review of the `feat/mcp-server` branch
   if/elif ladder over `tool_name`. Extract a `TOOL_DISPATCH = {...}` table
   shared by both transports.
 
-- **`DbApiKeyRegistry` missing.** `http.py:main()` only reads a single
-  `MCP_HTTP_DEV_API_KEY` env var. Production needs a registry that loads from
-  `mcp_api_keys` (already migrated). README currently warns about this.
+- ~~**`DbApiKeyRegistry` missing.**~~ DONE — `DbApiKeyRegistry` implemented in
+  `console/mcp/auth/tokens.py`. `http.py:main()` now defaults to DB-backed
+  registry (`MCP_HTTP_USE_DB_KEYS=1`). Dev mode uses `MCP_HTTP_USE_DB_KEYS=0`
+  via `mcp-dev.sh`. Key management CLI at
+  `console/mcp/scripts/manage_api_keys.py`.
+
+- **`mcp_api_keys.service_user_id` is currently unused at lookup time.** All
+  keys map to a single shared `MCP_API_TOKEN` from env. To allow per-key
+  service tokens (so different agents have distinct audit trails),
+  `DbApiKeyRegistry` should mint a per-user JWT on lookup or store an encrypted
+  JWT alongside each key.
 
 - **Backend doesn't read `X-Mcp-Actor-Metadata`.** `ConsoleClient` sends the
   header but `audit_log.actor_metadata` will stay NULL until the backend's

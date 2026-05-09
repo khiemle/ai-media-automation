@@ -502,6 +502,79 @@ EOF
 
 ---
 
+## Production deployment
+
+The MCP HTTP transport is the only transport that's exposed in production
+(stdio is dev-only; the mounted sub-app rides on the existing console
+container). Production deploy reuses the existing `api` image with a command
+override.
+
+### One-time setup
+
+1. **Apply migrations** (if not already):
+   ```bash
+   docker compose exec api alembic -c console/backend/alembic.ini upgrade head
+   ```
+
+2. **Mint a long-lived service-account JWT** for `mcp-system` and add it to
+   `console/.env`:
+   ```bash
+   docker compose exec api python -m console.mcp.scripts.mint_token --days 90 \
+     | xargs -I {} echo "MCP_API_TOKEN={}" >> console/.env
+   docker compose up -d --no-deps mcp-http
+   ```
+
+3. **Create at least one API key** for the cron/agent that will call MCP:
+   ```bash
+   docker compose exec api python -m console.mcp.scripts.manage_api_keys create --name cron-bot
+   ```
+   Copy the printed `api_key` to wherever the cron config lives. **It is not
+   retrievable later** — only the bcrypt hash is stored.
+
+4. **Verify**:
+   ```bash
+   curl -s -H "X-API-Key: <api-key>" http://127.0.0.1:8765/mcp/tools | jq
+   ```
+   Should return a JSON object with all 11 tool names.
+
+### Token rotation policy
+
+- **Service-account JWT (`MCP_API_TOKEN`)** — 90-day lifetime. Re-mint and
+  redeploy every 60 days to leave 30 days of overlap. Automation: a cron job
+  on the host running `python -m console.mcp.scripts.mint_token` and writing
+  to `console/.env`, followed by `docker compose up -d --no-deps mcp-http`.
+- **API keys (`mcp_api_keys`)** — no automatic expiry. Rotate when:
+  - a key is suspected of leakage
+  - a holder agent is decommissioned
+  - on a yearly cadence as defense-in-depth
+- **Revocation**: `python -m console.mcp.scripts.manage_api_keys revoke --id <N>`.
+  Effect is immediate — `DbApiKeyRegistry.lookup()` reads each request and
+  filters `revoked_at IS NOT NULL`.
+
+### Operational gotchas
+
+- **Empty registry → all 401s.** Fresh deploy with no `mcp_api_keys` rows
+  rejects every request. The `manage_api_keys create` step is mandatory.
+- **`MCP_API_TOKEN` not set in env.** Every authenticated request still hits
+  the FastAPI side as `Bearer <empty>` and gets 401 from the console.
+  Symptom in mcp_tool_calls: `error_code = 'auth.unauthorized'`.
+- **Reverse proxy / TLS.** Put the MCP HTTP transport behind the existing
+  nginx with TLS terminating there. The container only listens on
+  `127.0.0.1:8765`; expose externally only via the proxy.
+
+### Disabling MCP in production
+
+To turn the HTTP transport off without redeploying:
+```bash
+docker compose stop mcp-http
+```
+
+To turn the mounted sub-app off (more invasive — comments out the attach call
+in `console/backend/main.py` and rebuilds the api image): see "Turning it off"
+section below.
+
+---
+
 ## Common errors and recovery
 
 | Error code | Meaning | Most likely cause | First check | Fix |

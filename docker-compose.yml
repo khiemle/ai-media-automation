@@ -114,5 +114,26 @@ services:
     depends_on:
       - api
 
+  mcp-http:
+    image: ghcr.io/khiemle/ai-media-automation/api:latest
+    restart: unless-stopped
+    command: python -m console.mcp.http
+    ports:
+      - "127.0.0.1:8765:8765"
+    env_file:
+      - ./console/.env
+    environment:
+      MCP_HTTP_HOST: 0.0.0.0
+      MCP_HTTP_PORT: "8765"
+      MCP_HTTP_USE_DB_KEYS: "1"
+      MCP_CONSOLE_API_BASE: http://api:8080
+      # MCP_API_TOKEN must be supplied via console/.env or a docker-compose
+      # override file. Generate with:
+      #   docker compose exec api python -m console.mcp.scripts.mint_token --days 90
+    depends_on:
+      - postgres
+      - redis
+      - api
+
 volumes:
   postgres_data:

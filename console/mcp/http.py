@@ -15,13 +15,13 @@ from typing import Any
 from fastapi import FastAPI, Header, HTTPException, Request
 
 from console.mcp.auth.adapters import HttpAuth
-from console.mcp.auth.tokens import InMemoryApiKeyRegistry
+from console.mcp.auth.tokens import InMemoryApiKeyRegistry, DbApiKeyRegistry
 from console.mcp.client.console_client import ConsoleClient
 from console.mcp.server import build_server
 from console.mcp.tools import system_health, task_status, pipeline_jobs, music, sfx, visual_asset, channel_plan, channel, youtube_video, youtube_thumbnail, upload
 
 
-def build_http_app(*, registry: InMemoryApiKeyRegistry) -> FastAPI:
+def build_http_app(*, registry: Any) -> FastAPI:
     app = FastAPI(title="console-mcp-http")
 
     def make_client(api_key: str) -> ConsoleClient:
@@ -133,14 +133,19 @@ def build_http_app(*, registry: InMemoryApiKeyRegistry) -> FastAPI:
 
 def main() -> None:
     import uvicorn
-    registry = InMemoryApiKeyRegistry()
-    # In production, registry would load from `mcp_api_keys` table.
-    if os.environ.get("MCP_HTTP_DEV_API_KEY"):
-        registry.register(
-            "dev",
-            os.environ["MCP_HTTP_DEV_API_KEY"],
-            service_jwt=os.environ.get("MCP_API_TOKEN", ""),
-        )
+    use_db = os.environ.get("MCP_HTTP_USE_DB_KEYS", "1") not in ("0", "false", "False", "")
+
+    if use_db:
+        registry = DbApiKeyRegistry()
+    else:
+        registry = InMemoryApiKeyRegistry()
+        if os.environ.get("MCP_HTTP_DEV_API_KEY"):
+            registry.register(
+                "dev",
+                os.environ["MCP_HTTP_DEV_API_KEY"],
+                service_jwt=os.environ.get("MCP_API_TOKEN", ""),
+            )
+
     app = build_http_app(registry=registry)
     uvicorn.run(
         app,

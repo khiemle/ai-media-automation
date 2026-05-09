@@ -28,6 +28,14 @@ For an automated local-dev setup (prerequisite checks + JWT minting + ready-to-p
 ./console/mcp/scripts/mcp-dev.sh --http    # also launch HTTP transport
 ```
 
+To manage production API keys for the HTTP transport:
+
+```bash
+python -m console.mcp.scripts.manage_api_keys create --name cron-bot
+python -m console.mcp.scripts.manage_api_keys list
+python -m console.mcp.scripts.manage_api_keys revoke --id 3
+```
+
 ## Tools
 
 | Tool | Purpose |

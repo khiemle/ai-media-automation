@@ -141,6 +141,7 @@ if [[ "$START_HTTP" -eq 1 ]]; then
     export MCP_HTTP_HOST="${MCP_HTTP_HOST:-127.0.0.1}"
     export MCP_HTTP_PORT="$HTTP_PORT"
     export MCP_CONSOLE_API_BASE="$CONSOLE_BASE"
+    export MCP_HTTP_USE_DB_KEYS=0  # local dev uses InMemory + MCP_HTTP_DEV_API_KEY
 
     exec python3 -m console.mcp.http
 fi
