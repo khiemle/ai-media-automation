@@ -7,6 +7,7 @@ from console.mcp.tools.music import (  # reuse helpers
     _ok, _bad_action, _require, _pick,
     _confirmed_sync, _confirmed_async, _confirmed_destructive,
 )
+from console.mcp.tools._multipart import open_for_upload
 
 
 async def sfx(*, action: str, _client: Any, **kw: Any) -> dict:
@@ -17,8 +18,8 @@ async def sfx(*, action: str, _client: Any, **kw: Any) -> dict:
       - list                   [sound_type, limit, offset]
       - get_stream_url         {sfx_id}
       - generate               {text, duration_seconds?, loop?}  (W sync — returns SFX row directly)
-      - import_file            **Note:** Currently broken — backend expects multipart file upload;
-                               ConsoleClient only sends JSON. See FOLLOWUPS.md.
+      - import_file            {file_path, title, sound_type, source?}
+                               Uploads a local .wav/.mp3/.m4a/.ogg file to the SFX library.
       - delete                 {sfx_id} (destructive)
     """
     try:
@@ -37,12 +38,25 @@ async def sfx(*, action: str, _client: Any, **kw: Any) -> dict:
                                          json=_pick(kw, {"text", "duration_seconds", "loop", "title"})),
             )
         if action == "import_file":
-            return ConsoleError(
-                code="not_implemented",
-                message=f"action 'import_file' requires multipart upload, which ConsoleClient doesn't support yet. See FOLLOWUPS.md.",
-                retryable=False,
-                context={"action": action},
-            ).to_envelope()
+            file_path = _require(kw, "file_path")
+            title = _require(kw, "title")
+            sound_type = _require(kw, "sound_type")
+            try:
+                files = open_for_upload(file_path, field="file")
+            except FileNotFoundError as e:
+                return ConsoleError(
+                    code="validation.invalid_args",
+                    message=str(e),
+                    retryable=False,
+                    context={"file_path": file_path},
+                ).to_envelope()
+            form_data = {"title": title, "sound_type": sound_type}
+            if kw.get("source"):
+                form_data["source"] = kw["source"]
+            return await _confirmed_sync(
+                kw, summary=f"import sfx file {file_path!r}",
+                run=lambda: _client.multipart_post("/api/sfx/import", files=files, data=form_data),
+            )
         if action == "delete":
             sid = _require(kw, "sfx_id")
             return await _confirmed_destructive(

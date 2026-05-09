@@ -30,13 +30,46 @@ async def test_stream_and_thumbnail_urls():
 
 
 @pytest.mark.asyncio
-async def test_upload_not_implemented():
+async def test_upload_multipart(tmp_path):
+    f = tmp_path / "forest.mp4"
+    f.write_bytes(b"\x00\x00\x00\x18ftypisom")
+
     client = AsyncMock()
-    out = await visual_asset(action="upload", file_path="/tmp/x.mp4", title="x",
-                             niche="forest", confirm=True, _client=client)
-    assert out["ok"] is False
-    assert out["error"]["code"] == "not_implemented"
+    client.multipart_post.return_value = {"id": 77, "source": "manual"}
+
+    out = await visual_asset(
+        action="upload",
+        file_path=str(f),
+        title="forest clip",
+        source="manual",
+        description="rainy forest",
+        keywords="forest,rain",
+        asset_type="video_clip",
+        confirm=True,
+        _client=client,
+    )
+    assert out["ok"] is True
+    client.multipart_post.assert_awaited_once()
+    call = client.multipart_post.await_args
+    assert call.kwargs["files"]["file"][0] == "forest.mp4"
+    assert call.kwargs["data"]["title"] == "forest clip"
+    assert call.kwargs["data"]["source"] == "manual"
+    assert call.kwargs["data"]["keywords"] == "forest,rain"
     client.post.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_upload_missing_file_returns_validation_error():
+    client = AsyncMock()
+    out = await visual_asset(
+        action="upload",
+        file_path="/nonexistent/clip.mp4",
+        confirm=True,
+        _client=client,
+    )
+    assert out["ok"] is False
+    assert out["error"]["code"] == "validation.invalid_args"
+    client.multipart_post.assert_not_called()
 
 
 @pytest.mark.asyncio

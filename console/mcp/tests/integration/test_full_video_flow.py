@@ -16,11 +16,20 @@ from console.mcp.tools import (
 
 @pytest.mark.asyncio
 @respx.mock
-async def test_full_make_a_video_flow():
+async def test_full_make_a_video_flow(tmp_path):
     base = "http://test"
 
+    # ── Create fixture files for multipart upload steps ───────────────────────
+    plan_file = tmp_path / "my_channel.md"
+    plan_file.write_text("# Channel Plan\n\nContent here\n", encoding="utf-8")
+
+    asset_file = tmp_path / "forest.mp4"
+    asset_file.write_bytes(b"\x00\x00\x00\x18ftypisom")
+
     # ── Mock every endpoint the flow touches ─────────────────────────────────
-    # channel-plans/import is not mocked — import_json is not_implemented (multipart)
+    respx.post(f"{base}/api/channel-plans/import").mock(
+        return_value=httpx.Response(200, json={"id": 1, "slug": "my-channel"})
+    )
     respx.post(f"{base}/api/channel-plans/1/ai/seo").mock(return_value=httpx.Response(200, json={
         "title": "Forest Rain ASMR", "description": "...", "tags": ["asmr"],
     }))
@@ -34,7 +43,9 @@ async def test_full_make_a_video_flow():
     respx.get(f"{base}/api/sfx").mock(return_value=httpx.Response(200, json=[]))
 
     respx.get(f"{base}/api/production/assets").mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
-    # visual_asset.upload is now not_implemented (multipart); no respx mock needed
+    respx.post(f"{base}/api/production/assets/upload").mock(
+        return_value=httpx.Response(201, json={"id": 3, "source": "manual"})
+    )
 
     respx.post(f"{base}/api/youtube-videos").mock(return_value=httpx.Response(201, json={"id": 9}))
     respx.put(f"{base}/api/youtube-videos/9").mock(return_value=httpx.Response(200, json={"id": 9}))
@@ -63,10 +74,11 @@ async def test_full_make_a_video_flow():
     # ── Drive the flow as an agent would ─────────────────────────────────────
     client = ConsoleClient(base_url=base, token_provider=lambda: "tok")
 
-    # 1. Import channel plan — import_json is not_implemented (multipart); verify error envelope
-    out = await channel_plan.channel_plan(action="import_json", confirm=True, _client=client)
-    assert out["ok"] is False
-    assert out["error"]["code"] == "not_implemented"
+    # 1. Import channel plan — multipart .md upload
+    out = await channel_plan.channel_plan(
+        action="import_json", file_path=str(plan_file), confirm=True, _client=client,
+    )
+    assert out["ok"] is True
 
     # 2. AI SEO suggestion — theme is required by AIThemeBody
     out = await channel_plan.channel_plan(
@@ -85,8 +97,14 @@ async def test_full_make_a_video_flow():
     out = await sfx.sfx(action="list", _client=client)
     assert out["ok"] is True
 
-    # 5. Visual asset — list (upload is not_implemented; skip it)
+    # 5. Visual asset — list, then upload a clip via multipart
     out = await visual_asset.visual_asset(action="list", _client=client)
+    assert out["ok"] is True
+    out = await visual_asset.visual_asset(
+        action="upload", file_path=str(asset_file),
+        title="forest clip", source="manual",
+        confirm=True, _client=client,
+    )
     assert out["ok"] is True
 
     # 6. Create youtube video with all fields

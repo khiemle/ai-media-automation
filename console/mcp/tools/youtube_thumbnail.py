@@ -7,14 +7,16 @@ from console.mcp.tools.music import (
     _ok, _bad_action, _require,
     _confirmed_sync,
 )
+from console.mcp.tools._multipart import open_for_upload
 
 
 async def youtube_thumbnail(*, action: str, _client: Any, **kw: Any) -> dict:
     """YouTube thumbnail surface.
 
     Actions:
-      - upload_image        **Note:** Currently broken — backend expects multipart
-                            image upload; ConsoleClient only sends JSON. See FOLLOWUPS.md.
+      - upload_image        {video_id, file_path}
+                            Uploads a local .png/.jpg/.webp image as the Midjourney
+                            source for the thumbnail. The backend field name is ``image``.
       - generate_with_text  {video_id, text, style?, font?, color?}  (W sync)
                             Note: style, font, color are currently ignored by the backend
                             (ThumbnailGenerateRequest only accepts `text`); they are kept
@@ -25,12 +27,24 @@ async def youtube_thumbnail(*, action: str, _client: Any, **kw: Any) -> dict:
     try:
         vid = _require(kw, "video_id")
         if action == "upload_image":
-            return ConsoleError(
-                code="not_implemented",
-                message="action 'upload_image' requires multipart upload, which ConsoleClient doesn't support yet. See FOLLOWUPS.md.",
-                retryable=False,
-                context={"action": action},
-            ).to_envelope()
+            file_path = _require(kw, "file_path")
+            try:
+                # Backend field name is "image", not "file"
+                files = open_for_upload(file_path, field="image")
+            except FileNotFoundError as e:
+                return ConsoleError(
+                    code="validation.invalid_args",
+                    message=str(e),
+                    retryable=False,
+                    context={"file_path": file_path},
+                ).to_envelope()
+            return await _confirmed_sync(
+                kw, summary=f"upload thumbnail image {file_path!r} for video {vid}",
+                run=lambda: _client.multipart_post(
+                    f"/api/youtube-videos/{vid}/thumbnail-image",
+                    files=files,
+                ),
+            )
         if action == "generate_with_text":
             text = _require(kw, "text")
             return await _confirmed_sync(

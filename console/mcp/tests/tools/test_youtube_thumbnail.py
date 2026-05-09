@@ -5,14 +5,35 @@ from console.mcp.tools.youtube_thumbnail import youtube_thumbnail
 
 
 @pytest.mark.asyncio
-async def test_upload_image_not_implemented():
+async def test_upload_image_multipart(tmp_path):
+    f = tmp_path / "thumb.png"
+    f.write_bytes(b"\x89PNG\r\n\x1a\n")
+
+    c = AsyncMock()
+    c.multipart_post.return_value = {"asset_id": 55, "source_url": "/api/youtube-videos/9/thumbnail-source"}
+
+    out = await youtube_thumbnail(
+        action="upload_image", video_id=9, file_path=str(f), confirm=True, _client=c
+    )
+    assert out["ok"] is True
+    c.multipart_post.assert_awaited_once()
+    call = c.multipart_post.await_args
+    # Backend field name is "image", not "file"
+    assert "image" in call.kwargs["files"]
+    assert call.kwargs["files"]["image"][0] == "thumb.png"
+    c.post.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_upload_image_missing_file_returns_validation_error():
     c = AsyncMock()
     out = await youtube_thumbnail(
-        action="upload_image", video_id=9, file_path="/tmp/x.png", confirm=True, _client=c
+        action="upload_image", video_id=9, file_path="/nonexistent/thumb.png",
+        confirm=True, _client=c
     )
     assert out["ok"] is False
-    assert out["error"]["code"] == "not_implemented"
-    c.post.assert_not_awaited()
+    assert out["error"]["code"] == "validation.invalid_args"
+    c.multipart_post.assert_not_called()
 
 
 @pytest.mark.asyncio

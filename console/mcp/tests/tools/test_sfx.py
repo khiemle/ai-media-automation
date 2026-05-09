@@ -40,12 +40,64 @@ async def test_generate_sync():
 
 
 @pytest.mark.asyncio
-async def test_import_file_not_implemented():
+async def test_import_file_uploads_multipart(tmp_path):
+    f = tmp_path / "rain.wav"
+    f.write_bytes(b"RIFF\x00\x00\x00\x00WAVE")
+
     client = AsyncMock()
-    out = await sfx(action="import_file", file_path="/tmp/x.wav", name="x", confirm=True, _client=client)
-    assert out["ok"] is False
-    assert out["error"]["code"] == "not_implemented"
+    client.multipart_post.return_value = {"id": 9, "title": "rain", "file_path": "/sfx/9.wav"}
+
+    out = await sfx(
+        action="import_file",
+        file_path=str(f),
+        title="rain",
+        sound_type="nature",
+        confirm=True,
+        _client=client,
+    )
+    assert out["ok"] is True
+    client.multipart_post.assert_awaited_once()
+    call = client.multipart_post.await_args
+    assert call.kwargs["files"]["file"][0] == "rain.wav"
+    assert call.kwargs["data"] == {"title": "rain", "sound_type": "nature"}
     client.post.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_import_file_with_source(tmp_path):
+    f = tmp_path / "wind.mp3"
+    f.write_bytes(b"\xff\xfb\x90\x00")
+
+    client = AsyncMock()
+    client.multipart_post.return_value = {"id": 10, "title": "wind", "file_path": "/sfx/10.mp3"}
+
+    await sfx(
+        action="import_file",
+        file_path=str(f),
+        title="wind",
+        sound_type="nature",
+        source="import",
+        confirm=True,
+        _client=client,
+    )
+    call = client.multipart_post.await_args
+    assert call.kwargs["data"]["source"] == "import"
+
+
+@pytest.mark.asyncio
+async def test_import_file_missing_returns_validation_error():
+    client = AsyncMock()
+    out = await sfx(
+        action="import_file",
+        file_path="/nonexistent/rain.wav",
+        title="rain",
+        sound_type="nature",
+        confirm=True,
+        _client=client,
+    )
+    assert out["ok"] is False
+    assert out["error"]["code"] == "validation.invalid_args"
+    client.multipart_post.assert_not_called()
 
 
 @pytest.mark.asyncio

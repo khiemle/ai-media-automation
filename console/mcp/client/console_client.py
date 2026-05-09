@@ -42,6 +42,29 @@ class ConsoleClient:
     async def delete(self, path: str) -> Any:
         return await self._request("DELETE", path)
 
+    async def multipart_post(
+        self,
+        path: str,
+        *,
+        files: dict,
+        data: dict | None = None,
+    ) -> Any:
+        """Send a multipart/form-data POST. Used for endpoints that take UploadFile."""
+        url = f"{self._base}{path}"
+        headers = {"Authorization": f"Bearer {self._token()}"}
+        if self._actor:
+            headers["X-Mcp-Actor-Metadata"] = _json.dumps(self._actor, separators=(",", ":"))
+        # httpx.AsyncClient.post handles multipart natively when files= is set.
+        resp = await self._client.post(url, files=files, data=data, headers=headers)
+        if resp.status_code == 401 and self._on_unauthorized is not None:
+            self._on_unauthorized()
+            resp = await self._client.post(url, files=files, data=data, headers=headers)
+        if resp.status_code >= 400:
+            raise map_http_error(resp)
+        if resp.status_code == 204 or not resp.content:
+            return None
+        return resp.json()
+
     async def _request(
         self,
         method: str,

@@ -7,6 +7,7 @@ from console.mcp.tools.music import (
     _ok, _bad_action, _require, _pick,
     _confirmed_sync, _confirmed_async, _confirmed_destructive,
 )
+from console.mcp.tools._multipart import open_for_upload
 
 
 async def visual_asset(*, action: str, _client: Any, **kw: Any) -> dict:
@@ -17,8 +18,10 @@ async def visual_asset(*, action: str, _client: Any, **kw: Any) -> dict:
       - get                 {asset_id}
       - stream_url          {asset_id}
       - get_thumbnail       {asset_id}
-      - upload              **Note:** Currently broken — backend expects multipart file
-                            upload; ConsoleClient only sends JSON. See FOLLOWUPS.md.
+      - upload              {file_path, source?, title?, description?, keywords?,
+                             asset_type?, generation_prompt?}
+                            Uploads a local .mp4/.png/.jpg asset file.
+                            keywords should be a comma-separated string.
       - update              {asset_id, fields}
       - delete              {asset_id}                    (destructive)
       - animate             {asset_id, prompt}            (W async, Runway)
@@ -40,12 +43,26 @@ async def visual_asset(*, action: str, _client: Any, **kw: Any) -> dict:
             aid = _require(kw, "asset_id")
             return {"ok": True, "data": {"url": f"/api/production/assets/{aid}/thumbnail"}}
         if action == "upload":
-            return ConsoleError(
-                code="not_implemented",
-                message="action 'upload' requires multipart upload, which ConsoleClient doesn't support yet. See FOLLOWUPS.md.",
-                retryable=False,
-                context={"action": action},
-            ).to_envelope()
+            file_path = _require(kw, "file_path")
+            try:
+                files = open_for_upload(file_path, field="file")
+            except FileNotFoundError as e:
+                return ConsoleError(
+                    code="validation.invalid_args",
+                    message=str(e),
+                    retryable=False,
+                    context={"file_path": file_path},
+                ).to_envelope()
+            form_data = {}
+            for field in ("source", "title", "description", "keywords", "asset_type", "generation_prompt"):
+                val = kw.get(field)
+                if val is not None:
+                    form_data[field] = val
+            return await _confirmed_sync(
+                kw, summary=f"upload visual asset {file_path!r}",
+                run=lambda: _client.multipart_post("/api/production/assets/upload",
+                                                   files=files, data=form_data or None),
+            )
         if action == "update":
             aid = _require(kw, "asset_id")
             return await _confirmed_sync(
@@ -105,7 +122,12 @@ def register(server, *, client_factory, audit_sink=None, transport="stdio", acto
         limit: int = None,
         offset: int = None,
         file_path: str = None,
+        source: str = None,
         title: str = None,
+        description: str = None,
+        keywords: str = None,
+        asset_type: str = None,
+        generation_prompt: str = None,
         tags: list = None,
         duration_s: int = None,
         fields: dict = None,

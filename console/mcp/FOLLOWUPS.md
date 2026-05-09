@@ -1,23 +1,11 @@
 # console-mcp follow-ups
 
-## Multipart upload support
+## Streaming for large uploads
 
-Four MCP actions hit backend endpoints that require multipart file uploads,
-which `ConsoleClient` does not yet support. They currently return
-`error.code = "not_implemented"`:
-
-- `sfx.import_file` — uploads `.wav` files
-- `visual_asset.upload` — uploads `.mp4` / `.png` / `.jpg`
-- `youtube_thumbnail.upload_image` — uploads `.png` / `.jpg`
-- `channel_plan.import_json` — actually uploads a `.md` file (despite the
-  action name)
-
-Required to fix:
-1. Add `multipart_post(path, files={...}, data={...})` to `ConsoleClient`
-2. Update each action to read `file_path`, open the file, and send via the new
-   method
-3. Update tests
-4. Optionally rename `channel_plan.import_json` → `import_md` for accuracy
+`open_for_upload()` in `tools/_multipart.py` reads the entire file into memory
+before sending. For large visual assets (multi-GB `.mp4`), switch to httpx's
+streaming multipart support (passing a file-like object instead of bytes) to
+avoid blowing memory.
 
 Deferred items from the final code review of the `feat/mcp-server` branch
 (2026-05-09). Not blockers for merge; tracked here so they don't get lost.

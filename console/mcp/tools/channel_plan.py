@@ -1,4 +1,4 @@
-"""channel_plan — CRUD + JSON import + AI helpers."""
+"""channel_plan — CRUD + .md import + AI helpers."""
 
 from typing import Any
 
@@ -7,6 +7,7 @@ from console.mcp.tools.music import (
     _ok, _bad_action, _require, _pick,
     _confirmed_sync, _confirmed_destructive,
 )
+from console.mcp.tools._multipart import open_for_upload
 
 
 async def channel_plan(*, action: str, _client: Any, **kw: Any) -> dict:
@@ -15,9 +16,10 @@ async def channel_plan(*, action: str, _client: Any, **kw: Any) -> dict:
     Actions:
       - list                                                          (R)
       - get          {plan_id}                                        (R)
-      - import_json  **Note:** Currently broken — backend expects a .md file
-                     upload (multipart); ConsoleClient only sends JSON.
-                     See FOLLOWUPS.md.
+      - import_json  {file_path}
+                     Despite the action name, this uploads a local ``.md`` file
+                     (not JSON). The backend only accepts ``.md`` files.
+                     Alias: import_md does the same thing.
       - update       {plan_id, fields}                                (W)
       - delete       {plan_id}                                        (W destructive)
       - ai_seo       {plan_id, theme, context?}                       (W) → SEO suggestion
@@ -31,13 +33,21 @@ async def channel_plan(*, action: str, _client: Any, **kw: Any) -> dict:
         if action == "get":
             pid = _require(kw, "plan_id")
             return _ok(await _client.get(f"/api/channel-plans/{pid}", params={}))
-        if action == "import_json":
-            return ConsoleError(
-                code="not_implemented",
-                message="action 'import_json' requires multipart upload, which ConsoleClient doesn't support yet. See FOLLOWUPS.md.",
-                retryable=False,
-                context={"action": action},
-            ).to_envelope()
+        if action in ("import_json", "import_md"):
+            file_path = _require(kw, "file_path")
+            try:
+                files = open_for_upload(file_path, field="file")
+            except FileNotFoundError as e:
+                return ConsoleError(
+                    code="validation.invalid_args",
+                    message=str(e),
+                    retryable=False,
+                    context={"file_path": file_path},
+                ).to_envelope()
+            return await _confirmed_sync(
+                kw, summary=f"import channel plan from {file_path!r}",
+                run=lambda: _client.multipart_post("/api/channel-plans/import", files=files),
+            )
         if action == "update":
             pid = _require(kw, "plan_id")
             return await _confirmed_sync(
@@ -108,6 +118,7 @@ def register(server, *, client_factory, audit_sink=None, transport="stdio", acto
     async def _channel_plan(
         action: str,
         plan_id: int = None,
+        file_path: str = None,
         fields: dict = None,
         theme: str = None,
         context: str = None,
@@ -118,7 +129,7 @@ def register(server, *, client_factory, audit_sink=None, transport="stdio", acto
         client = client_factory()
         kw = {k: v for k, v in {
             "action": action,
-            "plan_id": plan_id, "fields": fields,
+            "plan_id": plan_id, "file_path": file_path, "fields": fields,
             "theme": theme, "context": context,
             "question": question,
             "confirm": confirm, "confirm_id": confirm_id,

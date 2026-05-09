@@ -17,12 +17,57 @@ async def test_list_and_get():
 
 
 @pytest.mark.asyncio
-async def test_import_json_not_implemented():
+async def test_import_json_uploads_md_file(tmp_path):
+    f = tmp_path / "my_channel.md"
+    f.write_text("# Channel Plan\n\nSome content\n", encoding="utf-8")
+
     client = AsyncMock()
-    out = await channel_plan(action="import_json", confirm=True, _client=client)
-    assert out["ok"] is False
-    assert out["error"]["code"] == "not_implemented"
+    client.multipart_post.return_value = {"id": 3, "slug": "my-channel", "md_content": "# Channel Plan\n"}
+
+    out = await channel_plan(
+        action="import_json",
+        file_path=str(f),
+        confirm=True,
+        _client=client,
+    )
+    assert out["ok"] is True
+    client.multipart_post.assert_awaited_once()
+    call = client.multipart_post.await_args
+    assert call.kwargs["files"]["file"][0] == "my_channel.md"
     client.post.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_import_md_alias(tmp_path):
+    """import_md is an alias for import_json."""
+    f = tmp_path / "plan.md"
+    f.write_text("# Plan\n", encoding="utf-8")
+
+    client = AsyncMock()
+    client.multipart_post.return_value = {"id": 4, "slug": "plan"}
+
+    out = await channel_plan(
+        action="import_md",
+        file_path=str(f),
+        confirm=True,
+        _client=client,
+    )
+    assert out["ok"] is True
+    client.multipart_post.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_import_json_missing_file_returns_validation_error():
+    client = AsyncMock()
+    out = await channel_plan(
+        action="import_json",
+        file_path="/nonexistent/plan.md",
+        confirm=True,
+        _client=client,
+    )
+    assert out["ok"] is False
+    assert out["error"]["code"] == "validation.invalid_args"
+    client.multipart_post.assert_not_called()
 
 
 @pytest.mark.asyncio
