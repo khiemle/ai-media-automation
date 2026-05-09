@@ -84,6 +84,9 @@ def upload(
         "status": {
             "privacyStatus":           privacy_status,
             "selfDeclaredMadeForKids": False,
+            "selfDeclaration": {
+                "hasSyntheticOrAltered": True,
+            },
         },
     }
 
