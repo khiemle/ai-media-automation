@@ -18,7 +18,7 @@ from console.mcp.auth.adapters import HttpAuth
 from console.mcp.auth.tokens import InMemoryApiKeyRegistry
 from console.mcp.client.console_client import ConsoleClient
 from console.mcp.server import build_server
-from console.mcp.tools import system_health
+from console.mcp.tools import system_health, task_status
 
 
 def build_http_app(*, registry: InMemoryApiKeyRegistry) -> FastAPI:
@@ -36,6 +36,10 @@ def build_http_app(*, registry: InMemoryApiKeyRegistry) -> FastAPI:
         lambda s: system_health.register(s, client_factory=lambda: ConsoleClient(
             base_url=os.environ.get("MCP_CONSOLE_API_BASE", "http://localhost:8080"),
             token_provider=lambda: "placeholder",  # overridden per-request below
+        )),
+        lambda s: task_status.register(s, client_factory=lambda: ConsoleClient(
+            base_url=os.environ.get("MCP_CONSOLE_API_BASE", "http://localhost:8080"),
+            token_provider=lambda: "placeholder",
         )),
     ])
 
@@ -66,6 +70,8 @@ def build_http_app(*, registry: InMemoryApiKeyRegistry) -> FastAPI:
         client = make_client(api_key)
         if tool_name == "system_health":
             return await system_health.system_health(_client=client, **args)
+        elif tool_name == "task_status":
+            return await task_status.task_status(_client=client, **args)
         raise HTTPException(status_code=404, detail=f"unknown tool {tool_name}")
 
     return app

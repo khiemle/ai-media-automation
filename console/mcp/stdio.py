@@ -6,7 +6,7 @@ import os
 from console.mcp.auth.adapters import StdioAuth
 from console.mcp.client.console_client import ConsoleClient
 from console.mcp.server import build_server
-from console.mcp.tools import system_health
+from console.mcp.tools import system_health, task_status
 
 
 def main() -> None:
@@ -21,6 +21,7 @@ def main() -> None:
 
     server = build_server(register=[
         lambda s: system_health.register(s, client_factory=client_factory),
+        lambda s: task_status.register(s, client_factory=client_factory),
     ])
     server.run("stdio")
 

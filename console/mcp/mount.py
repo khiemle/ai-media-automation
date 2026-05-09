@@ -10,14 +10,17 @@ from fastapi import FastAPI, Header, HTTPException, Request
 
 from console.mcp.auth.adapters import ChatAuth
 from console.mcp.client.console_client import ConsoleClient
-from console.mcp.tools import system_health
+from console.mcp.tools import system_health, task_status
 
 
 def attach(app: FastAPI) -> None:
     @app.get("/mcp/tools")
     async def list_tools(authorization: str | None = Header(default=None)) -> dict[str, Any]:
         _require_user_jwt(authorization)
-        return {"tools": [{"name": "system_health", "description": "system observability"}]}
+        return {"tools": [
+            {"name": "system_health", "description": "system observability"},
+            {"name": "task_status", "description": "poll any task_id returned by an async-kicking tool"},
+        ]}
 
     @app.post("/mcp/call")
     async def call_tool(req: Request, authorization: str | None = Header(default=None)) -> dict[str, Any]:
@@ -33,6 +36,8 @@ def attach(app: FastAPI) -> None:
         )
         if tool_name == "system_health":
             return await system_health.system_health(_client=client, **args)
+        elif tool_name == "task_status":
+            return await task_status.task_status(_client=client, **args)
         raise HTTPException(status_code=404, detail=f"unknown tool {tool_name}")
 
 
