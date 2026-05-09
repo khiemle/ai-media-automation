@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from console.backend.auth import require_editor_or_admin
 from console.backend.database import get_db
 from console.backend.services.youtube_video_service import YoutubeVideoService
+from console.backend.utils.file_naming import make_unique_path
 
 router = APIRouter(prefix="/youtube-videos", tags=["youtube-videos"])
 
@@ -426,7 +427,7 @@ async def upload_thumbnail_image(
         raise HTTPException(status_code=400, detail="Unsupported image type. Use jpg, png, or webp.")
     save_dir = Path("assets/thumbnails/source").resolve()
     save_dir.mkdir(parents=True, exist_ok=True)
-    save_path = save_dir / f"yt_{video_id}_{int(time.time())}{ext}"
+    save_path = make_unique_path("thumbnail-source", ext, save_dir)
     save_path.write_bytes(content)
 
     asset = VideoAsset(
@@ -483,7 +484,9 @@ def generate_thumbnail_endpoint(
     if not asset:
         raise HTTPException(status_code=400, detail="Thumbnail source asset not found")
 
-    output_path = Path(f"assets/thumbnails/generated/yt_{video_id}.png").resolve()
+    thumb_dir = Path("assets/thumbnails/generated").resolve()
+    thumb_dir.mkdir(parents=True, exist_ok=True)
+    output_path = make_unique_path("thumbnail", ".png", thumb_dir)
     try:
         generate_thumbnail(source_path=asset.file_path, output_path=output_path, text=text or None)
     except Exception as exc:
@@ -508,15 +511,41 @@ def generate_thumbnail_endpoint(
 
 @router.get("/{video_id}/thumbnail")
 def get_thumbnail(video_id: int, db: Session = Depends(get_db)):
-    """Serve the generated thumbnail PNG."""
+    """Serve the generated thumbnail PNG, or redirect to YouTube CDN for published videos."""
     from console.backend.models.youtube_video import YoutubeVideo
+    from console.backend.models.youtube_video_upload import YoutubeVideoUpload
+    from fastapi.responses import RedirectResponse
+
+    def _yt_cdn_redirect(vid_id: int):
+        upload = (
+            db.query(YoutubeVideoUpload)
+            .filter(
+                YoutubeVideoUpload.youtube_video_id == vid_id,
+                YoutubeVideoUpload.status == "done",
+                YoutubeVideoUpload.platform_id.isnot(None),
+            )
+            .first()
+        )
+        if upload:
+            return RedirectResponse(
+                f"https://img.youtube.com/vi/{upload.platform_id}/maxresdefault.jpg"
+            )
+        return None
 
     video = db.get(YoutubeVideo, video_id)
     if not video or not video.thumbnail_path:
+        redirect = _yt_cdn_redirect(video_id)
+        if redirect:
+            return redirect
         raise HTTPException(status_code=404, detail="No thumbnail available")
+
     p = Path(video.thumbnail_path)
     if not p.is_file():
+        redirect = _yt_cdn_redirect(video_id)
+        if redirect:
+            return redirect
         raise HTTPException(status_code=404, detail="Thumbnail file not found on disk")
+
     return FileResponse(str(p), media_type="image/png")
 
 
