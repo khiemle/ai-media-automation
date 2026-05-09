@@ -1,0 +1,101 @@
+"""channel_plan — CRUD + JSON import + AI helpers."""
+
+from typing import Any
+
+from console.mcp.errors import ConsoleError
+from console.mcp.tools.music import (
+    _ok, _bad_action, _require, _pick,
+    _confirmed_sync, _confirmed_destructive,
+)
+
+
+async def channel_plan(*, action: str, _client: Any, **kw: Any) -> dict:
+    """Channel plans (the upstream brief for a channel's content).
+
+    Actions:
+      - list                                                    (R)
+      - get          {plan_id}                                  (R)
+      - import_json  {payload: dict}                            (W) → plan_id
+      - update       {plan_id, fields}                          (W)
+      - delete       {plan_id}                                  (W destructive)
+      - ai_seo       {plan_id}                                  (W) → SEO suggestion
+      - ai_prompts   {plan_id, hints?}                          (W) → prompt suggestions
+      - ai_autofill  {plan_id, hints?}                          (W) → bulk autofill
+      - ai_ask       {plan_id, question}                        (W) → answer
+    """
+    try:
+        if action == "list":
+            return _ok(await _client.get("/api/channel-plans", params={}))
+        if action == "get":
+            pid = _require(kw, "plan_id")
+            return _ok(await _client.get(f"/api/channel-plans/{pid}", params={}))
+        if action == "import_json":
+            payload = _require(kw, "payload")
+            return await _confirmed_sync(
+                kw, summary="import channel plan from JSON",
+                run=lambda: _client.post("/api/channel-plans/import", json=payload),
+            )
+        if action == "update":
+            pid = _require(kw, "plan_id")
+            return await _confirmed_sync(
+                kw, summary=f"update channel plan {pid}",
+                run=lambda: _client.put(f"/api/channel-plans/{pid}", json=kw.get("fields") or {}),
+            )
+        if action == "delete":
+            pid = _require(kw, "plan_id")
+            return await _confirmed_destructive(
+                kw, id_arg="plan_id",
+                summary=f"DELETE channel plan {pid}",
+                run=lambda: _client.delete(f"/api/channel-plans/{pid}"),
+            )
+        if action == "ai_seo":
+            pid = _require(kw, "plan_id")
+            return await _confirmed_sync(
+                kw, summary=f"ai SEO for plan {pid}",
+                run=lambda: _client.post(f"/api/channel-plans/{pid}/ai/seo", json={}),
+            )
+        if action == "ai_prompts":
+            pid = _require(kw, "plan_id")
+            body = {"hints": kw["hints"]} if kw.get("hints") else {}
+            return await _confirmed_sync(
+                kw, summary=f"ai prompts for plan {pid}",
+                run=lambda: _client.post(f"/api/channel-plans/{pid}/ai/prompts", json=body),
+            )
+        if action == "ai_autofill":
+            pid = _require(kw, "plan_id")
+            body = {"hints": kw["hints"]} if kw.get("hints") else {}
+            return await _confirmed_sync(
+                kw, summary=f"ai autofill plan {pid}",
+                run=lambda: _client.post(f"/api/channel-plans/{pid}/ai/autofill", json=body),
+            )
+        if action == "ai_ask":
+            pid = _require(kw, "plan_id")
+            q = _require(kw, "question")
+            return await _confirmed_sync(
+                kw, summary=f"ai ask on plan {pid}: {q!r}",
+                run=lambda: _client.post(f"/api/channel-plans/{pid}/ai/ask", json={"question": q}),
+            )
+        return _bad_action(action)
+    except ConsoleError as e:
+        return e.to_envelope()
+
+
+def register(server, *, client_factory):
+    @server.tool(name="channel_plan")
+    async def _channel_plan(
+        action: str,
+        plan_id: int = None,
+        payload: dict = None,
+        fields: dict = None,
+        hints: dict = None,
+        question: str = None,
+        confirm: bool = False,
+        confirm_id: int = None,
+    ) -> dict:
+        client = client_factory()
+        kw = {k: v for k, v in {
+            "plan_id": plan_id, "payload": payload, "fields": fields,
+            "hints": hints, "question": question,
+            "confirm": confirm, "confirm_id": confirm_id,
+        }.items() if v is not None or k == "confirm"}
+        return await channel_plan(action=action, _client=client, **kw)

@@ -18,7 +18,7 @@ from console.mcp.auth.adapters import HttpAuth
 from console.mcp.auth.tokens import InMemoryApiKeyRegistry
 from console.mcp.client.console_client import ConsoleClient
 from console.mcp.server import build_server
-from console.mcp.tools import system_health, task_status, pipeline_jobs, music, sfx, visual_asset
+from console.mcp.tools import system_health, task_status, pipeline_jobs, music, sfx, visual_asset, channel_plan, channel
 
 
 def build_http_app(*, registry: InMemoryApiKeyRegistry) -> FastAPI:
@@ -54,6 +54,14 @@ def build_http_app(*, registry: InMemoryApiKeyRegistry) -> FastAPI:
             token_provider=lambda: "placeholder",
         )),
         lambda s: visual_asset.register(s, client_factory=lambda: ConsoleClient(
+            base_url=os.environ.get("MCP_CONSOLE_API_BASE", "http://localhost:8080"),
+            token_provider=lambda: "placeholder",
+        )),
+        lambda s: channel_plan.register(s, client_factory=lambda: ConsoleClient(
+            base_url=os.environ.get("MCP_CONSOLE_API_BASE", "http://localhost:8080"),
+            token_provider=lambda: "placeholder",
+        )),
+        lambda s: channel.register(s, client_factory=lambda: ConsoleClient(
             base_url=os.environ.get("MCP_CONSOLE_API_BASE", "http://localhost:8080"),
             token_provider=lambda: "placeholder",
         )),
@@ -96,6 +104,10 @@ def build_http_app(*, registry: InMemoryApiKeyRegistry) -> FastAPI:
             return await sfx.sfx(_client=client, **args)
         elif tool_name == "visual_asset":
             return await visual_asset.visual_asset(_client=client, **args)
+        elif tool_name == "channel_plan":
+            return await channel_plan.channel_plan(_client=client, **args)
+        elif tool_name == "channel":
+            return await channel.channel(_client=client, **args)
         raise HTTPException(status_code=404, detail=f"unknown tool {tool_name}")
 
     return app
