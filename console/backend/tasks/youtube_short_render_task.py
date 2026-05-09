@@ -3,10 +3,10 @@ from __future__ import annotations
 
 import logging
 import os
-import time
 from pathlib import Path
 
 from console.backend.celery_app import celery_app
+from console.backend.utils.file_naming import make_unique_path
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +56,7 @@ def render_youtube_short_task(self, youtube_video_id: int):
         db.commit()
 
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-        output_path = OUTPUT_DIR / f"short_{youtube_video_id}_v{int(time.time())}.mp4"
+        output_path = make_unique_path(video.title, ".mp4", OUTPUT_DIR)
 
         render_portrait_short(video, template, output_path, db)
         render_completed = True
