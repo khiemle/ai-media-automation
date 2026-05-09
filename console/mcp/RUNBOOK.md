@@ -16,7 +16,9 @@ All tool source lives under `console/mcp/`; the mounted sub-app is wired into
 
 ## Pre-flight checklist
 
-Before starting any MCP transport, confirm all of the following:
+For an automated check + setup, run `./console/mcp/scripts/mcp-dev.sh` from project root.
+
+Otherwise, confirm all of the following manually:
 
 - **PostgreSQL running.**
   ```bash

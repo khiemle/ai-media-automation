@@ -21,6 +21,13 @@ MCP server exposing AI Media Console video-creation workflows to LLM agents.
    }
    ```
 
+For an automated local-dev setup (prerequisite checks + JWT minting + ready-to-paste mcp.json), run:
+
+```bash
+./console/mcp/scripts/mcp-dev.sh           # stdio setup
+./console/mcp/scripts/mcp-dev.sh --http    # also launch HTTP transport
+```
+
 ## Tools
 
 | Tool | Purpose |
