@@ -18,7 +18,7 @@ from console.mcp.auth.adapters import HttpAuth
 from console.mcp.auth.tokens import InMemoryApiKeyRegistry
 from console.mcp.client.console_client import ConsoleClient
 from console.mcp.server import build_server
-from console.mcp.tools import system_health, task_status, pipeline_jobs, music, sfx, visual_asset, channel_plan, channel, youtube_video, youtube_thumbnail
+from console.mcp.tools import system_health, task_status, pipeline_jobs, music, sfx, visual_asset, channel_plan, channel, youtube_video, youtube_thumbnail, upload
 
 
 def build_http_app(*, registry: InMemoryApiKeyRegistry) -> FastAPI:
@@ -73,6 +73,10 @@ def build_http_app(*, registry: InMemoryApiKeyRegistry) -> FastAPI:
             base_url=os.environ.get("MCP_CONSOLE_API_BASE", "http://localhost:8080"),
             token_provider=lambda: "placeholder",
         )),
+        lambda s: upload.register(s, client_factory=lambda: ConsoleClient(
+            base_url=os.environ.get("MCP_CONSOLE_API_BASE", "http://localhost:8080"),
+            token_provider=lambda: "placeholder",
+        )),
     ])
 
     def _require_key(x_api_key: str | None) -> str:
@@ -120,6 +124,8 @@ def build_http_app(*, registry: InMemoryApiKeyRegistry) -> FastAPI:
             return await youtube_video.youtube_video(_client=client, **args)
         elif tool_name == "youtube_thumbnail":
             return await youtube_thumbnail.youtube_thumbnail(_client=client, **args)
+        elif tool_name == "upload":
+            return await upload.upload(_client=client, **args)
         raise HTTPException(status_code=404, detail=f"unknown tool {tool_name}")
 
     return app
