@@ -35,3 +35,4 @@ requests>=2.31.0                    # HTTP downloads (Veo, Pexels streams)
 # ── Utilities ─────────────────────────────────────────────
 python-dotenv>=1.0.1                # Load pipeline.env (already in console)
 pyyaml>=6.0.1                       # pipeline_config.yaml (already in console)
+unidecode>=1.3                       # File naming slugs (ASCII conversion)

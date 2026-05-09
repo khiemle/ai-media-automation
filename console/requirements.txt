@@ -38,6 +38,7 @@ lxml>=5.0.0
 # Utilities
 python-dateutil==2.9.0
 psutil==5.9.8
+unidecode>=1.3
 
 # Pipeline dependencies (TTS, video, captions, LLM, scrapers, etc.)
 -r ../requirements.pipeline.txt
