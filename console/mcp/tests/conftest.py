@@ -12,3 +12,9 @@ def _mcp_test_env(monkeypatch):
     monkeypatch.setenv("MCP_CONSOLE_API_BASE", "http://test")
     monkeypatch.setenv("MCP_LOG_LEVEL", "debug")
     monkeypatch.setenv("MCP_IDEMPOTENCY_TTL_S", "3600")
+
+
+@pytest.fixture
+def api_key_registry():
+    from console.mcp.auth.tokens import InMemoryApiKeyRegistry
+    return InMemoryApiKeyRegistry()
