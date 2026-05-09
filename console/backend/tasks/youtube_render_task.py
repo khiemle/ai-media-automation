@@ -7,6 +7,7 @@ import time
 from pathlib import Path
 
 from console.backend.celery_app import celery_app
+from console.backend.utils.file_naming import make_filename, make_unique_path
 
 # Import models at module load so SQLAlchemy resolves all YoutubeVideo FKs
 # before any task flushes a YoutubeVideo update.  Without this the mapper's
@@ -114,7 +115,7 @@ def render_youtube_video_task(self, youtube_video_id: int):
         _publish_youtube_render_event(youtube_video_id)
 
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-        output_path = OUTPUT_DIR / f"youtube_{youtube_video_id}_v{int(time.time())}.mp4"
+        output_path = make_unique_path(video.title, ".mp4", OUTPUT_DIR)
 
         render_landscape(video, output_path, db)
         render_completed = True
@@ -177,7 +178,7 @@ def render_youtube_audio_preview_task(self, youtube_video_id: int):
         _publish_youtube_render_event(youtube_video_id)
 
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-        out_dir = OUTPUT_DIR / f"youtube_{youtube_video_id}"
+        out_dir = OUTPUT_DIR / make_filename(video.title, "")
         out_dir.mkdir(parents=True, exist_ok=True)
         out_path = out_dir / "audio_preview.wav"
 
@@ -235,7 +236,7 @@ def render_youtube_video_preview_task(self, youtube_video_id: int):
         _publish_youtube_render_event(youtube_video_id)
 
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-        out_dir = OUTPUT_DIR / f"youtube_{youtube_video_id}"
+        out_dir = OUTPUT_DIR / make_filename(video.title, "")
         out_dir.mkdir(parents=True, exist_ok=True)
         out_path = out_dir / "video_preview.mp4"
 
