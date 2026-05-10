@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, Float, ForeignKey, Integer, String, Text, DateTime, func
+from sqlalchemy import Boolean, Float, ForeignKey, Integer, String, Text, DateTime, func, text
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -67,3 +67,13 @@ class YoutubeVideo(Base):
     )
     thumbnail_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     thumbnail_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Music template fields (added by migration 022)
+    track_transition:         Mapped[str]       = mapped_column(String(20),  nullable=False, default="gapless",  server_default="gapless")
+    track_transition_seconds: Mapped[float]     = mapped_column(Float,       nullable=False, default=2.0,        server_default="2.0")
+    playlist_overlay_style:   Mapped[str | None] = mapped_column(String(20), nullable=True)
+    spectrum_enabled:         Mapped[bool]      = mapped_column(Boolean,     nullable=False, default=False,      server_default=text("false"))
+    spectrum_position:        Mapped[str]       = mapped_column(String(10),  nullable=False, default="bottom",   server_default="bottom")
+    spectrum_height_pct:      Mapped[float]     = mapped_column(Float,       nullable=False, default=0.12,       server_default="0.12")
+    spectrum_color:           Mapped[str]       = mapped_column(String(9),   nullable=False, default="#ffffff",  server_default="#ffffff")
+    spectrum_opacity:         Mapped[float]     = mapped_column(Float,       nullable=False, default=0.6,        server_default="0.6")

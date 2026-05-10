@@ -23,3 +23,6 @@ class VideoTemplate(Base):
     seo_description_template: Mapped[str | None] = mapped_column(Text, nullable=True)
     short_cta_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     short_duration_s: Mapped[int | None] = mapped_column(Integer, nullable=True, default=58, server_default="58")
+    ui_features: Mapped[list] = mapped_column(
+        JSONB, nullable=False, default=list, server_default="'[]'::jsonb"
+    )

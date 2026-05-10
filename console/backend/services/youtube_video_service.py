@@ -15,6 +15,18 @@ from console.backend.models.channel import Channel
 from console.backend.models.youtube_video import YoutubeVideo
 from console.backend.models.youtube_video_upload import YoutubeVideoUpload
 from console.backend.models.video_template import VideoTemplate
+from database.models import MusicTrack
+
+# Fields that are NOT NULL in the DB — explicit None in an update payload is an error
+_MUSIC_NOT_NULL_FIELDS = (
+    "track_transition",
+    "track_transition_seconds",
+    "spectrum_enabled",
+    "spectrum_position",
+    "spectrum_height_pct",
+    "spectrum_color",
+    "spectrum_opacity",
+)
 
 # Valid status transitions for the YoutubeVideo state machine
 ALLOWED_TRANSITIONS: dict[str, set[str]] = {
@@ -25,6 +37,82 @@ ALLOWED_TRANSITIONS: dict[str, set[str]] = {
     "failed": {"draft"},
     "published": set(),
 }
+
+
+def _resolve_music_tracks(video, db) -> list[MusicTrack]:
+    """Return ordered list of MusicTrack rows for video.music_track_ids.
+
+    Preserves the user-specified order. Raises ValueError if any ID is missing.
+    Falls back to single music_track_id when music_track_ids is empty.
+    """
+    track_ids = list(getattr(video, "music_track_ids", None) or [])
+    if not track_ids and getattr(video, "music_track_id", None):
+        track_ids = [video.music_track_id]
+    if not track_ids:
+        return []
+
+    rows = db.query(MusicTrack).filter(MusicTrack.id.in_(track_ids)).all()
+    by_id = {t.id: t for t in rows}
+    missing = [tid for tid in track_ids if tid not in by_id]
+    if missing:
+        raise ValueError(f"music_track_ids not found: {missing}")
+    return [by_id[tid] for tid in track_ids]
+
+
+def _compute_music_total_duration(
+    tracks, transition: str, transition_s: float
+) -> tuple[float, list[float]]:
+    """Return (total_seconds, per-track-start boundaries).
+
+    Boundaries[i] is the start time of track i in the final timeline.
+    Total is the timeline length after transition adjustments.
+    """
+    if not tracks:
+        return 0.0, []
+
+    boundaries: list[float] = [0.0]
+    if transition == "gapless" or len(tracks) == 1:
+        for t in tracks[:-1]:
+            boundaries.append(boundaries[-1] + float(t.duration_s))
+        total = boundaries[-1] + float(tracks[-1].duration_s)
+    elif transition == "crossfade":
+        for t in tracks[:-1]:
+            boundaries.append(boundaries[-1] + float(t.duration_s) - transition_s)
+        total = boundaries[-1] + float(tracks[-1].duration_s)
+    elif transition == "gap":
+        for t in tracks[:-1]:
+            boundaries.append(boundaries[-1] + float(t.duration_s) + transition_s)
+        total = boundaries[-1] + float(tracks[-1].duration_s)
+    else:
+        raise ValueError(f"unknown transition mode: {transition}")
+    return total, boundaries
+
+
+def build_chapters_from_tracks(
+    tracks, transition: str, transition_s: float
+) -> list[dict] | None:
+    """Pure function — chapter list or None.
+
+    Returns None when fewer than 3 tracks (YouTube minimum). Falls back
+    to "Track {i+1}" when a track title is empty/null, with WARNING log.
+    """
+    if len(tracks) < 3:
+        return None
+    _, boundaries = _compute_music_total_duration(tracks, transition, transition_s)
+    chapters = []
+    for i, t in enumerate(tracks):
+        title = (t.title or "").strip()
+        if not title:
+            logger.warning(
+                "Music track at index %d has empty title; falling back to 'Track %d'",
+                i, i + 1,
+            )
+            title = f"Track {i + 1}"
+        chapters.append({
+            "seconds": int(round(boundaries[i])),
+            "title": title,
+        })
+    return chapters
 
 
 def _audit(
@@ -86,6 +174,16 @@ def _video_to_dict(
         "thumbnail_asset_id":      v.thumbnail_asset_id,
         "thumbnail_text":          v.thumbnail_text,
         "thumbnail_path":          v.thumbnail_path,
+        # Music template fields
+        "track_transition":         v.track_transition,
+        "track_transition_seconds": v.track_transition_seconds,
+        "playlist_overlay_style":   v.playlist_overlay_style,
+        "spectrum_enabled":         bool(v.spectrum_enabled) if v.spectrum_enabled is not None else False,
+        "spectrum_position":        v.spectrum_position,
+        "spectrum_height_pct":      v.spectrum_height_pct,
+        "spectrum_color":           v.spectrum_color,
+        "spectrum_opacity":         v.spectrum_opacity,
+        "total_duration_s":         None,
         "uploads": uploads if uploads is not None else [],
         "created_at": v.created_at.isoformat() if v.created_at else None,
         "updated_at": v.updated_at.isoformat() if v.updated_at else None,
@@ -121,6 +219,7 @@ def _template_to_dict(t: VideoTemplate) -> dict[str, Any]:
         "seo_description_template": t.seo_description_template,
         "short_cta_text": t.short_cta_text,
         "short_duration_s": t.short_duration_s if t.short_duration_s is not None else 58,
+        "ui_features": list(t.ui_features) if t.ui_features else [],
     }
 
 
@@ -212,6 +311,10 @@ class YoutubeVideoService:
         if not template:
             raise ValueError(f"Template {template_id} not found")
 
+        # Validate music-template-specific constraints before any writes
+        data = self._validate_music_template(data, template)
+        data.pop("_field_warnings", None)  # internal validator marker, don't pass to ORM
+
         # Default skip_previews=False for asmr/soundscape templates (preview flow opt-in by default)
         skip_previews = data.get("skip_previews")
         if skip_previews is None:
@@ -244,6 +347,14 @@ class YoutubeVideoService:
             visual_asset_ids=data.get("visual_asset_ids") or [],
             visual_clip_durations_s=data.get("visual_clip_durations_s") or [],
             visual_loop_mode=data.get("visual_loop_mode") or "concat_loop",
+            track_transition=data.get("track_transition", "gapless"),
+            track_transition_seconds=data.get("track_transition_seconds", 2.0),
+            playlist_overlay_style=data.get("playlist_overlay_style"),
+            spectrum_enabled=data.get("spectrum_enabled", False),
+            spectrum_position=data.get("spectrum_position", "bottom"),
+            spectrum_height_pct=data.get("spectrum_height_pct", 0.12),
+            spectrum_color=data.get("spectrum_color", "#ffffff"),
+            spectrum_opacity=data.get("spectrum_opacity", 0.6),
             status="draft",
         )
         self.db.add(video)
@@ -256,6 +367,53 @@ class YoutubeVideoService:
             self.db.rollback()
             raise
         return _video_to_dict(video)
+
+    def _validate_music_template(self, data: dict, template) -> dict:
+        """Reject music-template-incompatible fields, normalize single-track overlay.
+
+        Returns the (possibly mutated) data dict. May add `_field_warnings` key
+        listing soft warnings that the response will surface.
+        """
+        if template.slug != "music":
+            return data
+        warnings: list[str] = []
+
+        if data.get("target_duration_h") is not None:
+            raise ValueError(
+                "music template derives duration from tracks; remove target_duration_h"
+            )
+        if data.get("black_from_seconds") is not None:
+            raise ValueError("music template does not support blackout")
+        for field in ("sound_layers", "sfx_overrides", "sfx_pool"):
+            if data.get(field):
+                raise ValueError("music template does not support SFX layers")
+
+        track_ids = data.get("music_track_ids") or []
+        if not track_ids and not data.get("music_track_id"):
+            raise ValueError("music template requires at least 1 music track")
+
+        # Single-track → null the overlay style silently, with warning
+        effective_count = len(track_ids) if track_ids else 1
+        if effective_count < 2 and data.get("playlist_overlay_style"):
+            warnings.append("overlay hidden for single-track playlists")
+            data = {**data, "playlist_overlay_style": None}
+
+        # Crossfade safety: must be < half the shortest track
+        if data.get("track_transition") == "crossfade" and track_ids:
+            rows = self.db.query(MusicTrack).filter(MusicTrack.id.in_(track_ids)).all()
+            durations = [r.duration_s for r in rows if r.duration_s]
+            if durations:
+                shortest = min(durations)
+                xfade = float(data.get("track_transition_seconds") or 2.0)
+                if xfade > shortest / 2:
+                    raise ValueError(
+                        f"crossfade ({xfade}s) exceeds half the shortest "
+                        f"track duration ({shortest}s)"
+                    )
+
+        if warnings:
+            data = {**data, "_field_warnings": warnings}
+        return data
 
     def _validate_visual_playlist(self, data: dict) -> list[float] | None:
         """Validate visual playlist fields. Returns the normalized durations array if rewritten, else None.
@@ -333,6 +491,25 @@ class YoutubeVideoService:
                 f"(allowed: {sorted(self.EDITABLE_STATUSES)})"
             )
 
+        # Validate music-template-specific constraints BEFORE any writes
+        template = self.db.get(VideoTemplate, v.template_id)
+        if template and template.slug == "music":
+            # For partial updates, merge update data with existing video state so that
+            # single-track-overlay and crossfade checks can see the effective track list.
+            effective_data = {
+                "music_track_ids": list(v.music_track_ids or []),
+                "music_track_id": v.music_track_id,
+                "track_transition": v.track_transition,
+                "track_transition_seconds": v.track_transition_seconds,
+                "playlist_overlay_style": v.playlist_overlay_style,
+            }
+            effective_data.update(data)
+            validated = self._validate_music_template(effective_data, template)
+            validated.pop("_field_warnings", None)  # internal validator marker, don't pass to ORM
+            # If overlay was silently nulled, propagate that into the update payload
+            if validated.get("playlist_overlay_style") != effective_data.get("playlist_overlay_style"):
+                data = {**data, "playlist_overlay_style": validated["playlist_overlay_style"]}
+
         # Validate visual playlist BEFORE any writes
         playlist_validation = self._validate_visual_playlist(data)
 
@@ -342,8 +519,16 @@ class YoutubeVideoService:
             "black_from_seconds", "skip_previews", "target_duration_h", "output_quality",
             "seo_title", "seo_description", "seo_tags",
             "visual_asset_ids", "visual_clip_durations_s", "visual_loop_mode",
+            "track_transition", "track_transition_seconds", "playlist_overlay_style",
+            "spectrum_enabled", "spectrum_position", "spectrum_height_pct",
+            "spectrum_color", "spectrum_opacity",
         ]
         changed = {f: data[f] for f in editable_fields if f in data}
+
+        # Guard: NOT NULL music fields must not be set to None via partial update
+        for f in _MUSIC_NOT_NULL_FIELDS:
+            if f in changed and changed[f] is None:
+                raise ValueError(f"{f} cannot be null")
 
         # Apply normalized durations array if validation rewrote it
         if playlist_validation is not None:
@@ -622,3 +807,13 @@ class YoutubeVideoService:
     def get_render_state(self, video_id: int) -> dict:
         from console.backend.services.youtube_render_state import get_render_state
         return get_render_state(self.db, video_id)
+
+    def build_chapters(self, video) -> list[dict] | None:
+        """Service wrapper: builds chapters for a YoutubeVideo (music template only)."""
+        template = self.db.get(VideoTemplate, video.template_id)
+        if not template or template.slug != "music":
+            return None
+        tracks = _resolve_music_tracks(video, self.db)
+        return build_chapters_from_tracks(
+            tracks, video.track_transition, video.track_transition_seconds
+        )

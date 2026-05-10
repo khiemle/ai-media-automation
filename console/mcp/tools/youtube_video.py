@@ -23,6 +23,11 @@ async def youtube_video(*, action: str, _client: Any, **kw: Any) -> dict:
 
     Read:
       - list, get, list_templates, get_template, get_render_state
+      - get_chapters  {video_id} → {video_id, chapters: list | null}
+          Returns the YouTube chapter list (seconds + title) that would be
+          injected on upload. For non-music templates returns chapters=null.
+          For music templates with fewer than 3 tracks returns chapters=null
+          (YouTube minimum). Useful for previewing chapters before upload.
 
     Write (CRUD + import):
       - create       {fields}
@@ -40,6 +45,17 @@ async def youtube_video(*, action: str, _client: Any, **kw: Any) -> dict:
       - render_final          {video_id}           (W async)
       - cancel_render         {video_id}           (W destructive)
       - resume_render         {video_id}           (W async)
+
+    Music template fields (only valid when template_id refers to the 'music' template):
+      music_track_ids:           list[int] — ordered playlist (at least 1 track required)
+      track_transition:          'gapless' | 'crossfade' | 'gap'  (default 'gapless')
+      track_transition_seconds:  float, 0.5..10.0                  (default 2.0)
+      playlist_overlay_style:    'chip' | 'sidebar' | 'bottom_bar' | null
+      spectrum_enabled:          bool                               (default false)
+      spectrum_position:         'bottom' | 'center'
+      spectrum_height_pct:       float, 0..0.5
+      spectrum_color:            '#rrggbb'
+      spectrum_opacity:          float, 0..1.0
     """
     try:
         # ── Reads ────────────────────────────────────────────────────────────
@@ -59,6 +75,9 @@ async def youtube_video(*, action: str, _client: Any, **kw: Any) -> dict:
         if action == "get_render_state":
             vid = _require(kw, "video_id")
             return _ok(await _client.get(f"/api/youtube-videos/{vid}/render/state", params={}))
+        if action == "get_chapters":
+            vid = _require(kw, "video_id")
+            return _ok(await _client.get(f"/api/youtube-videos/{vid}/chapters", params={}))
 
         # ── CRUD ─────────────────────────────────────────────────────────────
         if action in ("create", "import_json"):

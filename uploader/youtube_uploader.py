@@ -25,6 +25,7 @@ def upload(
     video_path:  str | Path,
     metadata:    dict,
     credentials: dict,
+    chapters:    list[dict] | None = None,
 ) -> str:
     """
     Upload a video to YouTube using the Data API v3.
@@ -67,7 +68,7 @@ def upload(
     youtube = build("youtube", "v3", credentials=creds)
 
     title          = metadata.get("title", video_path.stem)[:100]
-    description    = _build_description(metadata)
+    description    = _build_description(metadata, chapters=chapters)
     tags           = _build_tags(metadata)
     category_id    = _niche_to_category(metadata.get("niche", "lifestyle"))
     language       = metadata.get("language", "en")
@@ -115,22 +116,75 @@ def upload(
     return video_id
 
 
-def _build_description(metadata: dict) -> str:
+def _fmt_timestamp(seconds: int) -> str:
+    """Format as M:SS or H:MM:SS depending on duration."""
+    seconds = max(0, int(seconds))
+    h, rem = divmod(seconds, 3600)
+    m, s = divmod(rem, 60)
+    if h:
+        return f"{h}:{m:02d}:{s:02d}"
+    return f"{m}:{s:02d}"
+
+
+def _format_chapters(chapters: list[dict]) -> str:
+    """Format chapter list as YouTube-compatible timestamp lines.
+
+    First chapter is FORCED to 0:00 per YouTube's spec, even if the
+    input boundary is non-zero (defensive guard for off-by-one bugs).
+    """
+    lines = []
+    for i, ch in enumerate(chapters):
+        ts = 0 if i == 0 else int(ch["seconds"])
+        lines.append(f"{_fmt_timestamp(ts)} {ch['title']}")
+    return "\n".join(lines)
+
+
+def build_description_with_chapters(
+    body: str,
+    chapters: list[dict] | None,
+    hashtags: list[str] | None = None,
+) -> str:
+    """Compose the final YouTube description.
+
+    When chapters has >= 3 entries, prepends a chapters block with a
+    blank-line separator. Otherwise returns body unchanged (plus optional
+    hashtag block).
+    """
+    parts = []
+    if chapters and len(chapters) >= 3:
+        parts.append(_format_chapters(chapters))
+        parts.append("")
+    parts.append(body)
+    if hashtags:
+        parts.append("")
+        parts.append(" ".join(f"#{h.lstrip('#')}" for h in hashtags))
+    return "\n".join(parts)
+
+
+def _build_description(metadata: dict, chapters: list[dict] | None = None) -> str:
     desc      = metadata.get("description", "")
     hashtags  = metadata.get("hashtags", [])
     affiliate = metadata.get("affiliate_links", [])
 
-    parts = [desc]
+    # Build the body portion (description + affiliate links)
+    body_parts = [desc]
     if affiliate:
-        parts.append("\n🔗 Links:\n" + "\n".join(affiliate))
+        body_parts.append("\n🔗 Links:\n" + "\n".join(affiliate))
+    body = "\n\n".join(p for p in body_parts if p).strip()
 
     # Build hashtag line — always include #Shorts
     ht_tags = [f"#{h.lstrip('#')}" for h in hashtags[:14]]
     if "#Shorts" not in ht_tags:
         ht_tags.append("#Shorts")
-    parts.append("\n" + " ".join(ht_tags))
+    ht_line = " ".join(ht_tags)
 
-    return "\n\n".join(p for p in parts if p).strip()[:5000]
+    # Use chapters helper to compose full description
+    result = build_description_with_chapters(
+        body=body,
+        chapters=chapters,
+        hashtags=[ht_line] if ht_line else None,
+    )
+    return result[:5000]
 
 
 def _build_tags(metadata: dict) -> list[str]:

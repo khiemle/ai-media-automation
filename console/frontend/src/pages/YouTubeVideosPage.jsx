@@ -9,6 +9,10 @@ import SoundLayersEditor from '../components/SoundLayersEditor.jsx'
 import VisualPlaylistEditor from '../components/VisualPlaylistEditor.jsx'
 import { useRenderWebSocket } from '../hooks/useRenderWebSocket.js'
 import PreviewPlayer from '../components/PreviewPlayer.jsx'
+import { MusicPlaylistPicker } from '../components/MusicPlaylistPicker.jsx'
+import { TransitionPanel } from '../components/TransitionPanel.jsx'
+import { OverlayStylePicker } from '../components/OverlayStylePicker.jsx'
+import { SpectrumPanel } from '../components/SpectrumPanel.jsx'
 
 const ACTIVE_RENDER_STATES = new Set([
   'audio_preview_rendering',
@@ -978,6 +982,21 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
   const [blackFromSeconds, setBlackFromSeconds] = useState(isEdit && existingVideo.black_from_seconds != null ? String(existingVideo.black_from_seconds) : '')
   const [skipPreviews, setSkipPreviews]         = useState(isEdit ? !!existingVideo.skip_previews : false)
   const isAsmrLike = ['asmr', 'soundscape'].includes(template?.slug)
+  const isMusic = template?.slug === 'music'
+  // Generic feature gating driven by template.ui_features array from the backend.
+  // music template has ui_features=[] so all panels below will be hidden.
+  // asmr/soundscape templates have ui_features=['sfx_panel','duration_picker','blackout'].
+  const uiFeatures = new Set(template?.ui_features ?? [])
+
+  // Music-template-only state
+  const [trackTransition,        setTrackTransition]        = useState(isEdit ? (existingVideo.track_transition        ?? 'gapless') : 'gapless')
+  const [trackTransitionSeconds, setTrackTransitionSeconds] = useState(isEdit ? (existingVideo.track_transition_seconds ?? 2.0)      : 2.0)
+  const [playlistOverlayStyle,   setPlaylistOverlayStyle]   = useState(isEdit ? (existingVideo.playlist_overlay_style  ?? null)      : null)
+  const [spectrumEnabled,        setSpectrumEnabled]        = useState(isEdit ? !!existingVideo.spectrum_enabled                     : false)
+  const [spectrumPosition,       setSpectrumPosition]       = useState(isEdit ? (existingVideo.spectrum_position        ?? 'bottom') : 'bottom')
+  const [spectrumHeightPct,      setSpectrumHeightPct]      = useState(isEdit ? (existingVideo.spectrum_height_pct     ?? 0.12)      : 0.12)
+  const [spectrumColor,          setSpectrumColor]          = useState(isEdit ? (existingVideo.spectrum_color           ?? '#ffffff') : '#ffffff')
+  const [spectrumOpacity,        setSpectrumOpacity]        = useState(isEdit ? (existingVideo.spectrum_opacity         ?? 0.6)      : 0.6)
 
   // Visual playlist — fall back to legacy single visual_asset_id when array is empty
   // so editing a pre-feature video doesn't drop the existing visual.
@@ -1234,6 +1253,17 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
           black_from_seconds: blackFromSeconds ? parseInt(blackFromSeconds, 10) : null,
           skip_previews: skipPreviews,
         } : {}),
+        ...(isMusic ? {
+          music_track_ids: musicTrackIds,
+          track_transition: trackTransition,
+          track_transition_seconds: trackTransitionSeconds,
+          playlist_overlay_style: playlistOverlayStyle,
+          spectrum_enabled: spectrumEnabled,
+          spectrum_position: spectrumPosition,
+          spectrum_height_pct: spectrumHeightPct,
+          spectrum_color: spectrumColor,
+          spectrum_opacity: spectrumOpacity,
+        } : {}),
       }
       let videoId = existingVideo?.id
       if (isEdit) {
@@ -1344,6 +1374,7 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
                 placeholder="e.g. Heavy Rain Window"
               />
 
+              {uiFeatures.has('duration_picker') && (
               <div className="flex flex-col gap-1">
                 <label className="text-xs text-[#9090a8] font-medium">Duration</label>
                 <div className="flex flex-wrap gap-2">
@@ -1383,6 +1414,7 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
                   </p>
                 )}
               </div>
+              )}
 
               <Input
                 label="SEO Title"
@@ -1505,6 +1537,13 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
                   </div>
                   <MusicPlaylistEditor trackIds={musicTrackIds} onChange={setMusicTrackIds} />
                 </div>
+              ) : isMusic ? (
+                <MusicPlaylistPicker
+                  value={musicTrackIds}
+                  onChange={setMusicTrackIds}
+                  transition={trackTransition}
+                  transitionSeconds={trackTransitionSeconds}
+                />
               ) : (
                 <Select
                   label="Music Track"
@@ -1670,7 +1709,8 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
             </div>
           </section>
 
-          {/* ④ SOUND LAYERS */}
+          {/* ④ SOUND LAYERS — hidden for templates that don't declare sfx_panel */}
+          {uiFeatures.has('sfx_panel') && (
           <section>
             <div className="text-xs font-bold text-[#5a5a70] tracking-widest mb-3">④ SOUND LAYERS</div>
             <SoundLayersEditor
@@ -1679,12 +1719,14 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
               onChange={setSoundLayers}
             />
           </section>
+          )}
 
-          {/* ④b EXTRAS — asmr/soundscape only */}
+          {/* ④b EXTRAS — asmr/soundscape only; blackout input also requires ui_features flag */}
           {isAsmrLike && (
             <section>
               <div className="text-xs font-bold text-[#5a5a70] tracking-widest mb-3">④b EXTRAS</div>
               <div className="flex flex-col gap-3">
+                {uiFeatures.has('blackout') && (
                 <Input
                   label="Black-out from (seconds — visual fades to black, audio continues)"
                   type="number"
@@ -1693,6 +1735,7 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
                   onChange={e => setBlackFromSeconds(e.target.value)}
                   placeholder="leave blank for no blackout"
                 />
+                )}
                 <label className="flex items-center gap-2 text-xs text-[#9090a8]">
                   <input
                     type="checkbox"
@@ -1702,6 +1745,44 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
                   />
                   Skip preview gates (render straight to final, still chunked)
                 </label>
+              </div>
+            </section>
+          )}
+
+          {/* ④c MUSIC OPTIONS — music template only */}
+          {isMusic && (
+            <section>
+              <div className="text-xs font-bold text-[#5a5a70] tracking-widest mb-3">④c MUSIC OPTIONS</div>
+              <div className="flex flex-col gap-4">
+                <TransitionPanel
+                  transition={trackTransition}
+                  transitionSeconds={trackTransitionSeconds}
+                  onChange={({ transition, transitionSeconds }) => {
+                    setTrackTransition(transition)
+                    setTrackTransitionSeconds(transitionSeconds)
+                  }}
+                />
+                <OverlayStylePicker
+                  value={playlistOverlayStyle}
+                  onChange={setPlaylistOverlayStyle}
+                  trackCount={musicTrackIds.length}
+                />
+                <SpectrumPanel
+                  value={{
+                    spectrum_enabled:    spectrumEnabled,
+                    spectrum_position:   spectrumPosition,
+                    spectrum_height_pct: spectrumHeightPct,
+                    spectrum_color:      spectrumColor,
+                    spectrum_opacity:    spectrumOpacity,
+                  }}
+                  onChange={patch => {
+                    if ('spectrum_enabled'    in patch) setSpectrumEnabled(patch.spectrum_enabled)
+                    if ('spectrum_position'   in patch) setSpectrumPosition(patch.spectrum_position)
+                    if ('spectrum_height_pct' in patch) setSpectrumHeightPct(patch.spectrum_height_pct)
+                    if ('spectrum_color'      in patch) setSpectrumColor(patch.spectrum_color)
+                    if ('spectrum_opacity'    in patch) setSpectrumOpacity(patch.spectrum_opacity)
+                  }}
+                />
               </div>
             </section>
           )}
@@ -1947,6 +2028,15 @@ export default function YouTubeVideosPage() {
   const [accordionOpen, setAccordionOpen]   = useState(false)
   const [expandedPlanId, setExpandedPlanId] = useState(null)
   const [activeChannelPlan, setActiveChannelPlan] = useState(null)
+  const [templateMenuOpen, setTemplateMenuOpen] = useState(null)  // 'header' | `plan-${id}` | null
+
+  const landscapeTemplates = templates.filter(t => t.output_format === 'landscape_long')
+
+  const openCreateForTemplate = (template, plan = null) => {
+    setActiveTemplate(template)
+    setActiveChannelPlan(plan)
+    setTemplateMenuOpen(null)
+  }
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type })
@@ -2012,18 +2102,32 @@ export default function YouTubeVideosPage() {
           <h1 className="text-xl font-bold text-[#e8e8f0]">YouTube Videos</h1>
           <p className="text-sm text-[#9090a8] mt-0.5">{videos.length} videos</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 relative">
           <Button
             variant="primary"
             onClick={() => {
-              const firstTemplate = templates.find(t => t.output_format === 'landscape_long')
-              if (!firstTemplate) { showToast('No landscape template configured', 'error'); return }
-              setActiveTemplate(firstTemplate)
-              setActiveChannelPlan(null)
+              if (!landscapeTemplates.length) { showToast('No landscape template configured', 'error'); return }
+              setTemplateMenuOpen(o => o === 'header' ? null : 'header')
             }}
           >
-            + New Video
+            + New Video {landscapeTemplates.length > 1 ? '▾' : ''}
           </Button>
+          {templateMenuOpen === 'header' && (
+            <div
+              className="absolute right-0 top-full mt-1 z-10 min-w-[180px] bg-[#1c1c22] border border-[#2a2a32] rounded-md shadow-lg py-1"
+              onMouseLeave={() => setTemplateMenuOpen(null)}
+            >
+              {landscapeTemplates.map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => openCreateForTemplate(t, null)}
+                  className="w-full text-left px-3 py-2 text-sm text-[#e8e8f0] hover:bg-[#2a2a32]"
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -2088,19 +2192,34 @@ export default function YouTubeVideosPage() {
 
                     <AIAssistantPanel key={plan.id} planId={plan.id} />
 
-                    <div className="flex justify-end">
+                    <div className="flex justify-end relative">
                       <Button
                         variant="primary"
                         size="sm"
                         onClick={() => {
-                          const firstTemplate = templates.find(t => t.output_format === 'landscape_long')
-                          if (!firstTemplate) { showToast('No landscape template configured', 'error'); return }
-                          setActiveTemplate(firstTemplate)
-                          setActiveChannelPlan(plan)
+                          if (!landscapeTemplates.length) { showToast('No landscape template configured', 'error'); return }
+                          const key = `plan-${plan.id}`
+                          setTemplateMenuOpen(o => o === key ? null : key)
                         }}
                       >
-                        + New Video for this channel
+                        + New Video for this channel {landscapeTemplates.length > 1 ? '▾' : ''}
                       </Button>
+                      {templateMenuOpen === `plan-${plan.id}` && (
+                        <div
+                          className="absolute right-0 top-full mt-1 z-10 min-w-[180px] bg-[#1c1c22] border border-[#2a2a32] rounded-md shadow-lg py-1"
+                          onMouseLeave={() => setTemplateMenuOpen(null)}
+                        >
+                          {landscapeTemplates.map(t => (
+                            <button
+                              key={t.id}
+                              onClick={() => openCreateForTemplate(t, plan)}
+                              className="w-full text-left px-3 py-2 text-sm text-[#e8e8f0] hover:bg-[#2a2a32]"
+                            >
+                              {t.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -2133,7 +2252,7 @@ export default function YouTubeVideosPage() {
       ) : videos.length === 0 ? (
         <EmptyState
           title="No YouTube videos"
-          description="Create your first ASMR or Soundscape video."
+          description="Create your first video — pick a template (ASMR, Soundscape, or Music Video)."
         />
       ) : (
         <div className="flex flex-col gap-3">
