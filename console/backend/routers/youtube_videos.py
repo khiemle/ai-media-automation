@@ -3,9 +3,13 @@ import time
 from pathlib import Path
 from typing import Literal
 
+TrackTransition  = Literal["gapless", "crossfade", "gap"]
+OverlayStyle     = Literal["chip", "sidebar", "bottom_bar"]
+SpectrumPosition = Literal["bottom", "center"]
+
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from console.backend.auth import require_editor_or_admin
@@ -41,6 +45,15 @@ class YoutubeVideoCreate(BaseModel):
     visual_asset_ids:        list[int] | None = None
     visual_clip_durations_s: list[float] | None = None
     visual_loop_mode:        Literal["concat_loop", "per_clip"] | None = None
+    # Music template fields
+    track_transition:         TrackTransition = "gapless"
+    track_transition_seconds: float = Field(default=2.0, ge=0.5, le=10.0)
+    playlist_overlay_style:   OverlayStyle | None = None    # legitimately nullable
+    spectrum_enabled:         bool = False
+    spectrum_position:        SpectrumPosition = "bottom"
+    spectrum_height_pct:      float = Field(default=0.12, gt=0.0, le=0.5)
+    spectrum_color:           str = "#ffffff"
+    spectrum_opacity:         float = Field(default=0.6, ge=0.0, le=1.0)
 
 
 class YoutubeVideoUpdate(BaseModel):
@@ -63,6 +76,15 @@ class YoutubeVideoUpdate(BaseModel):
     visual_asset_ids:        list[int] | None = None
     visual_clip_durations_s: list[float] | None = None
     visual_loop_mode:        Literal["concat_loop", "per_clip"] | None = None
+    # Music template fields (partial-update semantics: None means "not provided")
+    track_transition:         TrackTransition | None = None
+    track_transition_seconds: float | None = Field(default=None, ge=0.5, le=10.0)
+    playlist_overlay_style:   OverlayStyle | None = None
+    spectrum_enabled:         bool | None = None
+    spectrum_position:        SpectrumPosition | None = None
+    spectrum_height_pct:      float | None = Field(default=None, gt=0.0, le=0.5)
+    spectrum_color:           str | None = None
+    spectrum_opacity:         float | None = Field(default=None, ge=0.0, le=1.0)
 
 
 class StatusUpdate(BaseModel):

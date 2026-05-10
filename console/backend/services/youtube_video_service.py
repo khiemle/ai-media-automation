@@ -16,6 +16,17 @@ from console.backend.models.youtube_video import YoutubeVideo
 from console.backend.models.youtube_video_upload import YoutubeVideoUpload
 from console.backend.models.video_template import VideoTemplate
 
+# Fields that are NOT NULL in the DB — explicit None in an update payload is an error
+_MUSIC_NOT_NULL_FIELDS = (
+    "track_transition",
+    "track_transition_seconds",
+    "spectrum_enabled",
+    "spectrum_position",
+    "spectrum_height_pct",
+    "spectrum_color",
+    "spectrum_opacity",
+)
+
 # Valid status transitions for the YoutubeVideo state machine
 ALLOWED_TRANSITIONS: dict[str, set[str]] = {
     "draft": {"queued"},
@@ -86,6 +97,16 @@ def _video_to_dict(
         "thumbnail_asset_id":      v.thumbnail_asset_id,
         "thumbnail_text":          v.thumbnail_text,
         "thumbnail_path":          v.thumbnail_path,
+        # Music template fields
+        "track_transition":         v.track_transition,
+        "track_transition_seconds": v.track_transition_seconds,
+        "playlist_overlay_style":   v.playlist_overlay_style,
+        "spectrum_enabled":         bool(v.spectrum_enabled) if v.spectrum_enabled is not None else False,
+        "spectrum_position":        v.spectrum_position,
+        "spectrum_height_pct":      v.spectrum_height_pct,
+        "spectrum_color":           v.spectrum_color,
+        "spectrum_opacity":         v.spectrum_opacity,
+        "total_duration_s":         None,
         "uploads": uploads if uploads is not None else [],
         "created_at": v.created_at.isoformat() if v.created_at else None,
         "updated_at": v.updated_at.isoformat() if v.updated_at else None,
@@ -121,6 +142,7 @@ def _template_to_dict(t: VideoTemplate) -> dict[str, Any]:
         "seo_description_template": t.seo_description_template,
         "short_cta_text": t.short_cta_text,
         "short_duration_s": t.short_duration_s if t.short_duration_s is not None else 58,
+        "ui_features": list(t.ui_features) if t.ui_features else [],
     }
 
 
@@ -244,6 +266,14 @@ class YoutubeVideoService:
             visual_asset_ids=data.get("visual_asset_ids") or [],
             visual_clip_durations_s=data.get("visual_clip_durations_s") or [],
             visual_loop_mode=data.get("visual_loop_mode") or "concat_loop",
+            track_transition=data.get("track_transition", "gapless"),
+            track_transition_seconds=data.get("track_transition_seconds", 2.0),
+            playlist_overlay_style=data.get("playlist_overlay_style"),
+            spectrum_enabled=data.get("spectrum_enabled", False),
+            spectrum_position=data.get("spectrum_position", "bottom"),
+            spectrum_height_pct=data.get("spectrum_height_pct", 0.12),
+            spectrum_color=data.get("spectrum_color", "#ffffff"),
+            spectrum_opacity=data.get("spectrum_opacity", 0.6),
             status="draft",
         )
         self.db.add(video)
@@ -342,8 +372,16 @@ class YoutubeVideoService:
             "black_from_seconds", "skip_previews", "target_duration_h", "output_quality",
             "seo_title", "seo_description", "seo_tags",
             "visual_asset_ids", "visual_clip_durations_s", "visual_loop_mode",
+            "track_transition", "track_transition_seconds", "playlist_overlay_style",
+            "spectrum_enabled", "spectrum_position", "spectrum_height_pct",
+            "spectrum_color", "spectrum_opacity",
         ]
         changed = {f: data[f] for f in editable_fields if f in data}
+
+        # Guard: NOT NULL music fields must not be set to None via partial update
+        for f in _MUSIC_NOT_NULL_FIELDS:
+            if f in changed and changed[f] is None:
+                raise ValueError(f"{f} cannot be null")
 
         # Apply normalized durations array if validation rewrote it
         if playlist_validation is not None:
