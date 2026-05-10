@@ -1,4 +1,5 @@
 """Audit logging middleware — records every write operation to audit_log."""
+import json
 import logging
 from datetime import datetime, timezone
 
@@ -22,6 +23,23 @@ def _should_audit(request: Request) -> bool:
     return not any(path.startswith(p) for p in SKIP_PREFIXES)
 
 
+def _parse_actor_metadata(request: Request) -> "dict | None":
+    """Parse X-Mcp-Actor-Metadata header value into a dict.
+
+    The header is sent by ConsoleClient for MCP traffic. Returns None when
+    absent or when the value is not valid JSON.
+    """
+    raw = request.headers.get("x-mcp-actor-metadata")
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw)
+        return parsed if isinstance(parsed, dict) else None
+    except (json.JSONDecodeError, ValueError):
+        logger.debug("X-Mcp-Actor-Metadata header is not valid JSON: %r", raw)
+        return None
+
+
 class AuditMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
@@ -39,6 +57,9 @@ class AuditMiddleware(BaseHTTPMiddleware):
             if hasattr(request.state, "user_id"):
                 user_id = request.state.user_id
 
+            # Extract MCP actor metadata when request comes from an MCP transport
+            actor_metadata = _parse_actor_metadata(request)
+
             # Parse path into target_type / target_id
             parts = [p for p in request.url.path.strip("/").split("/") if p]
             # e.g. ['api', 'scripts', '42', 'approve']
@@ -55,6 +76,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
                     target_type=target_type,
                     target_id=target_id,
                     details={"status_code": response.status_code},
+                    actor_metadata=actor_metadata,
                     created_at=datetime.now(timezone.utc),
                 )
                 db.add(entry)

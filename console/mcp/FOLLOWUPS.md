@@ -34,15 +34,16 @@ Deferred items from the final code review of the `feat/mcp-server` branch
   `DbApiKeyRegistry` should mint a per-user JWT on lookup or store an encrypted
   JWT alongside each key.
 
-- **Backend doesn't read `X-Mcp-Actor-Metadata`.** `ConsoleClient` sends the
-  header but `audit_log.actor_metadata` will stay NULL until the backend's
-  audit middleware persists it. Wire `console/backend/middleware/audit.py` to
-  parse the header and write to the column.
+- ~~**Backend doesn't read `X-Mcp-Actor-Metadata`.**~~ DONE — `_parse_actor_metadata`
+  helper added to `console/backend/middleware/audit.py`; `AuditLog.actor_metadata`
+  (JSONB) is now populated for MCP traffic. `AuditLog` model also updated to
+  declare the column.
 
 - **Module-level `_store` globals.** `tools/upload.py` and
-  `tools/youtube_video.py` keep idempotency state in module globals. Convert
-  to `ContextVar` or thread the store through `client_factory` to remove the
-  test-isolation footgun.
+  `tools/youtube_video.py` keep idempotency state in module globals (now
+  activated via `activation.install_idempotency_store()` at transport startup).
+  Convert to `ContextVar` or thread the store through `client_factory` to
+  remove the test-isolation footgun.
 
 ## Cleanup
 
@@ -57,9 +58,18 @@ Deferred items from the final code review of the `feat/mcp-server` branch
   decorators are defined but unused — every tool uses the helper functions
   instead. Pick one style.
 
-- **Activate `DbAuditSink` in transport entrypoints.** All 11 tools accept
-  `audit_sink=...` but no entrypoint passes one. Add an opt-in flag like
-  `MCP_AUDIT_ENABLED=1` and wire `DbAuditSink()` when set.
+- ~~**Activate `DbAuditSink` in transport entrypoints.**~~ DONE — `activation.py`
+  introduced with `audit_kwargs()` and `install_idempotency_store()`. All 11
+  tools now receive `audit_sink=DbAuditSink()` when `MCP_AUDIT_ENABLED=1`.
+  Idempotency store wired to `upload` + `youtube_video` when
+  `MCP_IDEMPOTENCY_ENABLED=1` via `REDIS_URL`.
+
+- **Mount-transport audit gap.** `mount.py`'s `/mcp/call` route dispatches
+  via a hand-rolled if/elif ladder and calls tool functions directly, bypassing
+  `wrap_with_audit_log`. MCP traffic through the chat surface is NOT covered
+  by `DbAuditSink`. To fix, refactor `mount.py` to use FastMCP-style
+  registration like `stdio.py` (and stop maintaining a parallel dispatch
+  table).
 
 - **`http.py` default host.** Currently `0.0.0.0`. Switch to `127.0.0.1` so
   developers don't accidentally LAN-expose an empty-registry server.

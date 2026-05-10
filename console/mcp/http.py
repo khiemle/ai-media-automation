@@ -14,6 +14,7 @@ from typing import Any
 
 from fastapi import FastAPI, Header, HTTPException, Request
 
+from console.mcp.activation import audit_kwargs, install_idempotency_store
 from console.mcp.auth.adapters import HttpAuth
 from console.mcp.auth.tokens import InMemoryApiKeyRegistry, DbApiKeyRegistry
 from console.mcp.client.console_client import ConsoleClient
@@ -23,6 +24,8 @@ from console.mcp.tools import system_health, task_status, pipeline_jobs, music, 
 
 def build_http_app(*, registry: Any) -> FastAPI:
     app = FastAPI(title="console-mcp-http")
+
+    activation = audit_kwargs(transport="http")
 
     def make_client(api_key: str) -> ConsoleClient:
         auth = HttpAuth(registry=registry, header_value=api_key)
@@ -36,47 +39,47 @@ def build_http_app(*, registry: Any) -> FastAPI:
         lambda s: system_health.register(s, client_factory=lambda: ConsoleClient(
             base_url=os.environ.get("MCP_CONSOLE_API_BASE", "http://localhost:8080"),
             token_provider=lambda: "placeholder",  # overridden per-request below
-        )),
+        ), **activation),
         lambda s: task_status.register(s, client_factory=lambda: ConsoleClient(
             base_url=os.environ.get("MCP_CONSOLE_API_BASE", "http://localhost:8080"),
             token_provider=lambda: "placeholder",
-        )),
+        ), **activation),
         lambda s: pipeline_jobs.register(s, client_factory=lambda: ConsoleClient(
             base_url=os.environ.get("MCP_CONSOLE_API_BASE", "http://localhost:8080"),
             token_provider=lambda: "placeholder",
-        )),
+        ), **activation),
         lambda s: music.register(s, client_factory=lambda: ConsoleClient(
             base_url=os.environ.get("MCP_CONSOLE_API_BASE", "http://localhost:8080"),
             token_provider=lambda: "placeholder",
-        )),
+        ), **activation),
         lambda s: sfx.register(s, client_factory=lambda: ConsoleClient(
             base_url=os.environ.get("MCP_CONSOLE_API_BASE", "http://localhost:8080"),
             token_provider=lambda: "placeholder",
-        )),
+        ), **activation),
         lambda s: visual_asset.register(s, client_factory=lambda: ConsoleClient(
             base_url=os.environ.get("MCP_CONSOLE_API_BASE", "http://localhost:8080"),
             token_provider=lambda: "placeholder",
-        )),
+        ), **activation),
         lambda s: channel_plan.register(s, client_factory=lambda: ConsoleClient(
             base_url=os.environ.get("MCP_CONSOLE_API_BASE", "http://localhost:8080"),
             token_provider=lambda: "placeholder",
-        )),
+        ), **activation),
         lambda s: channel.register(s, client_factory=lambda: ConsoleClient(
             base_url=os.environ.get("MCP_CONSOLE_API_BASE", "http://localhost:8080"),
             token_provider=lambda: "placeholder",
-        )),
+        ), **activation),
         lambda s: youtube_video.register(s, client_factory=lambda: ConsoleClient(
             base_url=os.environ.get("MCP_CONSOLE_API_BASE", "http://localhost:8080"),
             token_provider=lambda: "placeholder",
-        )),
+        ), **activation),
         lambda s: youtube_thumbnail.register(s, client_factory=lambda: ConsoleClient(
             base_url=os.environ.get("MCP_CONSOLE_API_BASE", "http://localhost:8080"),
             token_provider=lambda: "placeholder",
-        )),
+        ), **activation),
         lambda s: upload.register(s, client_factory=lambda: ConsoleClient(
             base_url=os.environ.get("MCP_CONSOLE_API_BASE", "http://localhost:8080"),
             token_provider=lambda: "placeholder",
-        )),
+        ), **activation),
     ])
 
     def _require_key(x_api_key: str | None) -> str:
@@ -133,6 +136,7 @@ def build_http_app(*, registry: Any) -> FastAPI:
 
 def main() -> None:
     import uvicorn
+    install_idempotency_store()
     use_db = os.environ.get("MCP_HTTP_USE_DB_KEYS", "1") not in ("0", "false", "False", "")
 
     if use_db:

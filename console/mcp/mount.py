@@ -2,18 +2,26 @@
 
 Designed for the editor chat surface: forwards the end-user's JWT (already
 established by the existing console auth flow) to the console API.
+
+NOTE — Audit gap: the /mcp/call route below dispatches via a hand-rolled
+if/elif ladder and calls tool functions directly, bypassing wrap_with_audit_log.
+MCP traffic through this transport is NOT covered by DbAuditSink. To fix this,
+refactor mount.py to use FastMCP-style registration (like stdio.py) instead of
+the manual dispatch table. Tracked in FOLLOWUPS.md.
 """
 import os
 from typing import Any
 
 from fastapi import FastAPI, Header, HTTPException, Request
 
+from console.mcp.activation import install_idempotency_store
 from console.mcp.auth.adapters import ChatAuth
 from console.mcp.client.console_client import ConsoleClient
 from console.mcp.tools import system_health, task_status, pipeline_jobs, music, sfx, visual_asset, channel_plan, channel, youtube_video, youtube_thumbnail, upload
 
 
 def attach(app: FastAPI) -> None:
+    install_idempotency_store()
     @app.get("/mcp/tools")
     async def list_tools(authorization: str | None = Header(default=None)) -> dict[str, Any]:
         _require_user_jwt(authorization)

@@ -1,5 +1,6 @@
 from datetime import datetime
 from sqlalchemy import Integer, String, DateTime, JSON, ForeignKey, func
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 from console.backend.database import Base
 
@@ -13,4 +14,5 @@ class AuditLog(Base):
     target_type: Mapped[str | None] = mapped_column(String, nullable=True)
     target_id: Mapped[str | None] = mapped_column(String, nullable=True)
     details: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    actor_metadata: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
