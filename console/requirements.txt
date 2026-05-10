@@ -6,6 +6,7 @@ uvicorn[standard]==0.29.0
 
 # Config & validation
 pydantic-settings>=2.5.2,<3.0.0
+pydantic[email]>=2.0.0
 python-dotenv==1.0.1
 
 # Database

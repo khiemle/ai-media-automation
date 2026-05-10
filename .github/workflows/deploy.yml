@@ -173,7 +173,8 @@ jobs:
             "MUSIC_PATH=${{ vars.MUSIC_PATH }}",
             "ASSET_DB_PATH=${{ vars.ASSET_DB_PATH }}",
             "MODELS_PATH=${{ vars.MODELS_PATH }}",
-            "SFX_PATH=${{ vars.SFX_PATH }}"
+            "SFX_PATH=${{ vars.SFX_PATH }}",
+            "THUMBNAILS_PATH=${{ vars.THUMBNAILS_PATH }}"
           )
           [System.IO.File]::WriteAllLines("$PWD\.env", $lines, (New-Object System.Text.UTF8Encoding $false))
 
