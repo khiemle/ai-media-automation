@@ -58,38 +58,30 @@ Otherwise, confirm all of the following manually:
 ## Mint the service-account JWT
 
 The `mcp-system` user's password hash is set to `!disabled!` — login via the API is
-blocked. Mint a JWT directly in Python:
+blocked. Use the dedicated minting script:
 
-```python
-# Run from the project root: python3 scripts/mint_mcp_token.py
-# Or inline:
-python3 - <<'EOF'
-import sys
-sys.path.insert(0, ".")
-from console.backend.auth import create_access_token
-from console.backend.models.console_user import ConsoleUser
-from console.backend.database import SessionLocal
+```bash
+# Locally (uses your local JWT_SECRET from console/.env)
+python -m console.mcp.scripts.mint_token --days 90        # plaintext JWT
+python -m console.mcp.scripts.mint_token --days 90 --json # JSON with expires_at + lifetime
 
-with SessionLocal() as db:
-    user = db.query(ConsoleUser).filter(ConsoleUser.username == "mcp-system").first()
-    if not user:
-        print("ERROR: mcp-system user not found — run alembic upgrade head", file=sys.stderr)
-        sys.exit(1)
-    token = create_access_token(user.id, user.role)
-    print(token)
-EOF
+# In a docker compose stack (uses the in-container JWT_SECRET)
+docker compose exec -T api python -m console.mcp.scripts.mint_token --days 90
 ```
 
-**JWT lifetime:** `create_access_token` adds `JWT_EXPIRE_MINUTES` (default `1440` = 24h,
-set in `console/.env`) to the current time. For long-lived service tokens either raise
-`JWT_EXPIRE_MINUTES` in `console/.env` or arrange a refresh before expiry. There is no
-automatic service-token renewal — the `token_refresh` Celery beat task only handles OAuth
-platform credentials, not MCP JWTs.
+**Lifetime:** the script writes an explicit `exp` claim on the JWT and bypasses
+`JWT_EXPIRE_MINUTES` entirely — service tokens have a different lifecycle from
+short-lived user-login tokens. Default is 90 days; override with `--days N`.
+
+There is no automatic service-token renewal. Re-mint and redeploy every ~60 days
+(see "Token rotation policy" below). The `token_refresh` Celery beat task only
+refreshes OAuth platform credentials.
 
 Save the token:
 ```bash
 export MCP_API_TOKEN="<output-from-above>"
-# Or persist in console/.env alongside other env vars.
+# Or persist in console/.env alongside other env vars,
+# or set as a GitHub repo secret for the deploy workflow to write to console/.env.
 ```
 
 ---
@@ -165,16 +157,24 @@ MCP_HTTP_PORT="8765" \
   python -m console.mcp.http
 ```
 
-> **FOLLOWUPS gap (see FOLLOWUPS.md — "DbApiKeyRegistry missing"):**
-> The `main()` function reads only `MCP_HTTP_DEV_API_KEY`. The `mcp_api_keys` table
-> (created by the migration) is **not read at runtime**. Production multi-key management
-> requires implementing `DbApiKeyRegistry` first. Until then, there is exactly one API
-> key available per process: the value of `MCP_HTTP_DEV_API_KEY`. Without setting this
-> variable, **every request returns `401 invalid api key`**.
+**Two registry modes**, controlled by `MCP_HTTP_USE_DB_KEYS`:
+
+- `MCP_HTTP_USE_DB_KEYS=1` (default in prod compose) — `DbApiKeyRegistry` reads the
+  `mcp_api_keys` table on every lookup, bcrypt-checks the inbound key against each
+  unrevoked row's `key_hash`, updates `last_used_at` on success. Add keys with
+  `manage_api_keys.py create`; revoke with `manage_api_keys.py revoke`. Effect is
+  immediate (no service restart needed).
+- `MCP_HTTP_USE_DB_KEYS=0` — `InMemoryApiKeyRegistry` is populated only from the
+  `MCP_HTTP_DEV_API_KEY` env var. Used by `mcp-dev.sh --http` for local-only testing
+  without touching the DB.
+
+In either mode, **without at least one valid key**, every request returns
+`401 invalid api key`.
 
 Optional env vars:
-- `MCP_HTTP_HOST` — defaults to `0.0.0.0` (see FOLLOWUPS: should be `127.0.0.1` to avoid
-  accidental LAN exposure on an empty-registry server)
+- `MCP_HTTP_HOST` — defaults to `0.0.0.0` (compose port mapping uses
+  `127.0.0.1:8765:8765` to keep it host-local; expose externally only via reverse
+  proxy)
 - `MCP_HTTP_PORT` — defaults to `8765`
 
 ### Configure the API key
@@ -299,31 +299,39 @@ Keys whose name ends in `_token`, `_key`, `_secret`, or matches `password`, `pas
 
 ### How to enable
 
-> **FOLLOWUPS gap (see FOLLOWUPS.md — "Activate DbAuditSink in transport entrypoints"):**
-> All 11 tools accept `audit_sink=...` in their `register()` call, but none of the three
-> transport entrypoints (`stdio.py`, `http.py`, `mount.py`) passes one. Audit rows are
-> never written in the current shipped code. The pattern to activate it:
+Set `MCP_AUDIT_ENABLED=1` in the transport's environment. `console/mcp/activation.py`'s
+`audit_kwargs()` helper reads this and returns a `DbAuditSink()` to each tool's
+`register()` call. Default off (no rows written) — keeps tests and dev runs clean.
 
-```python
-# In stdio.py main(), http.py build_http_app(), or mount.py attach():
-from console.mcp.audit_db import DbAuditSink
-sink = DbAuditSink()
+```bash
+# Local stdio (rarely needed in dev):
+MCP_AUDIT_ENABLED=1 python -m console.mcp.stdio
 
-# Then replace each register call, e.g.:
-lambda s: system_health.register(s, client_factory=client_factory, audit_sink=sink, transport="stdio")
+# Local HTTP:
+MCP_AUDIT_ENABLED=1 python -m console.mcp.http
 ```
 
-A clean activation path would be to check an env var (`MCP_AUDIT_ENABLED=1`) and
-conditionally create the sink — this is the pattern described in FOLLOWUPS.md.
+In production, the deploy workflow writes `MCP_AUDIT_ENABLED=1` into `console/.env`
+automatically — no per-host action required.
 
-> **FOLLOWUPS gap (see FOLLOWUPS.md — "Audit middleware logs needs_confirmation calls
-> as ok=false"):** First-call intent responses (`needs_confirmation: true`) are logged
-> with `ok=false`, which inflates error-rate metrics. This is a known docs/behavior gap.
+**Backend audit chain:** when MCP makes a write call to FastAPI, `ConsoleClient` attaches
+`X-Mcp-Actor-Metadata` (a JSON blob with transport + identity hints). The console's
+audit middleware (`console/backend/middleware/audit.py`) parses the header and stores it
+in `audit_log.actor_metadata`. So a single MCP-mediated tool call produces two rows: one
+in `mcp_tool_calls` (the MCP-side log) and one in `audit_log` (the backend-side log
+linking the change to a real `console_user`).
 
-> **FOLLOWUPS gap (see FOLLOWUPS.md — "Backend doesn't read X-Mcp-Actor-Metadata"):**
-> `ConsoleClient` sends an `X-Mcp-Actor-Metadata` header to the console backend, but the
-> backend's audit middleware does not parse it. The `audit_log.actor_metadata` column
-> (added by the migration) will stay NULL until that middleware is wired.
+> **Known cosmetic issue (see FOLLOWUPS.md — "Audit middleware logs needs_confirmation
+> calls as ok=false"):** First-call intent responses (`needs_confirmation: true`) are
+> logged with `ok=false`. Inflates error-rate metrics; filter them out by also
+> requiring `error_code IS NOT NULL` in dashboards.
+
+> **Known gap (see FOLLOWUPS.md — "Mount transport audit gap"):** the `mount.py` chat
+> sub-app dispatches via a hand-rolled if/elif ladder that bypasses
+> `wrap_with_audit_log`. So `mcp_tool_calls` rows for chat-transport calls are not
+> written. Backend `audit_log` rows still record the change (the chat user's JWT is
+> forwarded), but the MCP-side log misses chat traffic until mount.py is refactored
+> to use FastMCP-style registration.
 
 ### Querying
 
@@ -377,14 +385,20 @@ Three actions accept an optional `idempotency_key` argument:
 - `upload(action="upload_all", idempotency_key="<key>", confirm=true, confirm_id="all")`
 - `youtube_video(action="render_final", video_id=N, idempotency_key="<key>", confirm=true)`
 
-> **FOLLOWUPS gap (see FOLLOWUPS.md — "Module-level `_store` globals"):**
-> The idempotency store in `tools/upload.py` and `tools/youtube_video.py` is a
-> module-level global (`_store`). It is `None` by default — idempotency is silently
-> disabled unless `set_idempotency_store()` is called during process startup. No
-> transport entrypoint currently calls this, so **idempotency keys are ignored at
-> runtime**. To activate: create a Redis connection and call
-> `upload.set_idempotency_store(IdempotencyStore(redis=r, ttl_s=ttl))` and
-> `youtube_video.set_idempotency_store(...)` in each transport's `main()`.
+**Activation:** set `MCP_IDEMPOTENCY_ENABLED=1` in the transport's environment.
+`console/mcp/activation.py`'s `install_idempotency_store()` reads this at startup,
+opens a `redis.asyncio` connection to `REDIS_URL`, and installs the store on both
+`tools.upload._store` and `tools.youtube_video._store`. Default off (no key
+deduplication) — keeps tests deterministic.
+
+In production, the deploy workflow writes `MCP_IDEMPOTENCY_ENABLED=1` and the compose
+file injects `REDIS_URL=redis://redis:6379/0` automatically.
+
+> **Known gap (see FOLLOWUPS.md — "Module-level `_store` globals"):** the store is
+> a module-level Python global. Fine for sequential test execution and the current
+> single-process production layout, but parallel test runs (pytest-xdist) or multiple
+> transports running in the same process would race. Convert to a `ContextVar` if
+> either ever becomes a concern.
 
 ### How agents use it
 
@@ -504,63 +518,142 @@ EOF
 
 ## Production deployment
 
-The MCP HTTP transport is the only transport that's exposed in production
-(stdio is dev-only; the mounted sub-app rides on the existing console
-container). Production deploy reuses the existing `api` image with a command
-override.
+Production runs on a Windows host with NVIDIA GTX 1660S. Deployment is automated
+via `.github/workflows/deploy.yml` — pushes a `v*` tag (or `gh workflow run
+deploy.yml`) to:
 
-### One-time setup
+1. Build api/render/frontend images on `ubuntu-latest`, push to GHCR
+2. On the self-hosted Windows runner: write `console/.env`, `pipeline.env`,
+   `config/api_keys.json`, root `.env` from GitHub secrets/vars
+3. Pull images, start postgres + redis, wait for postgres ready
+4. Run `alembic upgrade head` in a one-off container
+5. `docker compose up -d --remove-orphans` (api, celery-*, frontend, mcp-http)
 
-1. **Apply migrations** (if not already):
-   ```bash
-   docker compose exec api alembic -c console/backend/alembic.ini upgrade head
-   ```
+The `mcp-http` service in `docker-compose.yml` reuses the api image (same
+`Dockerfile.api` build) with a different `command:`, so it gets the new MCP code
+on every deploy without a separate image to build.
 
-2. **Mint a long-lived service-account JWT** for `mcp-system` and add it to
-   `console/.env`:
-   ```bash
-   docker compose exec api python -m console.mcp.scripts.mint_token --days 90 \
-     | xargs -I {} echo "MCP_API_TOKEN={}" >> console/.env
-   docker compose up -d --no-deps mcp-http
-   ```
+### Required GitHub repo secrets
 
-3. **Create at least one API key** for the cron/agent that will call MCP:
-   ```bash
-   docker compose exec api python -m console.mcp.scripts.manage_api_keys create --name cron-bot
-   ```
-   Copy the printed `api_key` to wherever the cron config lives. **It is not
-   retrievable later** — only the bcrypt hash is stored.
+Set under **Settings → Secrets and variables → Actions** before the first deploy:
 
-4. **Verify**:
-   ```bash
-   curl -s -H "X-API-Key: <api-key>" http://127.0.0.1:8765/mcp/tools | jq
-   ```
-   Should return a JSON object with all 11 tool names.
+| Secret | Value |
+|--------|-------|
+| `DB_PASSWORD` | postgres password chosen for the prod DB |
+| `JWT_SECRET` | random 32+ byte string — signs all JWTs |
+| `FERNET_KEY` | `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
+| `MCP_API_TOKEN` | output of `mint_token.py` run on the prod host (after first deploy seeds the `mcp-system` user). Long-lived 90-day JWT used by `mcp-http` to call the FastAPI backend. |
+| `RUNWAY_API_KEY` | Runway API key |
+| `GEMINI_SCRIPT_API_KEY`, `GEMINI_MEDIA_API_KEY` | Google AI keys |
+| `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID_EN`, `ELEVENLABS_VOICE_ID_VI` | ElevenLabs |
+| `SUNO_API_KEY` | Suno music gen |
+| `PEXELS_API_KEY` | Pexels stock |
+
+The deploy workflow also writes these MCP env vars to `console/.env`:
+- `MCP_AUDIT_ENABLED=1` — activates `DbAuditSink` so `mcp_tool_calls` rows are written
+- `MCP_IDEMPOTENCY_ENABLED=1` — installs the Redis-backed store on `upload` + `youtube_video`
+- `MCP_HTTP_USE_DB_KEYS=1` — `mcp-http` reads `mcp_api_keys` table (not env-only)
+
+### First deploy sequence
+
+```bash
+# 1. Push a release tag (or run workflow_dispatch from the GitHub UI)
+git tag v0.1.0
+git push origin v0.1.0
+# → workflow runs, builds images, deploys, runs migrations.
+#   First run takes ~10-15 min. Subsequent rebuilds are faster (Docker layer cache).
+```
+
+After the workflow completes, **before the prod `mcp-http` is usable, you must do
+two things on the prod host (one-time):**
+
+```bash
+# A. Mint MCP_API_TOKEN and add to GitHub secrets — required because the migration
+#    seeds the mcp-system user, but mint_token can only run after the first deploy.
+docker compose exec -T api python -m console.mcp.scripts.mint_token --days 90
+# Copy the printed JWT, add it to GitHub secrets as MCP_API_TOKEN.
+# Then re-run the deploy workflow so the new value lands in console/.env.
+
+# B. Create at least one API key for an MCP HTTP client
+docker compose exec api python -m console.mcp.scripts.manage_api_keys create --name first-agent
+# Save the printed api_key — it's bcrypt-hashed at rest, never retrievable.
+```
+
+### Verify
+
+```bash
+# On the prod host — liveness
+curl -s http://127.0.0.1:8765/healthz   # → {"status":"ok"}
+
+# With the API key from step B
+KEY="<the-saved-api-key>"
+curl -s -H "X-API-Key: $KEY" http://127.0.0.1:8765/mcp/tools | jq '.tools | length'
+# → 11
+
+# Make a real tool call
+curl -s -H "X-API-Key: $KEY" -H "Content-Type: application/json" \
+  -X POST http://127.0.0.1:8765/mcp/call \
+  -d '{"name":"system_health","arguments":{"action":"health"}}' | jq
+
+# Confirm the audit row was written
+docker compose exec postgres psql -U admin ai_media -c \
+  "SELECT tool_name, action, ok, transport, called_at FROM mcp_tool_calls ORDER BY called_at DESC LIMIT 1;"
+
+# Confirm X-Mcp-Actor-Metadata propagated to the backend audit log
+docker compose exec postgres psql -U admin ai_media -c \
+  "SELECT actor_metadata FROM audit_log WHERE actor_metadata IS NOT NULL ORDER BY id DESC LIMIT 1;"
+```
+
+If both SQL rows come back populated, audit + idempotency + actor-metadata
+propagation are all working end to end.
 
 ### Token rotation policy
 
 - **Service-account JWT (`MCP_API_TOKEN`)** — 90-day lifetime. Re-mint and
-  redeploy every 60 days to leave 30 days of overlap. Automation: a cron job
-  on the host running `python -m console.mcp.scripts.mint_token` and writing
-  to `console/.env`, followed by `docker compose up -d --no-deps mcp-http`.
+  redeploy every 60 days to leave 30 days of overlap. Both old and new tokens
+  remain valid until the redeploy lands the new value (zero-downtime rotation).
+  Procedure:
+  ```bash
+  # On the prod host
+  docker compose exec -T api python -m console.mcp.scripts.mint_token --days 90 > /tmp/mcp-token
+
+  # Update the GitHub secret (requires `gh auth login` against the repo)
+  gh secret set MCP_API_TOKEN --repo khiemle/ai-media-automation < /tmp/mcp-token
+
+  # Trigger the deploy workflow — pushes new console/.env, restarts mcp-http
+  gh workflow run deploy.yml --repo khiemle/ai-media-automation
+
+  rm -f /tmp/mcp-token
+  ```
+  Optional: same JWT can be reused in your local `claude mcp add` if you
+  also use Mac → prod stdio. See README "Connecting to a remote backend".
+
 - **API keys (`mcp_api_keys`)** — no automatic expiry. Rotate when:
   - a key is suspected of leakage
   - a holder agent is decommissioned
   - on a yearly cadence as defense-in-depth
-- **Revocation**: `python -m console.mcp.scripts.manage_api_keys revoke --id <N>`.
+- **Revocation**: `manage_api_keys.py revoke --id <N>`.
   Effect is immediate — `DbApiKeyRegistry.lookup()` reads each request and
-  filters `revoked_at IS NOT NULL`.
+  filters `revoked_at IS NOT NULL`. No restart needed.
 
 ### Operational gotchas
 
-- **Empty registry → all 401s.** Fresh deploy with no `mcp_api_keys` rows
-  rejects every request. The `manage_api_keys create` step is mandatory.
-- **`MCP_API_TOKEN` not set in env.** Every authenticated request still hits
-  the FastAPI side as `Bearer <empty>` and gets 401 from the console.
-  Symptom in mcp_tool_calls: `error_code = 'auth.unauthorized'`.
-- **Reverse proxy / TLS.** Put the MCP HTTP transport behind the existing
-  nginx with TLS terminating there. The container only listens on
-  `127.0.0.1:8765`; expose externally only via the proxy.
+- **Empty `mcp_api_keys` table → all 401s.** Fresh deploy with no API key
+  rows rejects every HTTP request. The `manage_api_keys create` one-time step
+  is mandatory.
+- **`MCP_API_TOKEN` GitHub secret missing/blank.** Deploy succeeds, but every
+  backend call from `mcp-http` returns 401 (empty bearer token). Symptom in
+  `mcp_tool_calls`: rows accumulate with `error_code = 'auth.unauthorized'`.
+  Fix: `gh secret set MCP_API_TOKEN < <(mint_token output)` then rerun deploy.
+- **Activation flags missing.** If `MCP_AUDIT_ENABLED` or
+  `MCP_IDEMPOTENCY_ENABLED` aren't `=1` in the prod `console/.env`, those
+  features stay inert. Verify with
+  `docker compose exec mcp-http env | grep MCP_`.
+- **Reverse proxy / TLS.** The compose port mapping is
+  `127.0.0.1:8765:8765` — only host-local. Expose to the LAN by changing the
+  port mapping prefix (and adding firewall rules), or front it with nginx /
+  Caddy + TLS. Don't expose without TLS — the API key travels in the
+  `X-API-Key` header on plain HTTP otherwise.
 
 ### Disabling MCP in production
 
