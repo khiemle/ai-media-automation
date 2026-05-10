@@ -5,8 +5,6 @@ so tests never invoke Docker or pbpaste.
 """
 from __future__ import annotations
 
-import os
-import shutil
 import subprocess
 from pathlib import Path
 
@@ -121,6 +119,19 @@ def test_single_line_command_parsed(tmp_path):
     contents = read_env_file(env_file)
     assert contents["MCP_API_TOKEN"] == "abc.def.ghi"
     assert contents["MCP_CONSOLE_API_BASE"] == "http://example.com:8080"
+
+
+def test_crlf_line_endings_handled(tmp_path):
+    """Pasted command with CRLF endings should not produce a CR-suffixed env value."""
+    pasted = CANONICAL_PASTED.replace("\n", "\r\n")
+    env_file = tmp_path / "out.env"
+    result = run_script(pasted, env_file)
+
+    assert result.returncode == 0, result.stderr
+    contents = read_env_file(env_file)
+    assert contents["MCP_CONSOLE_API_BASE"] == "http://192.168.68.119:8080"
+    assert "\r" not in contents["MCP_CONSOLE_API_BASE"]
+    assert "\r" not in contents["MCP_API_TOKEN"]
 
 
 def test_missing_token_returns_exit_2(tmp_path):

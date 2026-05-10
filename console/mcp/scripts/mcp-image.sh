@@ -106,7 +106,7 @@ extract_token_and_base() {
     # Reads pasted text on stdin. Prints two lines: token, base.
     # Exits 2 with a remediation message if either is missing.
     local input token base
-    input="$(cat)"
+    input="$(cat | tr -d '\r')"
 
     # Try quoted variant first: MCP_API_TOKEN="..."
     token="$(printf '%s' "$input" | grep -oE 'MCP_API_TOKEN="[^"]+"' | head -1 | sed -E 's/^MCP_API_TOKEN="(.*)"$/\1/')" || true
@@ -192,20 +192,14 @@ smoke_test() {
 }
 
 print_snippet() {
-    cat <<SNIPPET
-
-──── Run this to register the MCP with Claude Code ────
-
-claude mcp add ai-media-console \\
-  --transport stdio \\
-  -- docker run -i --rm \\
-       --env-file $ENV_FILE \\
-       --add-host=host.docker.internal:host-gateway \\
-       $IMAGE_TAG
-
-Then restart Claude Code.
-
-SNIPPET
+    printf '\n──── Run this to register the MCP with Claude Code ────\n\n'
+    printf 'claude mcp add ai-media-console \\\n'
+    printf '  --transport stdio \\\n'
+    printf '  -- docker run -i --rm \\\n'
+    printf '       --env-file "%s" \\\n' "$ENV_FILE"
+    printf '       --add-host=host.docker.internal:host-gateway \\\n'
+    printf '       %s\n\n' "$IMAGE_TAG"
+    printf 'Then restart Claude Code.\n\n'
 }
 
 # ─── main flow ─────────────────────────────────────────────────────────
