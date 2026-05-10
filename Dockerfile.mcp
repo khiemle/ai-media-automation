@@ -1,0 +1,30 @@
+# Slim, stdio-only image for the AI Media Console MCP server.
+#
+# The container makes outbound HTTP calls to a FastAPI backend specified
+# by MCP_CONSOLE_API_BASE and authenticates with a bearer token from
+# MCP_API_TOKEN. Both are supplied via `docker run --env-file`.
+#
+# Build:   docker build -t ai-media-console-mcp:latest -f Dockerfile.mcp .
+# Run:     docker run -i --rm \
+#            --env-file ~/.mcp/ai-media-console.env \
+#            --add-host=host.docker.internal:host-gateway \
+#            ai-media-console-mcp:latest
+FROM python:3.11-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /app
+
+COPY requirements.mcp.txt ./
+RUN pip install -r requirements.mcp.txt
+
+# Source — only what console.mcp.stdio actually imports. Verified via
+# `PYTHONPATH=. python -c "import console.mcp.stdio; print(...)"` —
+# nothing under console/backend/ is reached at import time.
+COPY console/__init__.py ./console/__init__.py
+COPY console/mcp ./console/mcp
+
+ENTRYPOINT ["python", "-m", "console.mcp.stdio"]
