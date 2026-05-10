@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Card, Spinner, Badge } from '../components/index.jsx'
+import { Card, Spinner, Badge, Button, Input } from '../components/index.jsx'
 import { fetchApi } from '../api/client.js'
 
 // ── Gauge ─────────────────────────────────────────────────────────────────────
@@ -42,6 +42,145 @@ function Gauge({ label, value, unit = '%', max = 100, sub }) {
 function ServiceDot({ ok }) {
   return (
     <span className={`inline-block w-2 h-2 rounded-full ${ok ? 'bg-[#34d399]' : 'bg-[#f87171]'}`} />
+  )
+}
+
+// ── MCP service-account token card ────────────────────────────────────────────
+function McpTokenCard() {
+  const [days, setDays]         = useState(90)
+  const [result, setResult]     = useState(null)  // {token, expires_at, lifetime_days}
+  const [error, setError]       = useState(null)
+  const [loading, setLoading]   = useState(false)
+  const [showFull, setShowFull] = useState(false)
+  const [copied, setCopied]     = useState(null)  // 'token' | 'cmd' | null
+
+  // Default API base = same origin, port 8080. User can edit.
+  const defaultBase = `${window.location.protocol}//${window.location.hostname}:8080`
+  const [apiBase, setApiBase] = useState(defaultBase)
+
+  const generate = async () => {
+    setLoading(true); setError(null); setResult(null); setShowFull(false)
+    try {
+      const r = await fetchApi('/api/system/mcp/mint-token', {
+        method: 'POST',
+        body: JSON.stringify({ days: Number(days) || 90 }),
+      })
+      setResult(r)
+    } catch (e) {
+      setError(e?.message || 'Failed to mint token. Admin role required.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const copy = async (text, key) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(key)
+      setTimeout(() => setCopied(null), 1500)
+    } catch {}
+  }
+
+  const claudeAddCmd = result
+    ? `claude mcp add ai-media-console-prod \\
+  --transport stdio \\
+  --env MCP_API_TOKEN="${result.token}" \\
+  --env MCP_CONSOLE_API_BASE=${apiBase} \\
+  -- python -m console.mcp.stdio`
+    : ''
+
+  const tokenPreview = (t) => {
+    if (!t) return ''
+    if (showFull) return t
+    return `${t.slice(0, 12)}…${t.slice(-8)}`
+  }
+
+  return (
+    <Card title="MCP Service Token">
+      <div className="space-y-3">
+        <p className="text-xs text-[#9090a8]">
+          Mint a JWT for the <span className="font-mono text-[#e8e8f0]">mcp-system</span> service-account user
+          to configure local Claude Code MCP without SSH-ing into this host. Anyone with this
+          token can act as <span className="font-mono">mcp-system</span> (admin role) — treat it like a password.
+        </p>
+
+        <div className="flex items-end gap-2">
+          <Input
+            label="Lifetime (days)"
+            type="number"
+            value={days}
+            onChange={e => setDays(e.target.value)}
+            className="w-32"
+            min="1"
+            max="365"
+          />
+          <Input
+            label="API base URL (passed to MCP)"
+            value={apiBase}
+            onChange={e => setApiBase(e.target.value)}
+            placeholder="http://host:8080"
+            className="flex-1"
+          />
+          <Button variant="primary" onClick={generate} loading={loading} disabled={loading}>
+            Generate Token
+          </Button>
+        </div>
+
+        {error && (
+          <div className="text-xs text-[#f87171] bg-[#1e0a0a] border border-[#3e1e1e] rounded px-3 py-2">
+            {error}
+          </div>
+        )}
+
+        {result && (
+          <div className="space-y-3 pt-2 border-t border-[#2a2a32]">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-[#9090a8]">Expires</span>
+              <span className="text-[#e8e8f0] font-mono">
+                {new Date(result.expires_at).toLocaleString()} ({result.lifetime_days}d)
+              </span>
+            </div>
+
+            {/* Token */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs text-[#9090a8] font-medium">JWT Token</span>
+                <div className="flex gap-2">
+                  <button onClick={() => setShowFull(s => !s)}
+                    className="text-xs text-[#7c6af7] hover:text-[#9888f9] transition-colors">
+                    {showFull ? 'Hide' : 'Reveal'}
+                  </button>
+                  <button onClick={() => copy(result.token, 'token')}
+                    className="text-xs text-[#7c6af7] hover:text-[#9888f9] transition-colors">
+                    {copied === 'token' ? '✓ Copied' : 'Copy token'}
+                  </button>
+                </div>
+              </div>
+              <div className="bg-[#0d0d0f] border border-[#2a2a32] rounded px-3 py-2 font-mono text-xs text-[#e8e8f0] break-all select-all">
+                {tokenPreview(result.token)}
+              </div>
+            </div>
+
+            {/* claude mcp add command */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs text-[#9090a8] font-medium">claude CLI command (paste in your terminal)</span>
+                <button onClick={() => copy(claudeAddCmd, 'cmd')}
+                  className="text-xs text-[#7c6af7] hover:text-[#9888f9] transition-colors">
+                  {copied === 'cmd' ? '✓ Copied' : 'Copy command'}
+                </button>
+              </div>
+              <pre className="bg-[#0d0d0f] border border-[#2a2a32] rounded px-3 py-2 font-mono text-[11px] text-[#e8e8f0] whitespace-pre overflow-x-auto leading-relaxed">
+{claudeAddCmd}
+              </pre>
+              <p className="text-[10px] text-[#5a5a70] mt-1">
+                After running, restart Claude Code and verify with <span className="font-mono text-[#9090a8]">claude mcp list</span>.
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+    </Card>
   )
 }
 
@@ -166,6 +305,9 @@ export default function SystemPage() {
           )}
         </Card>
       </div>
+
+      {/* MCP service-account token */}
+      <McpTokenCard />
     </div>
   )
 }
