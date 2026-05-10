@@ -81,6 +81,22 @@ async def test_self_test_connection_error(capsys, monkeypatch):
     assert "http://nope.invalid:8080" in captured.err
 
 
+@pytest.mark.asyncio
+async def test_self_test_missing_token(capsys, monkeypatch):
+    """MCP_API_TOKEN unset → exit 1 with a clear FAIL message on stderr (no traceback)."""
+    monkeypatch.delenv("MCP_API_TOKEN", raising=False)
+    monkeypatch.setenv("MCP_CONSOLE_API_BASE", "http://backend.test:8080")
+
+    from console.mcp.stdio import _self_test
+    rc = await _self_test()
+
+    assert rc == 1
+    captured = capsys.readouterr()
+    assert "FAIL" in captured.err
+    # No raw Python traceback in stderr
+    assert "Traceback" not in captured.err
+
+
 def test_main_dispatches_self_test(monkeypatch):
     """`main()` invoked with --self-test in argv calls _self_test, not the JSON-RPC server."""
     monkeypatch.setattr(sys, "argv", ["console.mcp.stdio", "--self-test"])

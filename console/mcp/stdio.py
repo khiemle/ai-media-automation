@@ -43,16 +43,24 @@ def _build_client() -> ConsoleClient:
 async def _self_test() -> int:
     """Validate that the configured backend accepts our token. Returns exit code."""
     base = os.environ.get("MCP_CONSOLE_API_BASE", "http://localhost:8080")
-    client = _build_client()
+    client = None
     try:
+        client = _build_client()
         await client.get("/api/system/health")
     except ConsoleError as e:
-        if getattr(e, "status", None) == 401 or e.code == "auth.unauthorized":
-            print(
-                f"FAIL: token rejected by {base} (401). "
-                "Re-mint in the System tab of the console UI.",
-                file=sys.stderr,
-            )
+        if e.code == "auth.unauthorized" or (e.context or {}).get("status") == 401:
+            if not os.environ.get("MCP_API_TOKEN"):
+                print(
+                    "FAIL: MCP_API_TOKEN is not set. "
+                    "Set it to a valid service-account JWT before running --self-test.",
+                    file=sys.stderr,
+                )
+            else:
+                print(
+                    f"FAIL: token rejected by {base} (401). "
+                    "Re-mint in the System tab of the console UI.",
+                    file=sys.stderr,
+                )
             return 1
         print(f"FAIL: {base} returned error: {e}", file=sys.stderr)
         return 1
@@ -65,7 +73,8 @@ async def _self_test() -> int:
         )
         return 1
     finally:
-        await client.aclose()
+        if client is not None:
+            await client.aclose()
 
     print(f"OK: {base} reachable, token accepted.")
     return 0
