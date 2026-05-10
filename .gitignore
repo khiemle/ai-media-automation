@@ -27,6 +27,9 @@ celerybeat-schedule.db
 # Logs
 console/logs/
 
+# Superpowers brainstorm session content
+.superpowers/
+
 # Node
 node_modules/
 console/frontend/node_modules/
