@@ -94,16 +94,35 @@ class SystemService:
         ]
 
     def _check_postgres(self) -> dict:
+        # Use the app's own SQLAlchemy engine — same DATABASE_URL the rest of
+        # the FastAPI uses. Avoids a CLI dependency (pg_isready) and the
+        # localhost-default pitfall when running inside the compose api
+        # container (where Postgres is reachable as `postgres:5432`, not
+        # localhost:5432).
         try:
-            result = subprocess.run(["pg_isready"], capture_output=True, timeout=3)
-            return {"ok": result.returncode == 0}
+            from sqlalchemy import text
+
+            from console.backend.database import engine
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            return {"ok": True}
         except Exception as e:
             return {"ok": False, "error": str(e)}
 
     def _check_redis(self) -> dict:
+        # Use REDIS_URL from settings — same broker URL Celery uses. Like
+        # the Postgres check, this avoids redis-cli's localhost default
+        # which fails inside the api container where Redis is at `redis:6379`.
         try:
-            result = subprocess.run(["redis-cli", "ping"], capture_output=True, text=True, timeout=3)
-            return {"ok": result.stdout.strip() == "PONG"}
+            import redis
+
+            from console.backend.config import settings
+            client = redis.from_url(settings.REDIS_URL, socket_connect_timeout=2)
+            try:
+                ok = bool(client.ping())
+            finally:
+                client.close()
+            return {"ok": ok}
         except Exception as e:
             return {"ok": False, "error": str(e)}
 
