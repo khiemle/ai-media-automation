@@ -1218,7 +1218,12 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
     const duration = form.isCustomDuration
       ? parseFloat(form.customDuration)
       : form.target_duration_h
-    if (!duration || duration <= 0) { showToast('Valid duration is required', 'error'); return }
+    if (!isMusic && (!duration || duration <= 0)) {
+      showToast('Valid duration is required', 'error'); return
+    }
+    if (isMusic && musicTrackIds.length === 0) {
+      showToast('Music template requires at least 1 music track', 'error'); return
+    }
     setLoading(true)
     try {
       const title = form.seo_title || `${template.label} — ${form.theme}`
@@ -1226,7 +1231,7 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
         title,
         template_id: template.id,
         theme: form.theme,
-        target_duration_h: duration,
+        ...(isMusic ? {} : { target_duration_h: duration }),
         music_track_id: form.music_track_id || null,
         visual_asset_id: null,
         visual_asset_ids: visualAssetIds,
