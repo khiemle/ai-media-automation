@@ -584,6 +584,205 @@ def _blackout_filter_chain(
     )
 
 
+def _render_landscape_music(
+    video,
+    output_path: Path,
+    db,
+    start_s: float,
+    end_s: float | None,
+) -> None:
+    """Music-template branch of render_landscape.
+
+    Total duration comes from the natural sum of track durations (no looping).
+    No SFX layers, no blackout overlay. Spectrum visualiser and now-playing
+    PNG overlays are optional and applied as filtergraph stages.
+    """
+    if not shutil.which("ffmpeg"):
+        raise RuntimeError("ffmpeg not found in PATH")
+
+    # Lazy imports — avoids circular dependency on console.backend.services
+    from console.backend.services.youtube_video_service import (
+        _resolve_music_tracks,
+        _compute_music_total_duration,
+    )
+    from pipeline.music_audio import build_music_playlist_wav_with_transitions
+    from pipeline.music_overlay import build_now_playing_overlay
+
+    music_tracks = _resolve_music_tracks(video, db)
+    if not music_tracks:
+        raise RuntimeError("Music template requires at least one music track")
+
+    total_dur_s, boundaries = _compute_music_total_duration(
+        music_tracks,
+        video.track_transition,
+        video.track_transition_seconds,
+    )
+    full_duration_s = int(round(total_dur_s))
+
+    if end_s is None:
+        end_s = full_duration_s
+    target_dur = int(end_s - start_s)
+    if target_dur <= 0:
+        raise ValueError(f"Window has non-positive duration: [{start_s}, {end_s})")
+
+    scale = QUALITY_SCALE.get(getattr(video, "output_quality", None) or "1080p", DEFAULT_SCALE)
+    w_str, h_str = scale.split(":")
+    w, h = int(w_str), int(h_str)
+
+    output_dir = output_path.parent
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # ── Visual (same playlist / single-asset logic as legacy path) ────────────
+    playlist = resolve_visual_playlist(video, db)
+    playlist_segment_path: Path | None = None
+    if playlist:
+        playlist_segment_path = _build_visual_segment(
+            playlist=playlist,
+            durations=list(getattr(video, "visual_clip_durations_s", None) or []),
+            loop_mode=getattr(video, "visual_loop_mode", None) or "concat_loop",
+            w=w, h=h, target_dur_s=target_dur,
+            output_dir=output_dir,
+        )
+
+    if playlist_segment_path is not None:
+        visual_path = str(playlist_segment_path)
+        is_image = False
+    else:
+        visual_path = resolve_visual(video, db)
+        is_image = visual_path is not None and Path(visual_path).suffix.lower() in IMAGE_EXTS
+
+    # ── Music WAV (exact-duration, no looping) ────────────────────────────────
+    music_wav = build_music_playlist_wav_with_transitions(
+        tracks=music_tracks,
+        total_duration_s=total_dur_s,
+        transition=video.track_transition,
+        transition_s=video.track_transition_seconds,
+        output_dir=output_dir,
+        start_s=start_s,
+    )
+
+    # ── Now-playing overlay segments ──────────────────────────────────────────
+    overlay_segments = []
+    if video.playlist_overlay_style and len(music_tracks) >= 2:
+        overlay_segments = build_now_playing_overlay(
+            video=video,
+            tracks=music_tracks,
+            boundaries=boundaries,
+            total_duration_s=total_dur_s,
+            output_dir=output_dir,
+            canvas_w=w,
+            canvas_h=h,
+        )
+
+    # ── Spectrum filter chain ─────────────────────────────────────────────────
+    # audio input is at index 1 (0 = video, 1 = music_wav)
+    spec_chain, _ = build_spectrum_filter(
+        enabled=getattr(video, "spectrum_enabled", False),
+        position=getattr(video, "spectrum_position", "bottom"),
+        height_pct=getattr(video, "spectrum_height_pct", 0.12),
+        color=getattr(video, "spectrum_color", "#ffffff"),
+        opacity=getattr(video, "spectrum_opacity", 0.6),
+        canvas_w=w,
+        canvas_h=h,
+        audio_input_label="[1:a]",
+        base_label="[base]",
+        out_label="[v_after_spec]",
+    )
+
+    # ── Build ffmpeg command ──────────────────────────────────────────────────
+    cmd = ["ffmpeg", "-y"]
+
+    # Input 0: visual
+    if visual_path and Path(visual_path).is_file():
+        if is_image:
+            cmd += ["-loop", "1", "-i", visual_path]
+        elif playlist_segment_path is not None:
+            cmd += ["-i", visual_path]
+        else:
+            if start_s > 0.5:
+                vid_dur = _probe_duration(visual_path)
+                effective_seek = (start_s % vid_dur) if vid_dur > 1.0 else 0.0
+                if effective_seek > 0.5:
+                    cmd += ["-stream_loop", "-1", "-ss", str(int(effective_seek)), "-i", visual_path]
+                else:
+                    cmd += ["-stream_loop", "-1", "-i", visual_path]
+            else:
+                cmd += ["-stream_loop", "-1", "-i", visual_path]
+    else:
+        cmd += ["-f", "lavfi", "-i", f"color=c=black:s={w}x{h}:r=30"]
+
+    # Input 1: music WAV (exact duration — no loop flag)
+    cmd += ["-i", music_wav]
+
+    # Inputs 2+: overlay PNGs (one still per track)
+    overlay_input_start = 2
+    for seg in overlay_segments:
+        cmd += ["-loop", "1", "-i", seg.png_path]
+
+    # ── Filtergraph ───────────────────────────────────────────────────────────
+    base_vf = (
+        f"scale={w}:{h}:force_original_aspect_ratio=decrease,"
+        f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2:black,fps=30"
+    )
+
+    parts: list[str] = []
+    parts.append(f"[0:v]{base_vf}[base]")
+
+    if spec_chain:
+        parts.append(spec_chain)
+        prev_label = "[v_after_spec]"
+    else:
+        prev_label = "[base]"
+
+    # Chain overlay PNGs: switch active PNG at each track boundary
+    for idx, seg in enumerate(overlay_segments):
+        input_idx = overlay_input_start + idx
+        is_last = (idx == len(overlay_segments) - 1)
+        next_label = "[vout]" if is_last else f"[v_o{idx}]"
+        # Rebase enable times to chunk window
+        enable_start = max(0.0, seg.start_s - start_s)
+        enable_end = max(0.0, seg.end_s - start_s)
+        parts.append(
+            f"{prev_label}[{input_idx}:v]overlay=0:0:"
+            f"enable='between(t,{enable_start:.3f},{enable_end:.3f})'{next_label}"
+        )
+        prev_label = next_label
+
+    # If neither spectrum nor overlays added, chain ended at [base]; rename to [vout]
+    if prev_label != "[vout]":
+        parts.append(f"{prev_label}null[vout]")
+
+    filter_complex = ";".join(parts)
+    cmd += [
+        "-filter_complex", filter_complex,
+        "-map", "[vout]",
+        "-map", "1:a",
+    ]
+
+    cmd += ["-t", str(target_dur)]
+
+    # Encoder — same params as legacy path (keyed off full duration for chunk-concat compat)
+    if _nvenc_available():
+        cmd += ["-c:v", "h264_nvenc", "-preset", "p1", "-rc", "vbr", "-cq", "23"]
+    else:
+        preset = "ultrafast" if full_duration_s > 600 else "slow"
+        if is_image:
+            cmd += ["-c:v", "libx264", "-preset", preset, "-tune", "stillimage", "-crf", "23"]
+        else:
+            cmd += ["-c:v", "libx264", "-preset", preset, "-crf", "23"]
+    cmd += [
+        "-c:a", "aac", "-b:a", "192k", "-ar", "44100",
+        "-movflags", "+faststart",
+        str(output_path),
+    ]
+
+    logger.info(
+        "ffmpeg landscape music cmd (window [%s,%s)): %s",
+        start_s, end_s, " ".join(cmd),
+    )
+    _run_ffmpeg(cmd, max(120, target_dur * 2))
+
+
 def render_landscape(
     video,
     output_path: Path,
@@ -595,9 +794,20 @@ def render_landscape(
 
     For chunked render: pass ``start_s`` and ``end_s``. Each chunk uses identical encoder
     params so concat-demuxer with ``-c copy`` joins seamlessly.
+
+    When the video's template slug is ``"music"``, rendering is delegated to
+    ``_render_landscape_music``, which derives total duration from the playlist
+    rather than ``target_duration_h``, omits SFX layers and blackout, and
+    optionally applies the spectrum visualiser and now-playing PNG overlays.
     """
     if not shutil.which("ffmpeg"):
         raise RuntimeError("ffmpeg not found in PATH")
+
+    # Detect music template — load by template_id (no ORM relationship on model)
+    from console.backend.models.video_template import VideoTemplate
+    _template = db.get(VideoTemplate, video.template_id) if video.template_id else None
+    if _template and getattr(_template, "slug", None) == "music":
+        return _render_landscape_music(video, output_path, db, start_s, end_s)
 
     full_duration_s = int((video.target_duration_h or 3.0) * 3600)
     if end_s is None:
