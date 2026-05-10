@@ -110,7 +110,11 @@ jobs:
             "FRONTEND_ORIGIN=http://localhost:3000",
             "ENV=production",
             "ASSETS_PATH=/app/assets/video_db",
-            "RUNWAY_API_KEY=${{ secrets.RUNWAY_API_KEY }}"
+            "RUNWAY_API_KEY=${{ secrets.RUNWAY_API_KEY }}",
+            "MCP_API_TOKEN=${{ secrets.MCP_API_TOKEN }}",
+            "MCP_AUDIT_ENABLED=1",
+            "MCP_IDEMPOTENCY_ENABLED=1",
+            "MCP_HTTP_USE_DB_KEYS=1"
           )
           [System.IO.File]::WriteAllLines("$PWD\console\.env", $lines, (New-Object System.Text.UTF8Encoding $false))
 
