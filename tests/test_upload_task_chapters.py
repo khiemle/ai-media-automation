@@ -13,15 +13,29 @@ def _make_track(title: str, duration_s: float) -> MagicMock:
     return t
 
 
-def _make_video(slug: str, track_count: int = 3):
-    """Return a MagicMock YoutubeVideo whose template.slug is ``slug``."""
+def _make_video(slug: str, track_count: int = 3, template_id: int = 1):
+    """Return a MagicMock YoutubeVideo with the given template slug.
+
+    Note: YoutubeVideo has no ``template`` ORM relationship — only
+    ``template_id``.  ``_make_db_for(slug)`` pairs with this to supply
+    a ``db.get`` mock that returns the right VideoTemplate.
+    """
     video = MagicMock()
-    video.template.slug = slug
+    video.template_id = template_id
     video.track_transition = "gapless"
     video.track_transition_seconds = 2.0
     video.music_track_ids = list(range(1, track_count + 1))
     video.music_track_id = None
     return video
+
+
+def _make_db_for(slug: str, template_id: int = 1) -> MagicMock:
+    """Return a MagicMock db whose .get() returns a fake VideoTemplate."""
+    fake_template = MagicMock()
+    fake_template.slug = slug
+    db = MagicMock()
+    db.get.return_value = fake_template
+    return db
 
 
 # ---------------------------------------------------------------------------
@@ -33,7 +47,7 @@ def test_build_chapters_returns_list_for_music_template():
     from console.backend.services.youtube_video_service import YoutubeVideoService
 
     tracks = [_make_track(f"Track {i}", 60.0) for i in range(1, 4)]
-    db = MagicMock()
+    db = _make_db_for("music")
     video = _make_video("music", track_count=3)
 
     with patch(
@@ -53,7 +67,7 @@ def test_build_chapters_returns_none_for_non_music_template():
     """Service.build_chapters returns None for templates that are not 'music'."""
     from console.backend.services.youtube_video_service import YoutubeVideoService
 
-    db = MagicMock()
+    db = _make_db_for("asmr")
     video = _make_video("asmr")
 
     chapters = YoutubeVideoService(db).build_chapters(video)
@@ -65,7 +79,7 @@ def test_build_chapters_returns_none_for_fewer_than_3_tracks():
     from console.backend.services.youtube_video_service import YoutubeVideoService
 
     tracks = [_make_track("A", 60.0), _make_track("B", 60.0)]
-    db = MagicMock()
+    db = _make_db_for("music")
     video = _make_video("music", track_count=2)
 
     with patch(

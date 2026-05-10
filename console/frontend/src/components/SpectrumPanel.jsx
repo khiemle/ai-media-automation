@@ -44,7 +44,7 @@ export function SpectrumPanel({ value, onChange }) {
             <label className="block text-xs text-[#9090a8] mb-1.5">
               Height:{' '}
               <span className="text-[#e8e8f0] font-mono">
-                {Math.round((value.spectrum_height_pct ?? 0.2) * 100)}%
+                {Math.round((value.spectrum_height_pct ?? 0.12) * 100)}%
               </span>
             </label>
             <input
@@ -52,7 +52,7 @@ export function SpectrumPanel({ value, onChange }) {
               min={0.05}
               max={0.50}
               step={0.01}
-              value={value.spectrum_height_pct ?? 0.2}
+              value={value.spectrum_height_pct ?? 0.12}
               onChange={e => update({ spectrum_height_pct: parseFloat(e.target.value) })}
               className="w-full accent-[#7c6af7]"
             />

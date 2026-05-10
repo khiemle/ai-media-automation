@@ -810,7 +810,8 @@ class YoutubeVideoService:
 
     def build_chapters(self, video) -> list[dict] | None:
         """Service wrapper: builds chapters for a YoutubeVideo (music template only)."""
-        if video.template.slug != "music":
+        template = self.db.get(VideoTemplate, video.template_id)
+        if not template or template.slug != "music":
             return None
         tracks = _resolve_music_tracks(video, self.db)
         return build_chapters_from_tracks(

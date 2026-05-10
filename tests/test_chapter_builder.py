@@ -56,3 +56,44 @@ def test_empty_title_falls_back(caplog):
     assert chapters[2]["title"] == "Track 3"
     warnings = [r for r in caplog.records if "empty title" in r.message.lower()]
     assert len(warnings) == 2
+
+
+def test_build_chapters_via_service_with_real_orm_video(db):
+    """Regression: previous version called video.template.slug which AttributeError'd
+    because YoutubeVideo has no `template` relationship — only template_id."""
+    from console.backend.models.video_template import VideoTemplate
+    from console.backend.models.youtube_video import YoutubeVideo
+    from console.backend.services.youtube_video_service import YoutubeVideoService
+    from database.models import MusicTrack
+
+    template = db.query(VideoTemplate).filter_by(slug="music").one()
+    tracks = [
+        MusicTrack(title=f"T{i}", file_path=f"/tmp/{i}.wav", duration_s=60.0)
+        for i in range(3)
+    ]
+    db.add_all(tracks); db.commit()
+
+    video = YoutubeVideo(
+        title="x", template_id=template.id,
+        music_track_ids=[t.id for t in tracks],
+        track_transition="gapless",
+        track_transition_seconds=2.0,
+    )
+    db.add(video); db.commit()
+
+    chapters = YoutubeVideoService(db).build_chapters(video)
+    assert chapters is not None
+    assert len(chapters) == 3
+    assert chapters[0]["seconds"] == 0
+
+
+def test_build_chapters_via_service_returns_none_for_asmr(db):
+    from console.backend.models.video_template import VideoTemplate
+    from console.backend.models.youtube_video import YoutubeVideo
+    from console.backend.services.youtube_video_service import YoutubeVideoService
+
+    template = db.query(VideoTemplate).filter_by(slug="asmr").one()
+    video = YoutubeVideo(title="x", template_id=template.id, target_duration_h=8.0)
+    db.add(video); db.commit()
+
+    assert YoutubeVideoService(db).build_chapters(video) is None
