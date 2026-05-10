@@ -88,6 +88,33 @@ def _compute_music_total_duration(
     return total, boundaries
 
 
+def build_chapters_from_tracks(
+    tracks, transition: str, transition_s: float
+) -> list[dict] | None:
+    """Pure function — chapter list or None.
+
+    Returns None when fewer than 3 tracks (YouTube minimum). Falls back
+    to "Track {i+1}" when a track title is empty/null, with WARNING log.
+    """
+    if len(tracks) < 3:
+        return None
+    _, boundaries = _compute_music_total_duration(tracks, transition, transition_s)
+    chapters = []
+    for i, t in enumerate(tracks):
+        title = (t.title or "").strip()
+        if not title:
+            logger.warning(
+                "Music track at index %d has empty title; falling back to 'Track %d'",
+                i, i + 1,
+            )
+            title = f"Track {i + 1}"
+        chapters.append({
+            "seconds": int(round(boundaries[i])),
+            "title": title,
+        })
+    return chapters
+
+
 def _audit(
     db: Session,
     user_id: int | None,
@@ -780,3 +807,12 @@ class YoutubeVideoService:
     def get_render_state(self, video_id: int) -> dict:
         from console.backend.services.youtube_render_state import get_render_state
         return get_render_state(self.db, video_id)
+
+    def build_chapters(self, video) -> list[dict] | None:
+        """Service wrapper: builds chapters for a YoutubeVideo (music template only)."""
+        if video.template.slug != "music":
+            return None
+        tracks = _resolve_music_tracks(video, self.db)
+        return build_chapters_from_tracks(
+            tracks, video.track_transition, video.track_transition_seconds
+        )
