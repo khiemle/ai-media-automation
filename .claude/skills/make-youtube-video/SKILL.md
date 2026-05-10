@@ -38,8 +38,10 @@ source of truth — do not summarize, paraphrase, or skip steps.
 ## What the workflow does (high-level summary)
 
 ```
-1. Glob `working/<slug>/json/*music.json`, `*visual.json`, `*seo.json`
-   — disambiguate via AskUserQuestion if multiple/zero matches
+1. Glob `working/<slug>/json/*music.json` (or `*suno.json` as fallback —
+   the visual-video skill saves the music file with `_suno` suffix),
+   `*visual.json`, `*seo.json` — disambiguate via AskUserQuestion if
+   multiple/zero matches
 2. Validate each JSON (parseMusicJson / parseSfxJson / parseSeoJson rules)
 3. AskUserQuestion for visual.mp4 path and thumbnail.jpg path
 4. visual_asset(action="upload", ...) — multipart upload of the .mp4

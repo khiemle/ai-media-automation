@@ -133,3 +133,37 @@ If the user asks for a field that is not in the schema, add it as a Vietnamese n
 - For batch work ("give me 5 variations"), run the interview once for the *theme*, then iterate the configuration steps for each variation while keeping the theme fixed.
 - Always follow the language rule. If the user writes in Vietnamese, respond in Vietnamese. Never write a Midjourney / Runway / Suno / SEO prompt in Vietnamese.
 - If the user pastes an existing prompt and asks for fixes, skip the interview. Identify the problems, propose a corrected version inline with a short bulleted "what changed and why" note.
+
+---
+
+## Final step — STOP and ask about the next stage
+
+This skill's job ends when all requested workflow files are written to disk. **Do not start uploading, rendering, or publishing on your own** — that's a separate phase handled by the `make-youtube-video` skill, which drives the AI Media Console pipeline.
+
+After saving the files for the workflow(s) the user picked:
+
+1. **Confirm what was produced.** List the absolute paths of every `.json` and `.md` file you wrote, grouped by `json/` and `md/` subfolder. If the user only ran one or two of the three workflows, list only what got written.
+
+2. **Stop and ask the user via `AskUserQuestion`** whether they want to chain into the production pipeline. Use this exact framing (translate the labels to Vietnamese if the user has been speaking Vietnamese):
+
+   - **Question:** "Files are saved at `working/{slug}/`. Continue into the make-youtube-video pipeline now?"
+   - **Header:** "Next step"
+   - **Options:**
+     - "Yes — invoke `make-youtube-video` skill" — describes: hands off to the production-pipeline skill, which will upload the visual asset + thumbnail you provide, generate music + SFX, render the YouTube video with approval gates, and upload.
+     - "Not yet — I'll review the files first" — describes: stops here so the user can inspect / tweak the JSON before running the pipeline.
+     - "Stop here — different next step" — describes: don't auto-chain; user has another plan.
+
+3. **Acting on the answer:**
+   - **"Yes"** → invoke the `make-youtube-video` skill via the `Skill` tool with the slug as context. The downstream skill expects files at `working/{slug}/json/` matching the globs `*music.json` / `*visual.json` / `*seo.json`. **Important compatibility note:** this skill saves the music file as `..._suno.json` (its established convention). The `make-youtube-video` skill globs `*music.json` first, then falls back to `*suno.json`. Both patterns work — no rename needed. If the downstream skill cannot find the music file, point it at the actual path explicitly.
+   - **"Not yet"** → end the conversation here. Tell the user how to invoke `make-youtube-video` later (a one-liner naming the slug is enough).
+   - **"Stop here"** → end without any handoff. Don't volunteer additional next steps.
+
+4. **Never** silently continue past file save into rendering or upload. Always pause for the question above. The pipeline is destructive (uploads videos to YouTube, consumes ElevenLabs / Runway / Topaz quota); the user must explicitly opt in.
+
+### Quick reference — what each downstream skill needs
+
+If the user picks "Yes — invoke `make-youtube-video`", they will additionally need to provide:
+- A path to a local `visual.mp4` file (the background loop video — Runway export, stock footage, etc.)
+- A path to a local `thumbnail.jpg` source image
+
+The downstream skill asks for these via `AskUserQuestion` during execution; you do not need to gather them here. Just confirm the JSON files exist and hand off.
