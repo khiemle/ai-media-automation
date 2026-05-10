@@ -2028,6 +2028,15 @@ export default function YouTubeVideosPage() {
   const [accordionOpen, setAccordionOpen]   = useState(false)
   const [expandedPlanId, setExpandedPlanId] = useState(null)
   const [activeChannelPlan, setActiveChannelPlan] = useState(null)
+  const [templateMenuOpen, setTemplateMenuOpen] = useState(null)  // 'header' | `plan-${id}` | null
+
+  const landscapeTemplates = templates.filter(t => t.output_format === 'landscape_long')
+
+  const openCreateForTemplate = (template, plan = null) => {
+    setActiveTemplate(template)
+    setActiveChannelPlan(plan)
+    setTemplateMenuOpen(null)
+  }
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type })
@@ -2093,18 +2102,32 @@ export default function YouTubeVideosPage() {
           <h1 className="text-xl font-bold text-[#e8e8f0]">YouTube Videos</h1>
           <p className="text-sm text-[#9090a8] mt-0.5">{videos.length} videos</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 relative">
           <Button
             variant="primary"
             onClick={() => {
-              const firstTemplate = templates.find(t => t.output_format === 'landscape_long')
-              if (!firstTemplate) { showToast('No landscape template configured', 'error'); return }
-              setActiveTemplate(firstTemplate)
-              setActiveChannelPlan(null)
+              if (!landscapeTemplates.length) { showToast('No landscape template configured', 'error'); return }
+              setTemplateMenuOpen(o => o === 'header' ? null : 'header')
             }}
           >
-            + New Video
+            + New Video {landscapeTemplates.length > 1 ? '▾' : ''}
           </Button>
+          {templateMenuOpen === 'header' && (
+            <div
+              className="absolute right-0 top-full mt-1 z-10 min-w-[180px] bg-[#1c1c22] border border-[#2a2a32] rounded-md shadow-lg py-1"
+              onMouseLeave={() => setTemplateMenuOpen(null)}
+            >
+              {landscapeTemplates.map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => openCreateForTemplate(t, null)}
+                  className="w-full text-left px-3 py-2 text-sm text-[#e8e8f0] hover:bg-[#2a2a32]"
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -2169,19 +2192,34 @@ export default function YouTubeVideosPage() {
 
                     <AIAssistantPanel key={plan.id} planId={plan.id} />
 
-                    <div className="flex justify-end">
+                    <div className="flex justify-end relative">
                       <Button
                         variant="primary"
                         size="sm"
                         onClick={() => {
-                          const firstTemplate = templates.find(t => t.output_format === 'landscape_long')
-                          if (!firstTemplate) { showToast('No landscape template configured', 'error'); return }
-                          setActiveTemplate(firstTemplate)
-                          setActiveChannelPlan(plan)
+                          if (!landscapeTemplates.length) { showToast('No landscape template configured', 'error'); return }
+                          const key = `plan-${plan.id}`
+                          setTemplateMenuOpen(o => o === key ? null : key)
                         }}
                       >
-                        + New Video for this channel
+                        + New Video for this channel {landscapeTemplates.length > 1 ? '▾' : ''}
                       </Button>
+                      {templateMenuOpen === `plan-${plan.id}` && (
+                        <div
+                          className="absolute right-0 top-full mt-1 z-10 min-w-[180px] bg-[#1c1c22] border border-[#2a2a32] rounded-md shadow-lg py-1"
+                          onMouseLeave={() => setTemplateMenuOpen(null)}
+                        >
+                          {landscapeTemplates.map(t => (
+                            <button
+                              key={t.id}
+                              onClick={() => openCreateForTemplate(t, plan)}
+                              className="w-full text-left px-3 py-2 text-sm text-[#e8e8f0] hover:bg-[#2a2a32]"
+                            >
+                              {t.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -2214,7 +2252,7 @@ export default function YouTubeVideosPage() {
       ) : videos.length === 0 ? (
         <EmptyState
           title="No YouTube videos"
-          description="Create your first ASMR or Soundscape video."
+          description="Create your first video — pick a template (ASMR, Soundscape, or Music Video)."
         />
       ) : (
         <div className="flex flex-col gap-3">
