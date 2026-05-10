@@ -15,6 +15,7 @@ from console.backend.models.channel import Channel
 from console.backend.models.youtube_video import YoutubeVideo
 from console.backend.models.youtube_video_upload import YoutubeVideoUpload
 from console.backend.models.video_template import VideoTemplate
+from database.models import MusicTrack
 
 # Fields that are NOT NULL in the DB — explicit None in an update payload is an error
 _MUSIC_NOT_NULL_FIELDS = (
@@ -36,6 +37,55 @@ ALLOWED_TRANSITIONS: dict[str, set[str]] = {
     "failed": {"draft"},
     "published": set(),
 }
+
+
+def _resolve_music_tracks(video, db) -> list[MusicTrack]:
+    """Return ordered list of MusicTrack rows for video.music_track_ids.
+
+    Preserves the user-specified order. Raises ValueError if any ID is missing.
+    Falls back to single music_track_id when music_track_ids is empty.
+    """
+    track_ids = list(getattr(video, "music_track_ids", None) or [])
+    if not track_ids and getattr(video, "music_track_id", None):
+        track_ids = [video.music_track_id]
+    if not track_ids:
+        return []
+
+    rows = db.query(MusicTrack).filter(MusicTrack.id.in_(track_ids)).all()
+    by_id = {t.id: t for t in rows}
+    missing = [tid for tid in track_ids if tid not in by_id]
+    if missing:
+        raise ValueError(f"music_track_ids not found: {missing}")
+    return [by_id[tid] for tid in track_ids]
+
+
+def _compute_music_total_duration(
+    tracks, transition: str, transition_s: float
+) -> tuple[float, list[float]]:
+    """Return (total_seconds, per-track-start boundaries).
+
+    Boundaries[i] is the start time of track i in the final timeline.
+    Total is the timeline length after transition adjustments.
+    """
+    if not tracks:
+        return 0.0, []
+
+    boundaries: list[float] = [0.0]
+    if transition == "gapless" or len(tracks) == 1:
+        for t in tracks[:-1]:
+            boundaries.append(boundaries[-1] + float(t.duration_s))
+        total = boundaries[-1] + float(tracks[-1].duration_s)
+    elif transition == "crossfade":
+        for t in tracks[:-1]:
+            boundaries.append(boundaries[-1] + float(t.duration_s) - transition_s)
+        total = boundaries[-1] + float(tracks[-1].duration_s)
+    elif transition == "gap":
+        for t in tracks[:-1]:
+            boundaries.append(boundaries[-1] + float(t.duration_s) + transition_s)
+        total = boundaries[-1] + float(tracks[-1].duration_s)
+    else:
+        raise ValueError(f"unknown transition mode: {transition}")
+    return total, boundaries
 
 
 def _audit(
