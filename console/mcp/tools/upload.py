@@ -26,6 +26,7 @@ async def upload(*, action: str, _client: Any, **kw: Any) -> dict:
       - set_targets       {video_id, channel_ids: [int]}      (W)
       - upload_one        {video_id}                          (W destructive async)
       - upload_all        {filter?}                           (W destructive async)
+      - retry_upload      {video_id, upload_id}               (W async)
       - delete_target     {video_id}                          (W destructive)
       - stream_url        {video_id}                          (R)
     """
@@ -73,6 +74,14 @@ async def upload(*, action: str, _client: Any, **kw: Any) -> dict:
                 return await _store.run_once(key=f"upload_all:{idem}", run=run_call_all)
             return await run_call_all()
 
+        if action == "retry_upload":
+            vid = _require(kw, "video_id")
+            uid = _require(kw, "upload_id")
+            return await _confirmed_async(
+                kw, summary=f"retry upload {uid} for youtube video {vid}",
+                task_kind="youtube_upload",
+                run=lambda: _client.post(f"/api/youtube-videos/{vid}/upload/{uid}/retry"),
+            )
         if action == "delete_target":
             vid = _require(kw, "video_id")
             return await _confirmed_destructive(
@@ -141,6 +150,7 @@ def register(server, *, client_factory, audit_sink=None, transport="stdio", acto
     async def _upload(
         action: str,
         video_id: int = None,
+        upload_id: int = None,
         channel_ids: list = None,
         filter: dict = None,
         status: str = None,
@@ -154,7 +164,8 @@ def register(server, *, client_factory, audit_sink=None, transport="stdio", acto
         client = client_factory()
         kw = {k: v for k, v in {
             "action": action,
-            "video_id": video_id, "channel_ids": channel_ids, "filter": filter,
+            "video_id": video_id, "upload_id": upload_id,
+            "channel_ids": channel_ids, "filter": filter,
             "status": status, "niche": niche, "limit": limit, "offset": offset,
             "idempotency_key": idempotency_key,
             "confirm": confirm, "confirm_id": confirm_id,

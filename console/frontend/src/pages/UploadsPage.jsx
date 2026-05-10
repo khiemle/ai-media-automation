@@ -345,6 +345,17 @@ function YouTubeLongSection({ channels }) {
     }
   }
 
+  const handleRetryUpload = async (videoId, uploadId) => {
+    try {
+      await youtubeVideosApi.retryUpload(videoId, uploadId)
+      showToast('Upload retry queued')
+      setVideos(vs => vs.map(v => v.id !== videoId ? v : {
+        ...v,
+        uploads: (v.uploads || []).map(u => u.id !== uploadId ? u : { ...u, status: 'queued', error: null }),
+      }))
+    } catch (e) { showToast(e.message || 'Retry failed', 'error') }
+  }
+
   const handleDelete = async (videoId) => {
     try {
       await youtubeVideosApi.delete(videoId)
@@ -399,6 +410,7 @@ function YouTubeLongSection({ channels }) {
                         {uploads.map(u => (
                           <span
                             key={u.id}
+                            title={u.error || undefined}
                             className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded font-medium ${
                               u.status === 'done'    ? 'bg-[#34d399]/15 text-[#34d399]' :
                               u.status === 'failed'  ? 'bg-[#f87171]/15 text-[#f87171]' :
@@ -411,6 +423,15 @@ function YouTubeLongSection({ channels }) {
                               </svg>
                             )}
                             {u.channel_name || `ch-${u.channel_id}`}
+                            {u.status === 'failed' && (
+                              <button
+                                title="Retry upload"
+                                onClick={(e) => { e.stopPropagation(); handleRetryUpload(v.id, u.id) }}
+                                className="ml-0.5 text-[#f87171] hover:text-[#fca5a5] transition-colors leading-none"
+                              >
+                                ↺
+                              </button>
+                            )}
                           </span>
                         ))}
                       </div>

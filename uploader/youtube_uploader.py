@@ -3,9 +3,21 @@ YouTube Data API v3 uploader.
 Uses OAuth credentials stored (Fernet-encrypted) in the console DB.
 """
 import logging
+import socket
+import time
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+_CHUNK_RETRY_MAX = 10
+_CHUNK_RETRY_BACKOFF_BASE = 2   # seconds, doubles each retry, capped at 60s
+_TRANSIENT_EXCEPTIONS = (
+    TimeoutError,
+    ConnectionError,
+    socket.timeout,
+    socket.error,
+    OSError,
+)
 
 try:
     from googleapiclient.discovery import build
@@ -19,6 +31,7 @@ except ImportError:
     Request = None  # type: ignore[assignment]
 
 CHUNK_SIZE = 10 * 1024 * 1024   # 10MB resumable upload chunks
+SOCKET_TIMEOUT = 300            # 5-minute SSL read timeout per chunk
 
 
 def upload(
@@ -64,7 +77,10 @@ def upload(
         creds.refresh(Request())
         logger.info("[YouTube] Token refreshed")
 
-    youtube = build("youtube", "v3", credentials=creds)
+    import httplib2
+    from google.auth.transport.httplib2 import AuthorizedHttp
+    authed_http = AuthorizedHttp(creds, http=httplib2.Http(timeout=SOCKET_TIMEOUT))
+    youtube = build("youtube", "v3", http=authed_http)
 
     title          = metadata.get("title", video_path.stem)[:100]
     description    = _build_description(metadata)
@@ -104,11 +120,41 @@ def upload(
     )
 
     response = None
+    retry = 0
+    backoff = _CHUNK_RETRY_BACKOFF_BASE
     while response is None:
-        status, response = request.next_chunk()
-        if status:
-            progress = int(status.progress() * 100)
-            logger.info(f"[YouTube] Upload progress: {progress}%")
+        try:
+            status, response = request.next_chunk()
+            if status:
+                progress = int(status.progress() * 100)
+                logger.info(f"[YouTube] Upload progress: {progress}%")
+            retry = 0
+            backoff = _CHUNK_RETRY_BACKOFF_BASE
+        except _TRANSIENT_EXCEPTIONS as exc:
+            if retry >= _CHUNK_RETRY_MAX:
+                raise
+            logger.warning(
+                "[YouTube] Transient error on chunk upload (attempt %d/%d): %s — retrying in %ds",
+                retry + 1, _CHUNK_RETRY_MAX, exc, backoff,
+            )
+            time.sleep(backoff)
+            backoff = min(backoff * 2, 60)
+            retry += 1
+        except Exception as exc:
+            # Re-raise non-transient errors immediately (e.g. 4xx auth failures)
+            error_msg = str(exc).lower()
+            if any(k in error_msg for k in ("timeout", "timed out", "connection", "ssl", "socket")):
+                if retry >= _CHUNK_RETRY_MAX:
+                    raise
+                logger.warning(
+                    "[YouTube] Transient error on chunk upload (attempt %d/%d): %s — retrying in %ds",
+                    retry + 1, _CHUNK_RETRY_MAX, exc, backoff,
+                )
+                time.sleep(backoff)
+                backoff = min(backoff * 2, 60)
+                retry += 1
+            else:
+                raise
 
     video_id = response.get("id", "")
     logger.info(f"[YouTube] Uploaded: https://youtube.com/watch?v={video_id}")
@@ -191,7 +237,10 @@ def set_thumbnail(platform_video_id: str, thumbnail_path: str | Path, credential
         creds.refresh(Request())
         logger.info("[YouTube] Token refreshed for thumbnail set")
 
-    youtube = build("youtube", "v3", credentials=creds)
+    import httplib2
+    from google.auth.transport.httplib2 import AuthorizedHttp
+    authed_http = AuthorizedHttp(creds, http=httplib2.Http(timeout=SOCKET_TIMEOUT))
+    youtube = build("youtube", "v3", http=authed_http)
     media = MediaFileUpload(str(thumbnail_path), mimetype="image/png")
     try:
         youtube.thumbnails().set(videoId=platform_video_id, media_body=media).execute()

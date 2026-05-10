@@ -251,6 +251,9 @@ export const youtubeVideosApi = {
     method: 'POST',
     body: JSON.stringify({ channel_id: channelId }),
   }),
+  retryUpload: (videoId, uploadId) => fetchApi(`/api/youtube-videos/${videoId}/upload/${uploadId}/retry`, {
+    method: 'POST',
+  }),
 
   // ── ASMR / Soundscape render lifecycle ──
   getRenderState: (id) => fetchApi(`/api/youtube-videos/${id}/render/state`),

@@ -440,6 +440,38 @@ class YoutubeVideoService:
         self.db.commit()
         return task.id
 
+    def retry_upload(self, video_id: int, upload_id: int, user_id: int | None = None) -> dict:
+        """Reset a failed or stuck upload record and re-dispatch the Celery task."""
+        v = self.db.get(YoutubeVideo, video_id)
+        if not v:
+            raise KeyError(f"YoutubeVideo {video_id} not found")
+
+        upload = self.db.get(YoutubeVideoUpload, upload_id)
+        if not upload or upload.youtube_video_id != video_id:
+            raise KeyError(f"YoutubeVideoUpload {upload_id} not found for video {video_id}")
+        if upload.status not in ("failed", "uploading", "queued"):
+            raise ValueError(
+                f"Upload {upload_id} has status {upload.status!r}; "
+                f"only failed/uploading/queued uploads can be retried"
+            )
+
+        upload.status = "queued"
+        upload.error = None
+        try:
+            self.db.flush()
+            from console.backend.tasks.youtube_upload_task import upload_youtube_video_task
+            task = upload_youtube_video_task.delay(video_id, upload.channel_id, upload.id)
+            upload.celery_task_id = task.id
+            _audit(self.db, user_id, "retry_upload", "youtube_video_upload", str(upload_id),
+                   {"video_id": video_id, "channel_id": upload.channel_id})
+            self.db.commit()
+            self.db.refresh(upload)
+        except Exception:
+            self.db.rollback()
+            raise
+
+        return {"task_id": task.id, "upload_id": upload.id, "status": "queued"}
+
     def queue_upload(self, video_id: int, channel_id: int) -> dict:
         """Create a YoutubeVideoUpload record and dispatch the upload Celery task."""
         v = self.db.get(YoutubeVideo, video_id)
