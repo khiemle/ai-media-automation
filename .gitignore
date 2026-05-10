@@ -40,8 +40,14 @@ console/frontend/.vite/
 .vscode/
 .idea/
 
-# Claude Code
-.claude/
+# Claude Code — ignore machine-local state, but track project-scoped skills/commands
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+.claude/projects/
+.claude/conversations/
+.claude/cache/
+# `*-workspace/` directories are scratch space from the writing-skills tool
+.claude/skills/*-workspace/
 /assets
 models/kokoro/kokoro.onnx
 models/kokoro/voices
