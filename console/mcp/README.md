@@ -64,6 +64,69 @@ python -m console.mcp.scripts.mint_token --days 90
 
 ---
 
+## Docker quickstart
+
+Run the MCP server in a slim Docker image instead of as host Python.
+This is the recommended setup for clients (operators) — it keeps the
+project's full Python pipeline off their machines.
+
+### One-time setup
+
+1. **Build the image and provision a token.** From the project root:
+
+   ```bash
+   ./console/mcp/scripts/mcp-image.sh
+   ```
+
+   Before running, mint a service token in the console UI:
+   - Log in as admin → System tab → MCP Service Token card → Generate Token → Copy command.
+   - The full `claude mcp add ...` command is now on your clipboard.
+
+   The script:
+   - Builds `ai-media-console-mcp:latest` from `Dockerfile.mcp`.
+   - Reads the pasted command (clipboard on macOS, stdin elsewhere).
+   - Rewrites `localhost` / `127.0.0.1` to `host.docker.internal` so the
+     container can reach the host's FastAPI.
+   - Writes `~/.mcp/ai-media-console.env` (mode 0600).
+   - Smoke-tests the container via `docker run --rm ... --self-test`.
+   - Prints a docker-flavored `claude mcp add` snippet.
+
+2. **Register with Claude Code.** Paste the printed snippet, then
+   restart Claude.
+
+### Token rotation
+
+```bash
+# Mint a fresh token in the UI, copy command, then:
+./console/mcp/scripts/mcp-image.sh --token-only
+```
+
+Image stays put; only `~/.mcp/ai-media-console.env` is rewritten.
+
+### Other flags
+
+| Flag | Effect |
+|---|---|
+| `--build-only` | Build image; skip token + smoke. |
+| `--token-only` | Skip build; only ingest token + smoke. |
+| `--no-smoke-test` | Skip the post-write smoke test. |
+| `--from-clipboard` / `--stdin` | Force a specific input source. |
+| `--env-file PATH` | Override the env-file path. |
+| `--image-tag TAG` | Override the image tag. |
+
+### Troubleshooting
+
+- **"docker not on PATH" / "daemon not responding"** — install / start
+  Docker Desktop and retry.
+- **Smoke test fails with 401** — token expired or `JWT_SECRET` rotated;
+  re-mint in the System tab.
+- **Smoke test fails with connection error** — the container can't reach
+  the backend. If your backend is on the host, the script rewrote the
+  base URL; verify your FastAPI is actually listening. If your backend
+  is on the LAN, verify the IP is reachable from inside Docker.
+
+---
+
 ## Connecting to a remote backend
 
 Run MCP locally on your Mac but route every tool call to a remote FastAPI
