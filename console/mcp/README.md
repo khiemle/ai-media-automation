@@ -72,15 +72,15 @@ project's full Python pipeline off their machines.
 
 ### One-time setup
 
-1. **Build the image and provision a token.** From the project root:
+1. **Mint a service token in the console UI.** Log in as admin → System
+   tab → MCP Service Token card → Generate Token → **Copy command**.
+   The full `claude mcp add ...` command is now on your clipboard.
+
+2. **Build the image and provision the token.** From the project root:
 
    ```bash
    ./console/mcp/scripts/mcp-image.sh
    ```
-
-   Before running, mint a service token in the console UI:
-   - Log in as admin → System tab → MCP Service Token card → Generate Token → Copy command.
-   - The full `claude mcp add ...` command is now on your clipboard.
 
    The script:
    - Builds `ai-media-console-mcp:latest` from `Dockerfile.mcp`.
@@ -91,7 +91,7 @@ project's full Python pipeline off their machines.
    - Smoke-tests the container via `docker run --rm ... --self-test`.
    - Prints a docker-flavored `claude mcp add` snippet.
 
-2. **Register with Claude Code.** Paste the printed snippet, then
+3. **Register with Claude Code.** Paste the printed snippet, then
    restart Claude.
 
 ### Token rotation
