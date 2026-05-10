@@ -15,7 +15,7 @@ from console.backend.models.video_asset import VideoAsset  # noqa: F401 — regi
 from console.backend.models.video_template import VideoTemplate  # noqa: F401 — registers video_templates FK target
 from console.backend.models.youtube_video import YoutubeVideo
 from console.backend.models.youtube_video_upload import YoutubeVideoUpload
-from uploader.youtube_uploader import set_thumbnail, upload_to_youtube
+from uploader.youtube_uploader import set_thumbnail, upload as _youtube_upload
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +72,9 @@ def upload_youtube_video_task(self, youtube_video_id: int, channel_id: int, uplo
             "privacy_status": "unlisted",
         }
 
-        platform_id = upload_to_youtube(video.output_path, video_meta, credentials_dict)
+        from console.backend.services.youtube_video_service import YoutubeVideoService
+        chapters = YoutubeVideoService(db).build_chapters(video)
+        platform_id = _youtube_upload(video.output_path, video_meta, credentials_dict, chapters=chapters)
 
         if video.thumbnail_path:
             try:

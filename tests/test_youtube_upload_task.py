@@ -45,10 +45,13 @@ def _make_db():
 def test_upload_task_sets_uploading_then_done():
     db, video, channel, cred, upload = _make_db()
 
-    with patch("console.backend.tasks.youtube_upload_task.SessionLocal", return_value=db), \
-         patch("console.backend.config.settings") as mock_settings, \
-         patch("console.backend.tasks.youtube_upload_task.Fernet") as mock_fernet_cls, \
-         patch("console.backend.tasks.youtube_upload_task.upload_to_youtube", return_value="yt_xyz"):
+    with (
+        patch("console.backend.tasks.youtube_upload_task.SessionLocal", return_value=db),
+        patch("console.backend.config.settings") as mock_settings,
+        patch("console.backend.tasks.youtube_upload_task.Fernet") as mock_fernet_cls,
+        patch("console.backend.tasks.youtube_upload_task._youtube_upload", return_value="yt_xyz"),
+        patch("console.backend.services.youtube_video_service.YoutubeVideoService.build_chapters", return_value=None),
+    ):
         mock_settings.FERNET_KEY = "a" * 44  # valid base64 length for Fernet
         mock_fernet_cls.return_value.decrypt.return_value = b"decrypted"
 
@@ -64,10 +67,13 @@ def test_upload_task_sets_uploading_then_done():
 def test_upload_task_sets_failed_on_error():
     db, video, channel, cred, upload = _make_db()
 
-    with patch("console.backend.tasks.youtube_upload_task.SessionLocal", return_value=db), \
-         patch("console.backend.config.settings") as mock_settings, \
-         patch("console.backend.tasks.youtube_upload_task.Fernet") as mock_fernet_cls, \
-         patch("console.backend.tasks.youtube_upload_task.upload_to_youtube", side_effect=RuntimeError("API error")):
+    with (
+        patch("console.backend.tasks.youtube_upload_task.SessionLocal", return_value=db),
+        patch("console.backend.config.settings") as mock_settings,
+        patch("console.backend.tasks.youtube_upload_task.Fernet") as mock_fernet_cls,
+        patch("console.backend.tasks.youtube_upload_task._youtube_upload", side_effect=RuntimeError("API error")),
+        patch("console.backend.services.youtube_video_service.YoutubeVideoService.build_chapters", return_value=None),
+    ):
         mock_settings.FERNET_KEY = "a" * 44
         mock_fernet_cls.return_value.decrypt.return_value = b"decrypted"
 
@@ -88,11 +94,14 @@ def test_upload_task_calls_set_thumbnail_when_path_set():
     db, video, channel, cred, upload = _make_db()
     video.thumbnail_path = "/assets/thumbnails/generated/yt_1.png"
 
-    with patch("console.backend.tasks.youtube_upload_task.SessionLocal", return_value=db), \
-         patch("console.backend.config.settings") as mock_settings, \
-         patch("console.backend.tasks.youtube_upload_task.Fernet") as mock_fernet_cls, \
-         patch("console.backend.tasks.youtube_upload_task.upload_to_youtube", return_value="yt_xyz"), \
-         patch("console.backend.tasks.youtube_upload_task.set_thumbnail") as mock_set_thumb:
+    with (
+        patch("console.backend.tasks.youtube_upload_task.SessionLocal", return_value=db),
+        patch("console.backend.config.settings") as mock_settings,
+        patch("console.backend.tasks.youtube_upload_task.Fernet") as mock_fernet_cls,
+        patch("console.backend.tasks.youtube_upload_task._youtube_upload", return_value="yt_xyz"),
+        patch("console.backend.services.youtube_video_service.YoutubeVideoService.build_chapters", return_value=None),
+        patch("console.backend.tasks.youtube_upload_task.set_thumbnail") as mock_set_thumb,
+    ):
         mock_settings.FERNET_KEY = "a" * 44
         mock_fernet_cls.return_value.decrypt.return_value = b"decrypted"
 
@@ -109,11 +118,14 @@ def test_upload_task_skips_set_thumbnail_when_no_path():
     db, video, channel, cred, upload = _make_db()
     video.thumbnail_path = None
 
-    with patch("console.backend.tasks.youtube_upload_task.SessionLocal", return_value=db), \
-         patch("console.backend.config.settings") as mock_settings, \
-         patch("console.backend.tasks.youtube_upload_task.Fernet") as mock_fernet_cls, \
-         patch("console.backend.tasks.youtube_upload_task.upload_to_youtube", return_value="yt_xyz"), \
-         patch("console.backend.tasks.youtube_upload_task.set_thumbnail") as mock_set_thumb:
+    with (
+        patch("console.backend.tasks.youtube_upload_task.SessionLocal", return_value=db),
+        patch("console.backend.config.settings") as mock_settings,
+        patch("console.backend.tasks.youtube_upload_task.Fernet") as mock_fernet_cls,
+        patch("console.backend.tasks.youtube_upload_task._youtube_upload", return_value="yt_xyz"),
+        patch("console.backend.services.youtube_video_service.YoutubeVideoService.build_chapters", return_value=None),
+        patch("console.backend.tasks.youtube_upload_task.set_thumbnail") as mock_set_thumb,
+    ):
         mock_settings.FERNET_KEY = "a" * 44
         mock_fernet_cls.return_value.decrypt.return_value = b"decrypted"
 
@@ -127,11 +139,14 @@ def test_upload_task_thumbnail_failure_does_not_fail_upload():
     db, video, channel, cred, upload = _make_db()
     video.thumbnail_path = "/assets/thumbnails/generated/yt_1.png"
 
-    with patch("console.backend.tasks.youtube_upload_task.SessionLocal", return_value=db), \
-         patch("console.backend.config.settings") as mock_settings, \
-         patch("console.backend.tasks.youtube_upload_task.Fernet") as mock_fernet_cls, \
-         patch("console.backend.tasks.youtube_upload_task.upload_to_youtube", return_value="yt_xyz"), \
-         patch("console.backend.tasks.youtube_upload_task.set_thumbnail", side_effect=RuntimeError("API error")):
+    with (
+        patch("console.backend.tasks.youtube_upload_task.SessionLocal", return_value=db),
+        patch("console.backend.config.settings") as mock_settings,
+        patch("console.backend.tasks.youtube_upload_task.Fernet") as mock_fernet_cls,
+        patch("console.backend.tasks.youtube_upload_task._youtube_upload", return_value="yt_xyz"),
+        patch("console.backend.services.youtube_video_service.YoutubeVideoService.build_chapters", return_value=None),
+        patch("console.backend.tasks.youtube_upload_task.set_thumbnail", side_effect=RuntimeError("API error")),
+    ):
         mock_settings.FERNET_KEY = "a" * 44
         mock_fernet_cls.return_value.decrypt.return_value = b"decrypted"
 
