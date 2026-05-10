@@ -13,7 +13,7 @@ Drive the full create-render-upload pipeline of a YouTube video using the
 working/<slug>/
 ├── json/
 │   ├── *music.json    (or *suno.json — filename suffix varies)
-│   ├── *sfx.json
+│   ├── *visual.json
 │   └── *seo.json
 └── (no media files pre-staged — agent asks for paths at runtime)
 ```
@@ -62,7 +62,7 @@ If neither is present, the JSON is invalid — ask the user.
 
 ---
 
-### `*sfx.json` — all four layers
+### `*visual.json` — all four layers
 
 Required field: `sfx` (top-level key). Everything else is optional but
 the schema below is what the parser expects.
@@ -185,7 +185,7 @@ auto-complete any step that requires user input.
 Use glob patterns to find each file:
 
 - Music JSON: `working/<slug>/json/*music.json` OR `working/<slug>/json/*suno.json`
-- SFX JSON:   `working/<slug>/json/*sfx.json`
+- Visual JSON:   `working/<slug>/json/*visual.json`
 - SEO JSON:   `working/<slug>/json/*seo.json`
 
 For each pattern:
@@ -201,7 +201,7 @@ to provide file paths. Do not abort silently.
 **Music JSON validation** — must satisfy: `parsed.composer` exists OR `parsed.suno.style_of_music` exists.
 If neither is present, use `AskUserQuestion` to report the problem and ask how to proceed.
 
-**SFX JSON validation** — must have a top-level `sfx` key.
+**Visual JSON validation** — must have a top-level `sfx` key.
 If missing, use `AskUserQuestion`.
 
 **SEO JSON validation** — must have `titles.recommended` OR `description.full`.
@@ -229,9 +229,9 @@ Call:
 visual_asset(
   action="upload",
   file_path=<absolute visual_path>,
-  title=<sfx.json:meta.title if present, else ask user>,
-  niche=<sfx.json:meta.theme if present, else ask user>,
-  keywords=<list from sfx.json:meta.theme split by "-" if present, else []>,
+  title=<visual.json:meta.title if present, else ask user>,
+  niche=<visual.json:meta.theme if present, else ask user>,
+  keywords=<list from visual.json:meta.theme split by "-" if present, else []>,
   asset_type="video",
   confirm=true
 )
@@ -310,11 +310,11 @@ Poll every 10 seconds. The task result states are: `PENDING`, `PROGRESS`,
 
 ---
 
-## Step 5 — Generate SFX assets (if sfx.json is present)
+## Step 5 — Generate SFX assets (if visual.json is present)
 
-Skip this step entirely if no SFX JSON was found.
+Skip this step entirely if no Visual JSON was found.
 
-### 5a. Flatten SFX items from sfx.json
+### 5a. Flatten SFX items from visual.json
 
 Replicate `collectSfxItems()` exactly. Process in this order:
 
@@ -400,7 +400,7 @@ sound_layers automation pool entry — see 5c).
 If any item fails (`ok=false`): show the error and use `AskUserQuestion`
 to ask whether to retry, skip this item, or abort.
 
-Do not invent prompts. Generate exactly the items defined in sfx.json,
+Do not invent prompts. Generate exactly the items defined in visual.json,
 using `english_prompt` verbatim.
 
 ### 5c. Assemble sound_layers
@@ -478,27 +478,27 @@ target_duration_h = seoJson.meta.video_length_hours   (or null)
 theme             = null  (seo.json does not carry theme)
 ```
 
-**Else if sfx.json is present** — use `extractSeoFromSfxJson()` mapping:
+**Else if visual.json is present** — use `extractSeoFromSfxJson()` mapping:
 ```
-theme             = sfxJson.meta.theme  (or null)
-target_duration_h = sfxJson.meta.video_length_hours  (or null)
-seo_title         = sfxJson.meta.title  (or null)
+theme             = visualJson.meta.theme  (or null)
+target_duration_h = visualJson.meta.video_length_hours  (or null)
+seo_title         = visualJson.meta.title  (or null)
 
 seo_description: Join non-empty parts with ". ":
-  - sfxJson.scene.pov
-  - sfxJson.scene.time_of_day + ", " + sfxJson.scene.weather  (only if either is present)
-  - sfxJson.scene.atmosphere
+  - visualJson.scene.pov
+  - visualJson.scene.time_of_day + ", " + visualJson.scene.weather  (only if either is present)
+  - visualJson.scene.atmosphere
   Strip trailing dots, then add a single trailing "." 
   (or null if no scene fields present)
 
 seo_tags: Collect and deduplicate, lowercase, trimmed:
-  - sfxJson.meta.theme split by "-", keep only tokens longer than 2 chars
-  - sfxJson.meta.use_case
-  - sfxJson.meta.channel
+  - visualJson.meta.theme split by "-", keep only tokens longer than 2 chars
+  - visualJson.meta.use_case
+  - visualJson.meta.channel
   Join with ", "  (or null if all empty)
 ```
 
-**Else (neither seo.json nor sfx.json)** — use `AskUserQuestion` to ask the user for:
+**Else (neither seo.json nor visual.json)** — use `AskUserQuestion` to ask the user for:
 - seo_title (required)
 - seo_description
 - seo_tags (comma-separated)
@@ -710,7 +710,7 @@ When all steps succeed, summarize:
    and use its output.
 
 3. **Do not invent SFX prompts.** Generate exactly the items defined in
-   sfx.json using `english_prompt` verbatim. Skipping `automation_only` items
+   visual.json using `english_prompt` verbatim. Skipping `automation_only` items
    is correct — do not generate assets for them.
 
 4. **Do not use `music(action="generate")`.** That is the Suno/Lyria path.

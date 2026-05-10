@@ -1,6 +1,6 @@
 ---
 name: make-youtube-video
-description: Drive the full end-to-end "create a YouTube video" pipeline of the AI Media Console using the ai-media-console MCP server. Reads three template JSON files (`*music.json`, `*sfx.json`, `*seo.json`) from `working/<slug>/json/`, uploads a user-provided visual video and thumbnail image, generates ElevenLabs music + layered SFX, assembles sound layers, creates the YouTube video record, and walks through the audio-preview → video-preview → final-render → upload sequence with explicit user confirmation at each destructive step. Use when the user asks to "make a youtube video", "build a youtube video from json", "import template and produce a video", "render a relax/ambient/asmr video end to end", "push my [theme] video to youtube", "run the make-video workflow", or any phrasing that means "take my JSON templates and produce + publish a finished YouTube video via the console". Strongly prefer over manually orchestrating the underlying MCP tools — this skill encodes the choreography, the field-name correctness (sound_layers vs sfx_overrides, channel_ids vs channels, idea vs prompt), and the render-gate ordering that's easy to get wrong by hand.
+description: Drive the full end-to-end "create a YouTube video" pipeline of the AI Media Console using the ai-media-console MCP server. Reads three template JSON files (`*music.json`, `*visual.json`, `*seo.json`) from `working/<slug>/json/`, uploads a user-provided visual video and thumbnail image, generates ElevenLabs music + layered SFX, assembles sound layers, creates the YouTube video record, and walks through the audio-preview → video-preview → final-render → upload sequence with explicit user confirmation at each destructive step. Use when the user asks to "make a youtube video", "build a youtube video from json", "import template and produce a video", "render a relax/ambient/asmr video end to end", "push my [theme] video to youtube", "run the make-video workflow", or any phrasing that means "take my JSON templates and produce + publish a finished YouTube video via the console". Strongly prefer over manually orchestrating the underlying MCP tools — this skill encodes the choreography, the field-name correctness (sound_layers vs sfx_overrides, channel_ids vs channels, idea vs prompt), and the render-gate ordering that's easy to get wrong by hand.
 ---
 
 # Make YouTube Video — End-to-End Workflow
@@ -38,7 +38,7 @@ source of truth — do not summarize, paraphrase, or skip steps.
 ## What the workflow does (high-level summary)
 
 ```
-1. Glob `working/<slug>/json/*music.json`, `*sfx.json`, `*seo.json`
+1. Glob `working/<slug>/json/*music.json`, `*visual.json`, `*seo.json`
    — disambiguate via AskUserQuestion if multiple/zero matches
 2. Validate each JSON (parseMusicJson / parseSfxJson / parseSeoJson rules)
 3. AskUserQuestion for visual.mp4 path and thumbnail.jpg path
@@ -48,7 +48,7 @@ source of truth — do not summarize, paraphrase, or skip steps.
    - music(action="elevenlabs_plan", input=..., music_length_ms=600000)
    - music(action="elevenlabs_compose", composition_plan=..., title=..., confirm=true)
    - Poll task_status until SUCCESS, capture result.track_id
-6. If sfx.json present:
+6. If visual.json present:
    - Flatten sfx.{background, midground, foreground, random_sfx} via collectSfxItems
    - For each non-automation_only item: sfx(action="generate", text=..., loop=..., title=..., confirm=true)
    - Build `sound_layers` dict with per-layer volumes (bg 0.4, mid 0.5, fg 0.7, random 0.6)
