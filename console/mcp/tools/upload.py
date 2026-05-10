@@ -144,7 +144,7 @@ def register(server, *, client_factory, audit_sink=None, transport="stdio", acto
         offset: int = None,
         idempotency_key: str = None,
         confirm: bool = False,
-        confirm_id: Any = None,
+        confirm_id: int = None,
     ) -> dict:
         client = client_factory()
         kw = {k: v for k, v in {

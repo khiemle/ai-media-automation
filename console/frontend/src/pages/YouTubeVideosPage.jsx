@@ -1862,7 +1862,7 @@ function RegenerateThumbnailModal({ video, onClose, onDone }) {
   }
 
   return (
-    <Modal title="Regenerate Thumbnail" onClose={onClose}>
+    <Modal open title="Regenerate Thumbnail" onClose={onClose}>
       {toast && (
         <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />
       )}
