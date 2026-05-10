@@ -247,3 +247,55 @@ def render_bottom_bar_png(
 
     img.save(out, "PNG")
     return str(out)
+
+
+def _playlist_cache_key(tracks: list) -> str:
+    """Hash the ordered (id, title) list so cache invalidates on rename."""
+    h = hashlib.sha1()
+    for t in tracks:
+        tid = getattr(t, "id", "?")
+        title = (t.title or "").strip()
+        h.update(f"{tid}|{title}\n".encode("utf-8"))
+    return h.hexdigest()[:12]
+
+
+_RENDERERS = {
+    "chip":       render_chip_png,
+    "sidebar":    render_sidebar_png,
+    "bottom_bar": render_bottom_bar_png,
+}
+
+
+def build_now_playing_overlay(
+    video,
+    tracks: list,
+    boundaries: list[float],
+    total_duration_s: float,
+    output_dir: Path,
+    canvas_w: int = 1920,
+    canvas_h: int = 1080,
+) -> list[OverlaySegment]:
+    """Build one OverlaySegment per track using video.playlist_overlay_style.
+
+    Returns [] if style is None or fewer than 2 tracks (no overlay needed).
+    """
+    style = getattr(video, "playlist_overlay_style", None)
+    if not style or len(tracks) < 2:
+        return []
+    renderer = _RENDERERS.get(style)
+    if renderer is None:
+        raise ValueError(f"Unknown overlay style: {style}")
+
+    cache_key = _playlist_cache_key(tracks)
+    segments: list[OverlaySegment] = []
+    for i in range(len(tracks)):
+        start = boundaries[i]
+        end   = boundaries[i + 1] if i + 1 < len(tracks) else total_duration_s
+        png   = renderer(
+            tracks=tracks, current_index=i,
+            output_dir=Path(output_dir),
+            canvas_w=canvas_w, canvas_h=canvas_h,
+            cache_key=cache_key,
+        )
+        segments.append(OverlaySegment(png_path=png, start_s=start, end_s=end))
+    return segments

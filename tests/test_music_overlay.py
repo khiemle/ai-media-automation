@@ -81,3 +81,70 @@ def test_bottom_bar_long_title_truncates(tmp_path):
     tracks = [FakeTrackWithDuration("A" * 100, 60.0)]
     out = render_bottom_bar_png(tracks, 0, tmp_path, 1920, 1080, "b2")
     assert Path(out).is_file()
+
+
+from pipeline.music_overlay import build_now_playing_overlay
+
+
+class FakeVideo:
+    def __init__(self, style):
+        self.playlist_overlay_style = style
+
+
+def test_orchestrator_returns_segment_per_track(tmp_path):
+    tracks = [FakeTrackWithDuration(f"T{i}", 60.0) for i in range(3)]
+    boundaries = [0.0, 60.0, 120.0]
+    video = FakeVideo("chip")
+    segs = build_now_playing_overlay(
+        video=video, tracks=tracks, boundaries=boundaries,
+        total_duration_s=180.0, output_dir=tmp_path,
+        canvas_w=1920, canvas_h=1080,
+    )
+    assert len(segs) == 3
+    assert segs[0].start_s == 0.0
+    assert segs[0].end_s == 60.0
+    assert segs[1].start_s == 60.0
+    assert segs[1].end_s == 120.0
+    assert segs[2].start_s == 120.0
+    assert segs[2].end_s == 180.0
+    for seg in segs:
+        assert Path(seg.png_path).is_file()
+
+
+def test_orchestrator_returns_empty_for_no_style(tmp_path):
+    tracks = [FakeTrackWithDuration("T", 60.0) for _ in range(3)]
+    video = FakeVideo(None)
+    segs = build_now_playing_overlay(
+        video=video, tracks=tracks, boundaries=[0.0, 60.0, 120.0],
+        total_duration_s=180.0, output_dir=tmp_path,
+        canvas_w=1920, canvas_h=1080,
+    )
+    assert segs == []
+
+
+def test_orchestrator_returns_empty_for_single_track(tmp_path):
+    tracks = [FakeTrackWithDuration("T", 60.0)]
+    video = FakeVideo("chip")
+    segs = build_now_playing_overlay(
+        video=video, tracks=tracks, boundaries=[0.0],
+        total_duration_s=60.0, output_dir=tmp_path,
+        canvas_w=1920, canvas_h=1080,
+    )
+    assert segs == []
+
+
+def test_cache_key_invalidates_on_title_change(tmp_path):
+    tracks_v1 = [FakeTrackWithDuration("Original", 60.0),
+                 FakeTrackWithDuration("Two", 60.0),
+                 FakeTrackWithDuration("Three", 60.0)]
+    tracks_v2 = [FakeTrackWithDuration("Renamed", 60.0),
+                 FakeTrackWithDuration("Two", 60.0),
+                 FakeTrackWithDuration("Three", 60.0)]
+    video = FakeVideo("chip")
+    segs1 = build_now_playing_overlay(
+        video, tracks_v1, [0.0, 60.0, 120.0], 180.0, tmp_path, 1920, 1080
+    )
+    segs2 = build_now_playing_overlay(
+        video, tracks_v2, [0.0, 60.0, 120.0], 180.0, tmp_path, 1920, 1080
+    )
+    assert segs1[0].png_path != segs2[0].png_path
