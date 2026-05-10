@@ -58,3 +58,26 @@ def test_sidebar_handles_long_playlist(tmp_path):
     tracks = [FakeTrack(f"Track {i}") for i in range(20)]
     out = render_sidebar_png(tracks, 10, tmp_path, 1920, 1080, "s3")
     assert Path(out).is_file()
+
+
+from pipeline.music_overlay import render_bottom_bar_png
+
+
+class FakeTrackWithDuration:
+    def __init__(self, title, duration_s):
+        self.title = title
+        self.duration_s = duration_s
+
+
+def test_bottom_bar_full_canvas_rgba(tmp_path):
+    tracks = [FakeTrackWithDuration(f"Track {i}", 60.0) for i in range(3)]
+    out = render_bottom_bar_png(tracks, 1, tmp_path, 1920, 1080, "b1")
+    img = Image.open(out)
+    assert img.size == (1920, 1080)
+    assert img.mode == "RGBA"
+
+
+def test_bottom_bar_long_title_truncates(tmp_path):
+    tracks = [FakeTrackWithDuration("A" * 100, 60.0)]
+    out = render_bottom_bar_png(tracks, 0, tmp_path, 1920, 1080, "b2")
+    assert Path(out).is_file()

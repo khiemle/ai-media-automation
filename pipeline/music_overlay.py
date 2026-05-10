@@ -192,3 +192,58 @@ def render_sidebar_png(
 
     img.save(out, "PNG")
     return str(out)
+
+
+def _fmt_mmss(seconds: float) -> str:
+    s = int(round(seconds))
+    m, s = divmod(s, 60)
+    if m >= 60:
+        h, m = divmod(m, 60)
+        return f"{h}:{m:02d}:{s:02d}"
+    return f"{m}:{s:02d}"
+
+
+def render_bottom_bar_png(
+    tracks: list, current_index: int,
+    output_dir: Path, canvas_w: int, canvas_h: int,
+    cache_key: str,
+) -> str:
+    """Bottom-center bar showing 'Track i/n · Title · MM:SS'."""
+    out = Path(output_dir) / f"overlay_bottom_bar_{current_index}_{cache_key}.png"
+    if out.is_file():
+        return str(out)
+
+    img = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+
+    track = tracks[current_index]
+    title = _truncate(track.title or f"Track {current_index+1}", 50)
+    duration = _fmt_mmss(track.duration_s)
+    label = f"Track {current_index + 1} / {len(tracks)}   ·   {title}   ·   {duration}"
+    font = _load_font(22)
+
+    bar_w = int(canvas_w * 0.60)
+    pad_x, pad_y = 24, 16
+
+    bbox = draw.textbbox((0, 0), label, font=font)
+    text_w = bbox[2] - bbox[0]
+    text_h = bbox[3] - bbox[1]
+    bar_h = text_h + pad_y * 2
+
+    margin_y = int(canvas_h * 0.06)
+    x = (canvas_w - bar_w) // 2
+    y = canvas_h - margin_y - bar_h
+
+    draw.rounded_rectangle(
+        (x, y, x + bar_w, y + bar_h),
+        radius=6,
+        fill=(8, 10, 20, int(0.55 * 255)),
+        outline=(255, 255, 255, int(0.08 * 255)),
+        width=1,
+    )
+    tx = x + (bar_w - text_w) // 2 - bbox[0]
+    ty = y + (bar_h - text_h) // 2 - bbox[1]
+    draw.text((tx, ty), label, font=font, fill=(232, 232, 240, 255))
+
+    img.save(out, "PNG")
+    return str(out)
