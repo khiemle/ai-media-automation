@@ -284,6 +284,10 @@ class YoutubeVideoService:
         if not template:
             raise ValueError(f"Template {template_id} not found")
 
+        # Validate music-template-specific constraints before any writes
+        data = self._validate_music_template(data, template)
+        data.pop("_field_warnings", None)  # internal validator marker, don't pass to ORM
+
         # Default skip_previews=False for asmr/soundscape templates (preview flow opt-in by default)
         skip_previews = data.get("skip_previews")
         if skip_previews is None:
@@ -336,6 +340,53 @@ class YoutubeVideoService:
             self.db.rollback()
             raise
         return _video_to_dict(video)
+
+    def _validate_music_template(self, data: dict, template) -> dict:
+        """Reject music-template-incompatible fields, normalize single-track overlay.
+
+        Returns the (possibly mutated) data dict. May add `_field_warnings` key
+        listing soft warnings that the response will surface.
+        """
+        if template.slug != "music":
+            return data
+        warnings: list[str] = []
+
+        if data.get("target_duration_h") is not None:
+            raise ValueError(
+                "music template derives duration from tracks; remove target_duration_h"
+            )
+        if data.get("black_from_seconds") is not None:
+            raise ValueError("music template does not support blackout")
+        for field in ("sound_layers", "sfx_overrides", "sfx_pool"):
+            if data.get(field):
+                raise ValueError("music template does not support SFX layers")
+
+        track_ids = data.get("music_track_ids") or []
+        if not track_ids and not data.get("music_track_id"):
+            raise ValueError("music template requires at least 1 music track")
+
+        # Single-track → null the overlay style silently, with warning
+        effective_count = len(track_ids) if track_ids else 1
+        if effective_count < 2 and data.get("playlist_overlay_style"):
+            warnings.append("overlay hidden for single-track playlists")
+            data = {**data, "playlist_overlay_style": None}
+
+        # Crossfade safety: must be < half the shortest track
+        if data.get("track_transition") == "crossfade" and track_ids:
+            rows = self.db.query(MusicTrack).filter(MusicTrack.id.in_(track_ids)).all()
+            durations = [r.duration_s for r in rows if r.duration_s]
+            if durations:
+                shortest = min(durations)
+                xfade = float(data.get("track_transition_seconds") or 2.0)
+                if xfade > shortest / 2:
+                    raise ValueError(
+                        f"crossfade ({xfade}s) exceeds half the shortest "
+                        f"track duration ({shortest}s)"
+                    )
+
+        if warnings:
+            data = {**data, "_field_warnings": warnings}
+        return data
 
     def _validate_visual_playlist(self, data: dict) -> list[float] | None:
         """Validate visual playlist fields. Returns the normalized durations array if rewritten, else None.
@@ -412,6 +463,25 @@ class YoutubeVideoService:
                 f"Video in status {v.status!r} cannot be edited "
                 f"(allowed: {sorted(self.EDITABLE_STATUSES)})"
             )
+
+        # Validate music-template-specific constraints BEFORE any writes
+        template = self.db.get(VideoTemplate, v.template_id)
+        if template and template.slug == "music":
+            # For partial updates, merge update data with existing video state so that
+            # single-track-overlay and crossfade checks can see the effective track list.
+            effective_data = {
+                "music_track_ids": list(v.music_track_ids or []),
+                "music_track_id": v.music_track_id,
+                "track_transition": v.track_transition,
+                "track_transition_seconds": v.track_transition_seconds,
+                "playlist_overlay_style": v.playlist_overlay_style,
+            }
+            effective_data.update(data)
+            validated = self._validate_music_template(effective_data, template)
+            validated.pop("_field_warnings", None)  # internal validator marker, don't pass to ORM
+            # If overlay was silently nulled, propagate that into the update payload
+            if validated.get("playlist_overlay_style") != effective_data.get("playlist_overlay_style"):
+                data = {**data, "playlist_overlay_style": validated["playlist_overlay_style"]}
 
         # Validate visual playlist BEFORE any writes
         playlist_validation = self._validate_visual_playlist(data)
