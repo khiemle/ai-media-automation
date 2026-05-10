@@ -177,20 +177,20 @@ def _compute_music_total_duration(tracks, transition, transition_s) -> tuple[flo
     boundaries = [0.0]
     if transition == 'gapless' or len(tracks) == 1:
         for t in tracks[:-1]:
-            boundaries.append(boundaries[-1] + t.duration_seconds)
-        total = boundaries[-1] + tracks[-1].duration_seconds
+            boundaries.append(boundaries[-1] + t.duration_s)
+        total = boundaries[-1] + tracks[-1].duration_s
     elif transition == 'crossfade':
         for t in tracks[:-1]:
-            boundaries.append(boundaries[-1] + t.duration_seconds - transition_s)
-        total = boundaries[-1] + tracks[-1].duration_seconds
+            boundaries.append(boundaries[-1] + t.duration_s - transition_s)
+        total = boundaries[-1] + tracks[-1].duration_s
     elif transition == 'gap':
         for t in tracks[:-1]:
-            boundaries.append(boundaries[-1] + t.duration_seconds + transition_s)
-        total = boundaries[-1] + tracks[-1].duration_seconds
+            boundaries.append(boundaries[-1] + t.duration_s + transition_s)
+        total = boundaries[-1] + tracks[-1].duration_s
     return total, boundaries
 ```
 
-If a `MusicTrack.duration_seconds` is null at render time, the service runs `ffprobe` once and persists the value. A second null on the same track is a hard render error.
+If a `MusicTrack.duration_s` is null at render time, the service runs `ffprobe` once and persists the value. A second null on the same track is a hard render error.
 
 ### Audio assembly
 
@@ -463,7 +463,7 @@ Reuses the existing visual asset picker (single asset or `visual_asset_ids` play
 | `sound_layers` / `sfx_overrides` / `sfx_pool` set on music template | 400, "music template does not support SFX layers" |
 | `playlist_overlay_style` set with 1 track | Silently null it, return `field_warnings` |
 | `crossfade` with `transition_seconds > shortest_track / 2` | 400, "crossfade exceeds half the shortest track duration" |
-| `MusicTrack.duration_seconds` null at render time | Service runs ffprobe + persists; second null = render error |
+| `MusicTrack.duration_s` null at render time | Service runs ffprobe + persists; second null = render error |
 | Spectrum + overlay + >4h video | Soft warning in API response, no block |
 
 ### Render task
