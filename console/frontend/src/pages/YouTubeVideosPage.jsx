@@ -9,6 +9,10 @@ import SoundLayersEditor from '../components/SoundLayersEditor.jsx'
 import VisualPlaylistEditor from '../components/VisualPlaylistEditor.jsx'
 import { useRenderWebSocket } from '../hooks/useRenderWebSocket.js'
 import PreviewPlayer from '../components/PreviewPlayer.jsx'
+import { MusicPlaylistPicker } from '../components/MusicPlaylistPicker.jsx'
+import { TransitionPanel } from '../components/TransitionPanel.jsx'
+import { OverlayStylePicker } from '../components/OverlayStylePicker.jsx'
+import { SpectrumPanel } from '../components/SpectrumPanel.jsx'
 
 const ACTIVE_RENDER_STATES = new Set([
   'audio_preview_rendering',
@@ -978,10 +982,21 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
   const [blackFromSeconds, setBlackFromSeconds] = useState(isEdit && existingVideo.black_from_seconds != null ? String(existingVideo.black_from_seconds) : '')
   const [skipPreviews, setSkipPreviews]         = useState(isEdit ? !!existingVideo.skip_previews : false)
   const isAsmrLike = ['asmr', 'soundscape'].includes(template?.slug)
+  const isMusic = template?.slug === 'music'
   // Generic feature gating driven by template.ui_features array from the backend.
   // music template has ui_features=[] so all panels below will be hidden.
   // asmr/soundscape templates have ui_features=['sfx_panel','duration_picker','blackout'].
   const uiFeatures = new Set(template?.ui_features ?? [])
+
+  // Music-template-only state
+  const [trackTransition,        setTrackTransition]        = useState(isEdit ? (existingVideo.track_transition        ?? 'gapless') : 'gapless')
+  const [trackTransitionSeconds, setTrackTransitionSeconds] = useState(isEdit ? (existingVideo.track_transition_seconds ?? 2.0)      : 2.0)
+  const [playlistOverlayStyle,   setPlaylistOverlayStyle]   = useState(isEdit ? (existingVideo.playlist_overlay_style  ?? null)      : null)
+  const [spectrumEnabled,        setSpectrumEnabled]        = useState(isEdit ? !!existingVideo.spectrum_enabled                     : false)
+  const [spectrumPosition,       setSpectrumPosition]       = useState(isEdit ? (existingVideo.spectrum_position        ?? 'bottom') : 'bottom')
+  const [spectrumHeightPct,      setSpectrumHeightPct]      = useState(isEdit ? (existingVideo.spectrum_height_pct     ?? 0.12)      : 0.12)
+  const [spectrumColor,          setSpectrumColor]          = useState(isEdit ? (existingVideo.spectrum_color           ?? '#ffffff') : '#ffffff')
+  const [spectrumOpacity,        setSpectrumOpacity]        = useState(isEdit ? (existingVideo.spectrum_opacity         ?? 0.6)      : 0.6)
 
   // Visual playlist — fall back to legacy single visual_asset_id when array is empty
   // so editing a pre-feature video doesn't drop the existing visual.
@@ -1237,6 +1252,17 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
           music_track_ids: musicTrackIds,
           black_from_seconds: blackFromSeconds ? parseInt(blackFromSeconds, 10) : null,
           skip_previews: skipPreviews,
+        } : {}),
+        ...(isMusic ? {
+          music_track_ids: musicTrackIds,
+          track_transition: trackTransition,
+          track_transition_seconds: trackTransitionSeconds,
+          playlist_overlay_style: playlistOverlayStyle,
+          spectrum_enabled: spectrumEnabled,
+          spectrum_position: spectrumPosition,
+          spectrum_height_pct: spectrumHeightPct,
+          spectrum_color: spectrumColor,
+          spectrum_opacity: spectrumOpacity,
         } : {}),
       }
       let videoId = existingVideo?.id
@@ -1511,6 +1537,13 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
                   </div>
                   <MusicPlaylistEditor trackIds={musicTrackIds} onChange={setMusicTrackIds} />
                 </div>
+              ) : isMusic ? (
+                <MusicPlaylistPicker
+                  value={musicTrackIds}
+                  onChange={setMusicTrackIds}
+                  transition={trackTransition}
+                  transitionSeconds={trackTransitionSeconds}
+                />
               ) : (
                 <Select
                   label="Music Track"
@@ -1712,6 +1745,44 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
                   />
                   Skip preview gates (render straight to final, still chunked)
                 </label>
+              </div>
+            </section>
+          )}
+
+          {/* ④c MUSIC OPTIONS — music template only */}
+          {isMusic && (
+            <section>
+              <div className="text-xs font-bold text-[#5a5a70] tracking-widest mb-3">④c MUSIC OPTIONS</div>
+              <div className="flex flex-col gap-4">
+                <TransitionPanel
+                  transition={trackTransition}
+                  transitionSeconds={trackTransitionSeconds}
+                  onChange={({ transition, transitionSeconds }) => {
+                    setTrackTransition(transition)
+                    setTrackTransitionSeconds(transitionSeconds)
+                  }}
+                />
+                <OverlayStylePicker
+                  value={playlistOverlayStyle}
+                  onChange={setPlaylistOverlayStyle}
+                  trackCount={musicTrackIds.length}
+                />
+                <SpectrumPanel
+                  value={{
+                    spectrum_enabled:    spectrumEnabled,
+                    spectrum_position:   spectrumPosition,
+                    spectrum_height_pct: spectrumHeightPct,
+                    spectrum_color:      spectrumColor,
+                    spectrum_opacity:    spectrumOpacity,
+                  }}
+                  onChange={patch => {
+                    if ('spectrum_enabled'    in patch) setSpectrumEnabled(patch.spectrum_enabled)
+                    if ('spectrum_position'   in patch) setSpectrumPosition(patch.spectrum_position)
+                    if ('spectrum_height_pct' in patch) setSpectrumHeightPct(patch.spectrum_height_pct)
+                    if ('spectrum_color'      in patch) setSpectrumColor(patch.spectrum_color)
+                    if ('spectrum_opacity'    in patch) setSpectrumOpacity(patch.spectrum_opacity)
+                  }}
+                />
               </div>
             </section>
           )}
