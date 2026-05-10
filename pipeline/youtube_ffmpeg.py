@@ -16,6 +16,41 @@ DEFAULT_SCALE = "1920:1080"
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 
 
+def build_spectrum_filter(
+    enabled: bool,
+    position: str,
+    height_pct: float,
+    color: str,
+    opacity: float,
+    canvas_w: int,
+    canvas_h: int,
+    audio_input_label: str = "[1:a]",
+    base_label: str = "[base]",
+    out_label: str = "[v_with_spec]",
+) -> tuple[str, list[str]]:
+    """Return (filter_chain_fragment, extra_ffmpeg_inputs).
+
+    Returns ('', []) when disabled. Caller splices the chain into the
+    larger filtergraph and labels the inputs.
+    """
+    if not enabled:
+        return ("", [])
+
+    height_px = int(canvas_h * height_pct)
+    y = canvas_h - height_px if position == "bottom" else (canvas_h - height_px) // 2
+
+    hex_no_alpha = color[:7]
+
+    chain = (
+        f"{audio_input_label}showfreqs=mode=bar:ascale=log:fscale=log:"
+        f"cmode=combined:win_size=2048:colors={hex_no_alpha}:"
+        f"size={canvas_w}x{height_px}[spec_raw];"
+        f"[spec_raw]format=rgba,colorchannelmixer=aa={opacity}[spec];"
+        f"{base_label}[spec]overlay=0:{y}{out_label}"
+    )
+    return (chain, [])
+
+
 def resolve_visual(video, db) -> str | None:
     """Return the file path of the linked visual asset, or None."""
     if not video.visual_asset_id:
