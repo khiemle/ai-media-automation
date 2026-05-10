@@ -98,3 +98,97 @@ def render_chip_png(
 
     img.save(out, "PNG")
     return str(out)
+
+
+def render_sidebar_png(
+    tracks: list, current_index: int,
+    output_dir: Path, canvas_w: int, canvas_h: int,
+    cache_key: str,
+) -> str:
+    """Right-side playlist column showing all tracks, current highlighted.
+
+    For >8 tracks, shows a window of 8 around the current index with
+    ellipsis markers above/below.
+    """
+    out = Path(output_dir) / f"overlay_sidebar_{current_index}_{cache_key}.png"
+    if out.is_file():
+        return str(out)
+
+    img = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+
+    panel_w = int(canvas_w * 0.28)
+    margin  = int(canvas_w * 0.03)
+    pad     = 18
+    header_font = _load_font(13)
+    row_font    = _load_font(18)
+
+    n = len(tracks)
+    if n <= 8:
+        rows = list(range(n))
+        show_top_ellipsis = show_bot_ellipsis = False
+    else:
+        start = max(0, current_index - 3)
+        end   = min(n, start + 8)
+        if end == n:
+            start = max(0, end - 8)
+        rows = list(range(start, end))
+        show_top_ellipsis = start > 0
+        show_bot_ellipsis = end < n
+
+    header = f"Playlist · {n} tracks"
+    h_bbox = draw.textbbox((0, 0), header.upper(), font=header_font)
+    h_h = h_bbox[3] - h_bbox[1]
+
+    row_h = 28
+    panel_h = pad * 2 + h_h + 12 + row_h * (
+        len(rows) + (1 if show_top_ellipsis else 0)
+        + (1 if show_bot_ellipsis else 0)
+    )
+
+    x = canvas_w - margin - panel_w
+    y = (canvas_h - panel_h) // 2
+
+    draw.rounded_rectangle(
+        (x, y, x + panel_w, y + panel_h),
+        radius=8,
+        fill=(8, 10, 20, int(0.45 * 255)),
+        outline=(255, 255, 255, int(0.08 * 255)),
+        width=1,
+    )
+
+    hx = x + pad
+    hy = y + pad - h_bbox[1]
+    draw.text((hx, hy), header.upper(),
+              font=header_font, fill=(90, 90, 112, 255))
+
+    cursor_y = y + pad + h_h + 12
+    if show_top_ellipsis:
+        draw.text((hx, cursor_y), "…", font=row_font, fill=(90, 90, 112, 255))
+        cursor_y += row_h
+
+    for i in rows:
+        played = i < current_index
+        is_current = i == current_index
+        marker = "✓" if played else ("▶" if is_current else f"{i+1}")
+        title = _truncate(tracks[i].title or f"Track {i+1}", 30)
+
+        if is_current:
+            color = (232, 232, 240, 255)
+            marker_color = (124, 106, 247, 255)
+        elif played:
+            color = (106, 106, 128, 255)
+            marker_color = (52, 211, 153, 255)
+        else:
+            color = (106, 106, 128, 255)
+            marker_color = (90, 90, 112, 255)
+
+        draw.text((hx, cursor_y), marker, font=row_font, fill=marker_color)
+        draw.text((hx + 28, cursor_y), title, font=row_font, fill=color)
+        cursor_y += row_h
+
+    if show_bot_ellipsis:
+        draw.text((hx, cursor_y), "…", font=row_font, fill=(90, 90, 112, 255))
+
+    img.save(out, "PNG")
+    return str(out)

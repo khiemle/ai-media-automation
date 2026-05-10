@@ -1,7 +1,7 @@
 from pathlib import Path
 import pytest
 from PIL import Image
-from pipeline.music_overlay import render_chip_png
+from pipeline.music_overlay import render_chip_png, render_sidebar_png
 
 
 class FakeTrack:
@@ -38,3 +38,23 @@ def test_chip_png_caches_by_key(tmp_path):
     assert p1 == p2
     p3 = render_chip_png(tracks, 0, tmp_path, 1920, 1080, "other-key")
     assert p3 != p1
+
+
+def test_sidebar_full_canvas_rgba(tmp_path):
+    tracks = [FakeTrack(f"Track {i}") for i in range(5)]
+    out = render_sidebar_png(tracks, 2, tmp_path, 1920, 1080, "s1")
+    img = Image.open(out)
+    assert img.size == (1920, 1080)
+    assert img.mode == "RGBA"
+
+
+def test_sidebar_truncates_to_30_chars(tmp_path):
+    tracks = [FakeTrack("A" * 100), FakeTrack("B"), FakeTrack("C")]
+    out = render_sidebar_png(tracks, 0, tmp_path, 1920, 1080, "s2")
+    assert Path(out).is_file()
+
+
+def test_sidebar_handles_long_playlist(tmp_path):
+    tracks = [FakeTrack(f"Track {i}") for i in range(20)]
+    out = render_sidebar_png(tracks, 10, tmp_path, 1920, 1080, "s3")
+    assert Path(out).is_file()
