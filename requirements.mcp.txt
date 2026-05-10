@@ -1,0 +1,21 @@
+# Slim runtime deps for the dockerized MCP image (console.mcp.stdio).
+# Verified against every top-level import under console/mcp/.
+
+# MCP SDK
+mcp>=1.0.0
+
+# HTTP client used by ConsoleClient
+httpx>=0.27.0
+
+# JWT decode/encode (used by auth.tokens for service tokens)
+python-jose[cryptography]==3.3.0
+
+# Models / settings (pydantic v2)
+pydantic[email]>=2.0.0
+pydantic-settings>=2.5.2,<3.0.0
+
+# audit_db.py uses sqlalchemy.MetaData/Table/insert; auth/tokens uses bcrypt.
+# These are required even though the container does not connect to Postgres
+# (the imports run at module load time).
+sqlalchemy>=2.0.31
+bcrypt>=4.0.1
