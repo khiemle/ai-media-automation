@@ -978,6 +978,10 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
   const [blackFromSeconds, setBlackFromSeconds] = useState(isEdit && existingVideo.black_from_seconds != null ? String(existingVideo.black_from_seconds) : '')
   const [skipPreviews, setSkipPreviews]         = useState(isEdit ? !!existingVideo.skip_previews : false)
   const isAsmrLike = ['asmr', 'soundscape'].includes(template?.slug)
+  // Generic feature gating driven by template.ui_features array from the backend.
+  // music template has ui_features=[] so all panels below will be hidden.
+  // asmr/soundscape templates have ui_features=['sfx_panel','duration_picker','blackout'].
+  const uiFeatures = new Set(template?.ui_features ?? [])
 
   // Visual playlist — fall back to legacy single visual_asset_id when array is empty
   // so editing a pre-feature video doesn't drop the existing visual.
@@ -1344,6 +1348,7 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
                 placeholder="e.g. Heavy Rain Window"
               />
 
+              {uiFeatures.has('duration_picker') && (
               <div className="flex flex-col gap-1">
                 <label className="text-xs text-[#9090a8] font-medium">Duration</label>
                 <div className="flex flex-wrap gap-2">
@@ -1383,6 +1388,7 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
                   </p>
                 )}
               </div>
+              )}
 
               <Input
                 label="SEO Title"
@@ -1670,7 +1676,8 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
             </div>
           </section>
 
-          {/* ④ SOUND LAYERS */}
+          {/* ④ SOUND LAYERS — hidden for templates that don't declare sfx_panel */}
+          {uiFeatures.has('sfx_panel') && (
           <section>
             <div className="text-xs font-bold text-[#5a5a70] tracking-widest mb-3">④ SOUND LAYERS</div>
             <SoundLayersEditor
@@ -1679,12 +1686,14 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
               onChange={setSoundLayers}
             />
           </section>
+          )}
 
-          {/* ④b EXTRAS — asmr/soundscape only */}
+          {/* ④b EXTRAS — asmr/soundscape only; blackout input also requires ui_features flag */}
           {isAsmrLike && (
             <section>
               <div className="text-xs font-bold text-[#5a5a70] tracking-widest mb-3">④b EXTRAS</div>
               <div className="flex flex-col gap-3">
+                {uiFeatures.has('blackout') && (
                 <Input
                   label="Black-out from (seconds — visual fades to black, audio continues)"
                   type="number"
@@ -1693,6 +1702,7 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
                   onChange={e => setBlackFromSeconds(e.target.value)}
                   placeholder="leave blank for no blackout"
                 />
+                )}
                 <label className="flex items-center gap-2 text-xs text-[#9090a8]">
                   <input
                     type="checkbox"
