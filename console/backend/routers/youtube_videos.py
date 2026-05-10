@@ -391,6 +391,24 @@ def get_render_state(
         raise HTTPException(status_code=404, detail=str(e))
 
 
+@router.get("/{video_id}/chapters")
+def get_chapters(
+    video_id: int, db: Session = Depends(get_db), _user=Depends(require_editor_or_admin),
+):
+    """Return the YouTube chapter list that would be injected on upload.
+
+    For non-music templates returns chapters=null. For music templates with
+    fewer than 3 tracks returns chapters=null (YouTube minimum). Useful for
+    previewing multi-hour video chapters without triggering an upload.
+    """
+    from console.backend.models.youtube_video import YoutubeVideo
+    video = db.get(YoutubeVideo, video_id)
+    if not video:
+        raise HTTPException(status_code=404, detail=f"YoutubeVideo {video_id} not found")
+    chapters = YoutubeVideoService(db).build_chapters(video)
+    return {"video_id": video_id, "chapters": chapters}
+
+
 # ── Preview file serving (no auth — browsers can't send Bearer to media element loads) ──
 
 

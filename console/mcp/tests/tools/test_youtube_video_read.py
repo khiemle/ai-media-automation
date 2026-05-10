@@ -40,3 +40,42 @@ async def test_get_render_state():
     out = await youtube_video(action="get_render_state", video_id=7, _client=c)
     c.get.assert_awaited_once_with("/api/youtube-videos/7/render/state", params={})
     assert out["data"]["phase"] == "audio_preview"
+
+
+@pytest.mark.asyncio
+async def test_get_chapters_music_template():
+    """get_chapters passes through the API response intact."""
+    c = AsyncMock()
+    c.get.return_value = {
+        "video_id": 42,
+        "chapters": [
+            {"seconds": 0,   "title": "Track 1"},
+            {"seconds": 60,  "title": "Track 2"},
+            {"seconds": 120, "title": "Track 3"},
+        ],
+    }
+    out = await youtube_video(action="get_chapters", video_id=42, _client=c)
+    c.get.assert_awaited_once_with("/api/youtube-videos/42/chapters", params={})
+    assert out["data"]["video_id"] == 42
+    assert len(out["data"]["chapters"]) == 3
+    assert out["data"]["chapters"][1]["seconds"] == 60
+
+
+@pytest.mark.asyncio
+async def test_get_chapters_non_music_returns_null():
+    """For non-music templates the API returns chapters=null; tool passes it through."""
+    c = AsyncMock()
+    c.get.return_value = {"video_id": 5, "chapters": None}
+    out = await youtube_video(action="get_chapters", video_id=5, _client=c)
+    c.get.assert_awaited_once_with("/api/youtube-videos/5/chapters", params={})
+    assert out["data"]["chapters"] is None
+
+
+@pytest.mark.asyncio
+async def test_get_chapters_requires_video_id():
+    """get_chapters returns an error envelope when video_id is missing."""
+    c = AsyncMock()
+    out = await youtube_video(action="get_chapters", _client=c)
+    assert out["ok"] is False
+    assert "video_id" in out["error"]["message"]
+    c.get.assert_not_awaited()
