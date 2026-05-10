@@ -147,7 +147,7 @@ async def _confirmed_async(kw, *, summary, task_kind, run):
 async def _confirmed_destructive(kw, *, id_arg, summary, run):
     if not kw.get("confirm", False):
         return _intent(summary, kw, hint=f"call again with confirm=true and confirm_id={kw.get(id_arg)}")
-    if kw.get("confirm_id") != kw.get(id_arg):
+    if str(kw.get("confirm_id")) != str(kw.get(id_arg)):
         return ConsoleError(
             code="validation.confirm_id_mismatch",
             message=f"confirm_id must equal {id_arg}",

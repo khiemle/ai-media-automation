@@ -98,7 +98,12 @@ async def _async_destructive(kw, *, id_arg, summary, task_kind, run, fixed_id=No
             "intent": {"summary": summary, "args": {k: v for k, v in kw.items() if k != "_client"}},
             "to_proceed": f"call again with confirm=true and confirm_id={expected}",
         }
-    if kw.get("confirm_id") != expected:
+    # Compare as strings — FastMCP serializes `confirm_id: Any` as a string
+    # over the wire even when the caller sends a JSON number, while
+    # `expected` is whatever native type kw[id_arg] / fixed_id is (int for
+    # video_id, str for "all"). Stringifying both sides makes the gate
+    # work for both cases without forcing a Union type on the param.
+    if str(kw.get("confirm_id")) != str(expected):
         return ConsoleError(
             code="validation.confirm_id_mismatch",
             message=f"confirm_id must equal {expected!r}",
