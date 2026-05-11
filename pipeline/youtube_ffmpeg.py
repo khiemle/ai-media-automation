@@ -692,11 +692,19 @@ def _render_landscape_music(
             height_pct=getattr(video, "spectrum_height_pct", 0.12),
             color_hex=getattr(video, "spectrum_color", "#ffffff"),
             bar_width_px=getattr(video, "spectrum_bar_width_px", 10.0),
+            bar_count=getattr(video, "spectrum_bar_count", 50),
+            align_horizontal=getattr(video, "spectrum_align_horizontal", "center"),
         )
     elif spectrum_enabled:  # classic
+        # Classic showfreqs supports only bottom/center vertical placement.
+        # Map align_vertical → position; 'top' falls back to 'center' since
+        # the legacy filter has no native top mode.
+        legacy_pos = getattr(video, "spectrum_align_vertical", "bottom")
+        if legacy_pos == "top":
+            legacy_pos = "center"
         spec_chain, _ = build_spectrum_filter(
             enabled=True,
-            position=getattr(video, "spectrum_position", "bottom"),
+            position=legacy_pos,
             height_pct=getattr(video, "spectrum_height_pct", 0.12),
             color=getattr(video, "spectrum_color", "#ffffff"),
             opacity=getattr(video, "spectrum_opacity", 0.6),
@@ -759,10 +767,17 @@ def _render_landscape_music(
         parts.append(spec_chain)
         prev_label = "[v_after_spec]"
     elif bars_input_idx is not None:
-        # Bars spectrum: pre-rendered WebM overlaid onto [base]
+        # Bars spectrum: pre-rendered MOV overlaid onto [base]
         strip_h = max(1, int(h * getattr(video, "spectrum_height_pct", 0.12)))
-        spec_pos = getattr(video, "spectrum_position", "bottom")
-        y_pos = (h - strip_h) if spec_pos == "bottom" else (h - strip_h) // 2
+        align_v = getattr(video, "spectrum_align_vertical", "bottom")
+        edge_margin = max(8, int(round(h * 0.02)))
+        if align_v == "top":
+            y_pos = edge_margin
+        elif align_v == "bottom":
+            y_pos = h - strip_h - edge_margin
+        else:  # center
+            y_pos = (h - strip_h) // 2
+        y_pos = max(0, y_pos)
         opacity = getattr(video, "spectrum_opacity", 0.6)
         parts.append(
             f"[{bars_input_idx}:v]format=rgba,colorchannelmixer=aa={opacity:.3f}[spec_bars]"

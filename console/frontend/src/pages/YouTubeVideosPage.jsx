@@ -993,12 +993,14 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
   const [trackTransitionSeconds, setTrackTransitionSeconds] = useState(isEdit ? (existingVideo.track_transition_seconds ?? 2.0)      : 2.0)
   const [playlistOverlayStyle,   setPlaylistOverlayStyle]   = useState(isEdit ? (existingVideo.playlist_overlay_style  ?? null)      : null)
   const [spectrumEnabled,        setSpectrumEnabled]        = useState(isEdit ? !!existingVideo.spectrum_enabled                     : false)
-  const [spectrumPosition,       setSpectrumPosition]       = useState(isEdit ? (existingVideo.spectrum_position        ?? 'bottom') : 'bottom')
-  const [spectrumHeightPct,      setSpectrumHeightPct]      = useState(isEdit ? (existingVideo.spectrum_height_pct     ?? 0.12)      : 0.12)
+  const [spectrumHeightPct,      setSpectrumHeightPct]      = useState(isEdit ? (existingVideo.spectrum_height_pct      ?? 0.12)      : 0.12)
   const [spectrumColor,          setSpectrumColor]          = useState(isEdit ? (existingVideo.spectrum_color           ?? '#ffffff') : '#ffffff')
   const [spectrumOpacity,        setSpectrumOpacity]        = useState(isEdit ? (existingVideo.spectrum_opacity         ?? 0.6)      : 0.6)
   const [spectrumStyle,          setSpectrumStyle]          = useState(isEdit ? (existingVideo.spectrum_style           ?? 'classic') : 'classic')
   const [spectrumBarWidthPx,     setSpectrumBarWidthPx]     = useState(isEdit ? (existingVideo.spectrum_bar_width_px    ?? 10)        : 10)
+  const [spectrumBarCount,       setSpectrumBarCount]       = useState(isEdit ? (existingVideo.spectrum_bar_count       ?? 50)        : 50)
+  const [spectrumAlignH,         setSpectrumAlignH]         = useState(isEdit ? (existingVideo.spectrum_align_horizontal ?? 'center')  : 'center')
+  const [spectrumAlignV,         setSpectrumAlignV]         = useState(isEdit ? (existingVideo.spectrum_align_vertical   ?? 'bottom')  : 'bottom')
 
   // Visual playlist — fall back to legacy single visual_asset_id when array is empty
   // so editing a pre-feature video doesn't drop the existing visual.
@@ -1266,12 +1268,14 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
           track_transition_seconds: trackTransitionSeconds,
           playlist_overlay_style: playlistOverlayStyle,
           spectrum_enabled: spectrumEnabled,
-          spectrum_position: spectrumPosition,
           spectrum_height_pct: spectrumHeightPct,
           spectrum_color: spectrumColor,
           spectrum_opacity: spectrumOpacity,
           spectrum_style: spectrumStyle,
           spectrum_bar_width_px: spectrumBarWidthPx,
+          spectrum_bar_count: spectrumBarCount,
+          spectrum_align_horizontal: spectrumAlignH,
+          spectrum_align_vertical: spectrumAlignV,
         } : {}),
       }
       let videoId = existingVideo?.id
@@ -1778,22 +1782,26 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
                 />
                 <SpectrumPanel
                   value={{
-                    spectrum_enabled:      spectrumEnabled,
-                    spectrum_position:     spectrumPosition,
-                    spectrum_height_pct:   spectrumHeightPct,
-                    spectrum_color:        spectrumColor,
-                    spectrum_opacity:      spectrumOpacity,
-                    spectrum_style:        spectrumStyle,
-                    spectrum_bar_width_px: spectrumBarWidthPx,
+                    spectrum_enabled:           spectrumEnabled,
+                    spectrum_height_pct:        spectrumHeightPct,
+                    spectrum_color:             spectrumColor,
+                    spectrum_opacity:           spectrumOpacity,
+                    spectrum_style:             spectrumStyle,
+                    spectrum_bar_width_px:      spectrumBarWidthPx,
+                    spectrum_bar_count:         spectrumBarCount,
+                    spectrum_align_horizontal:  spectrumAlignH,
+                    spectrum_align_vertical:    spectrumAlignV,
                   }}
                   onChange={patch => {
-                    if ('spectrum_enabled'      in patch) setSpectrumEnabled(patch.spectrum_enabled)
-                    if ('spectrum_position'     in patch) setSpectrumPosition(patch.spectrum_position)
-                    if ('spectrum_height_pct'   in patch) setSpectrumHeightPct(patch.spectrum_height_pct)
-                    if ('spectrum_color'        in patch) setSpectrumColor(patch.spectrum_color)
-                    if ('spectrum_opacity'      in patch) setSpectrumOpacity(patch.spectrum_opacity)
-                    if ('spectrum_style'        in patch) setSpectrumStyle(patch.spectrum_style)
-                    if ('spectrum_bar_width_px' in patch) setSpectrumBarWidthPx(patch.spectrum_bar_width_px)
+                    if ('spectrum_enabled'           in patch) setSpectrumEnabled(patch.spectrum_enabled)
+                    if ('spectrum_height_pct'        in patch) setSpectrumHeightPct(patch.spectrum_height_pct)
+                    if ('spectrum_color'             in patch) setSpectrumColor(patch.spectrum_color)
+                    if ('spectrum_opacity'           in patch) setSpectrumOpacity(patch.spectrum_opacity)
+                    if ('spectrum_style'             in patch) setSpectrumStyle(patch.spectrum_style)
+                    if ('spectrum_bar_width_px'      in patch) setSpectrumBarWidthPx(patch.spectrum_bar_width_px)
+                    if ('spectrum_bar_count'         in patch) setSpectrumBarCount(patch.spectrum_bar_count)
+                    if ('spectrum_align_horizontal'  in patch) setSpectrumAlignH(patch.spectrum_align_horizontal)
+                    if ('spectrum_align_vertical'    in patch) setSpectrumAlignV(patch.spectrum_align_vertical)
                   }}
                 />
               </div>

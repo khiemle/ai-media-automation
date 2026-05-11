@@ -34,7 +34,8 @@ def test_music_fields_round_trip_create(db):
     assert result["spectrum_enabled"] is True
     assert result["spectrum_color"] == "#7c6af7"
     # Defaults preserved for unspecified fields
-    assert result["spectrum_position"] == "bottom"
+    assert result["spectrum_align_horizontal"] == "center"
+    assert result["spectrum_align_vertical"] == "bottom"
     assert result["spectrum_height_pct"] == 0.12
     assert result["spectrum_opacity"] == 0.6
     assert result["playlist_overlay_style"] is None
@@ -50,7 +51,9 @@ def test_music_fields_defaults_on_create(db):
     assert result["track_transition_seconds"] == 2.0
     assert result["playlist_overlay_style"] is None
     assert result["spectrum_enabled"] is False
-    assert result["spectrum_position"] == "bottom"
+    assert result["spectrum_align_horizontal"] == "center"
+    assert result["spectrum_align_vertical"] == "bottom"
+    assert result["spectrum_bar_count"] == 50
     assert result["spectrum_height_pct"] == 0.12
     assert result["spectrum_color"] == "#ffffff"
     assert result["spectrum_opacity"] == 0.6
@@ -87,9 +90,14 @@ def test_create_rejects_null_track_transition():
         YoutubeVideoCreate(title="x", template_id=1, track_transition=None)
 
 
-def test_create_rejects_null_spectrum_position():
+def test_create_rejects_null_spectrum_align_horizontal():
     with pytest.raises(ValidationError):
-        YoutubeVideoCreate(title="x", template_id=1, spectrum_position=None)
+        YoutubeVideoCreate(title="x", template_id=1, spectrum_align_horizontal=None)
+
+
+def test_create_rejects_null_spectrum_align_vertical():
+    with pytest.raises(ValidationError):
+        YoutubeVideoCreate(title="x", template_id=1, spectrum_align_vertical=None)
 
 
 def test_create_rejects_null_spectrum_color():

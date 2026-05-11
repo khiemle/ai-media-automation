@@ -132,11 +132,19 @@ def render_spectrum_bars_video(
     bar_gap_px: int = 2,
     corner_radius_px: int = 2,
     spectrum_fps: int = 15,
+    align_horizontal: str = "center",
+    edge_margin_px: int | None = None,
 ) -> Path:
     """Pre-render the spectrum as a qtrle .mov with rgba (lossless alpha).
 
-    Bars are centered horizontally as a block of (bar_count * bar_width_px +
-    (bar_count-1) * bar_gap_px) pixels, with transparent space on either side.
+    Bars are positioned horizontally as a block of (bar_count * bar_width_px +
+    (bar_count-1) * bar_gap_px) pixels. Position is controlled by
+    align_horizontal: 'left' / 'center' / 'right'. For left/right, an
+    edge_margin_px (default ~2% of canvas_w) keeps the block off the border.
+
+    Caller composes vertical positioning at overlay time (using a separate
+    Y argument), so this renderer only handles horizontal placement within
+    its canvas_w wide strip.
 
     Encoder is qtrle in MOV container with rgba — preserves alpha exactly
     (no chroma subsampling, no background tint artifacts). Caches by mtime:
@@ -156,9 +164,20 @@ def render_spectrum_bars_video(
     bar_w = max(1, int(round(bar_width_px)))
     slot_w = bar_w + bar_gap_px
 
-    # Center the bars block within the canvas width
+    # Block width and horizontal placement
     total_block_w = bar_count * bar_w + (bar_count - 1) * bar_gap_px
-    x_offset = max(0, (canvas_w - total_block_w) // 2)
+    if edge_margin_px is None:
+        edge_margin_px = max(8, int(round(canvas_w * 0.02)))
+
+    if align_horizontal == "left":
+        x_offset = edge_margin_px
+    elif align_horizontal == "right":
+        x_offset = canvas_w - total_block_w - edge_margin_px
+    else:  # center
+        x_offset = (canvas_w - total_block_w) // 2
+    # Clamp to 0 if block exceeds canvas (rightmost bars will clip; the
+    # frontend warns the user before this case happens)
+    x_offset = max(0, x_offset)
 
     color_rgb = _hex_to_rgb(color_hex)
     template = _build_bar_template(

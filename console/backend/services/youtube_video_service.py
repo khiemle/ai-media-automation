@@ -22,12 +22,14 @@ _MUSIC_NOT_NULL_FIELDS = (
     "track_transition",
     "track_transition_seconds",
     "spectrum_enabled",
-    "spectrum_position",
     "spectrum_height_pct",
     "spectrum_color",
     "spectrum_opacity",
     "spectrum_style",
     "spectrum_bar_width_px",
+    "spectrum_bar_count",
+    "spectrum_align_horizontal",
+    "spectrum_align_vertical",
 )
 
 # Valid status transitions for the YoutubeVideo state machine
@@ -181,12 +183,14 @@ def _video_to_dict(
         "track_transition_seconds": v.track_transition_seconds,
         "playlist_overlay_style":   v.playlist_overlay_style,
         "spectrum_enabled":         bool(v.spectrum_enabled) if v.spectrum_enabled is not None else False,
-        "spectrum_position":        v.spectrum_position,
         "spectrum_height_pct":      v.spectrum_height_pct,
         "spectrum_color":           v.spectrum_color,
         "spectrum_opacity":         v.spectrum_opacity,
         "spectrum_style":           v.spectrum_style or "classic",
         "spectrum_bar_width_px":    v.spectrum_bar_width_px if v.spectrum_bar_width_px is not None else 10.0,
+        "spectrum_bar_count":       v.spectrum_bar_count if v.spectrum_bar_count is not None else 50,
+        "spectrum_align_horizontal": v.spectrum_align_horizontal or "center",
+        "spectrum_align_vertical":  v.spectrum_align_vertical or "bottom",
         "total_duration_s":         None,
         "uploads": uploads if uploads is not None else [],
         "created_at": v.created_at.isoformat() if v.created_at else None,
@@ -355,12 +359,14 @@ class YoutubeVideoService:
             track_transition_seconds=data.get("track_transition_seconds", 2.0),
             playlist_overlay_style=data.get("playlist_overlay_style"),
             spectrum_enabled=data.get("spectrum_enabled", False),
-            spectrum_position=data.get("spectrum_position", "bottom"),
             spectrum_height_pct=data.get("spectrum_height_pct", 0.12),
             spectrum_color=data.get("spectrum_color", "#ffffff"),
             spectrum_opacity=data.get("spectrum_opacity", 0.6),
             spectrum_style=data.get("spectrum_style", "classic"),
             spectrum_bar_width_px=data.get("spectrum_bar_width_px", 10.0),
+            spectrum_bar_count=data.get("spectrum_bar_count", 50),
+            spectrum_align_horizontal=data.get("spectrum_align_horizontal", "center"),
+            spectrum_align_vertical=data.get("spectrum_align_vertical", "bottom"),
             status="draft",
         )
         self.db.add(video)
@@ -526,9 +532,10 @@ class YoutubeVideoService:
             "seo_title", "seo_description", "seo_tags",
             "visual_asset_ids", "visual_clip_durations_s", "visual_loop_mode",
             "track_transition", "track_transition_seconds", "playlist_overlay_style",
-            "spectrum_enabled", "spectrum_position", "spectrum_height_pct",
+            "spectrum_enabled", "spectrum_height_pct",
             "spectrum_color", "spectrum_opacity", "spectrum_style",
-            "spectrum_bar_width_px",
+            "spectrum_bar_width_px", "spectrum_bar_count",
+            "spectrum_align_horizontal", "spectrum_align_vertical",
         ]
         changed = {f: data[f] for f in editable_fields if f in data}
 

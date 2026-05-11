@@ -3,10 +3,11 @@ import time
 from pathlib import Path
 from typing import Literal
 
-TrackTransition  = Literal["gapless", "crossfade", "gap"]
-OverlayStyle     = Literal["chip", "sidebar", "bottom_bar"]
-SpectrumPosition = Literal["bottom", "center"]
-SpectrumStyle    = Literal["classic", "bars"]
+TrackTransition   = Literal["gapless", "crossfade", "gap"]
+OverlayStyle      = Literal["chip", "sidebar", "bottom_bar"]
+SpectrumStyle     = Literal["classic", "bars"]
+SpectrumAlignH    = Literal["left", "center", "right"]
+SpectrumAlignV    = Literal["top", "center", "bottom"]
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
@@ -51,12 +52,14 @@ class YoutubeVideoCreate(BaseModel):
     track_transition_seconds: float = Field(default=2.0, ge=0.5, le=10.0)
     playlist_overlay_style:   OverlayStyle | None = None    # legitimately nullable
     spectrum_enabled:         bool = False
-    spectrum_position:        SpectrumPosition = "bottom"
     spectrum_height_pct:      float = Field(default=0.12, gt=0.0, le=0.5)
     spectrum_color:           str = "#ffffff"
     spectrum_opacity:         float = Field(default=0.6, ge=0.0, le=1.0)
     spectrum_style:           SpectrumStyle = "classic"
     spectrum_bar_width_px:    float = Field(default=10.0, ge=2.0, le=50.0)
+    spectrum_bar_count:       int = Field(default=50, ge=5, le=200)
+    spectrum_align_horizontal: SpectrumAlignH = "center"
+    spectrum_align_vertical:   SpectrumAlignV = "bottom"
 
 
 class YoutubeVideoUpdate(BaseModel):
@@ -84,12 +87,14 @@ class YoutubeVideoUpdate(BaseModel):
     track_transition_seconds: float | None = Field(default=None, ge=0.5, le=10.0)
     playlist_overlay_style:   OverlayStyle | None = None
     spectrum_enabled:         bool | None = None
-    spectrum_position:        SpectrumPosition | None = None
     spectrum_height_pct:      float | None = Field(default=None, gt=0.0, le=0.5)
     spectrum_color:           str | None = None
     spectrum_opacity:         float | None = Field(default=None, ge=0.0, le=1.0)
     spectrum_style:           SpectrumStyle | None = None
     spectrum_bar_width_px:    float | None = Field(default=None, ge=2.0, le=50.0)
+    spectrum_bar_count:       int | None = Field(default=None, ge=5, le=200)
+    spectrum_align_horizontal: SpectrumAlignH | None = None
+    spectrum_align_vertical:   SpectrumAlignV | None = None
 
 
 class StatusUpdate(BaseModel):
