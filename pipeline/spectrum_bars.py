@@ -52,3 +52,68 @@ def _build_bar_template(
             arr[y, x, 3] = alpha                  # top-left
             arr[y, bar_w - 1 - x, 3] = alpha      # top-right
     return arr
+
+
+def _apply_smoothing(bar_heights: np.ndarray, decay: float = 0.85) -> np.ndarray:
+    """In-place exponential decay smoothing: each frame is max(raw, prev * decay)."""
+    for k in range(1, bar_heights.shape[0]):
+        np.maximum(bar_heights[k], bar_heights[k - 1] * decay, out=bar_heights[k])
+    return bar_heights
+
+
+def compute_bar_heights(
+    wav_path: str,
+    total_duration_s: float,
+    bar_count: int = 50,
+    spectrum_fps: int = 15,
+    f_low: float = 60.0,
+    f_high: float = 16000.0,
+    smoothing_decay: float = 0.85,
+) -> np.ndarray:
+    """Compute (n_target_frames, bar_count) bar heights in [0, 1] from a WAV file."""
+    import scipy.io.wavfile
+    import scipy.signal
+
+    sample_rate, audio = scipy.io.wavfile.read(wav_path)
+
+    # Normalize to float32 [-1, 1] and mix to mono
+    if np.issubdtype(audio.dtype, np.integer):
+        audio = audio.astype(np.float32) / float(np.iinfo(audio.dtype).max)
+    else:
+        audio = audio.astype(np.float32)
+    if audio.ndim > 1:
+        audio = audio.mean(axis=1)
+
+    nperseg = 2048
+    noverlap = 1024
+    f, t, Zxx = scipy.signal.stft(
+        audio, fs=sample_rate, nperseg=nperseg, noverlap=noverlap, boundary=None
+    )
+    magnitudes = np.abs(Zxx).astype(np.float32)
+
+    freq_edges = np.geomspace(f_low, f_high, num=bar_count + 1)
+    bin_indices = np.searchsorted(f, freq_edges)
+
+    bar_amps = np.zeros((bar_count, magnitudes.shape[1]), dtype=np.float32)
+    for i in range(bar_count):
+        lo = int(bin_indices[i])
+        hi = max(int(bin_indices[i + 1]), lo + 1)
+        bar_amps[i] = magnitudes[lo:hi].sum(axis=0)
+
+    bars = np.log1p(bar_amps * 0.05).T
+    peak = float(bars.max())
+    if peak > 1e-6:
+        bars /= peak
+    np.clip(bars, 0.0, 1.0, out=bars)
+
+    n_target_frames = int(round(total_duration_s * spectrum_fps))
+    if n_target_frames <= 0:
+        return np.zeros((0, bar_count), dtype=np.float32)
+    src_times = t
+    dst_times = np.linspace(0.0, total_duration_s, num=n_target_frames)
+    bar_heights = np.empty((n_target_frames, bar_count), dtype=np.float32)
+    for i in range(bar_count):
+        bar_heights[:, i] = np.interp(dst_times, src_times, bars[:, i])
+
+    _apply_smoothing(bar_heights, decay=smoothing_decay)
+    return bar_heights
