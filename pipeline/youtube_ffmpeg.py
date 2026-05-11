@@ -6,6 +6,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from pipeline.spectrum_bars import render_spectrum_bars_video
+
 logger = logging.getLogger(__name__)
 
 QUALITY_SCALE = {
@@ -674,20 +676,35 @@ def _render_landscape_music(
             canvas_h=h,
         )
 
-    # ── Spectrum filter chain ─────────────────────────────────────────────────
-    # audio input is at index 1 (0 = video, 1 = music_wav)
-    spec_chain, _ = build_spectrum_filter(
-        enabled=getattr(video, "spectrum_enabled", False),
-        position=getattr(video, "spectrum_position", "bottom"),
-        height_pct=getattr(video, "spectrum_height_pct", 0.12),
-        color=getattr(video, "spectrum_color", "#ffffff"),
-        opacity=getattr(video, "spectrum_opacity", 0.6),
-        canvas_w=w,
-        canvas_h=h,
-        audio_input_label="[1:a]",
-        base_label="[base]",
-        out_label="[v_after_spec]",
-    )
+    # ── Spectrum: classic uses inline showfreqs filter; bars pre-renders a separate video ──
+    spectrum_style = getattr(video, "spectrum_style", "classic") or "classic"
+    spectrum_enabled = bool(getattr(video, "spectrum_enabled", False))
+    spectrum_video_path: Path | None = None
+    spec_chain = ""
+
+    if spectrum_enabled and spectrum_style == "bars":
+        spectrum_video_path = render_spectrum_bars_video(
+            music_wav=str(music_wav),
+            out_path=output_dir / "spectrum.webm",
+            total_duration_s=total_dur_s,
+            canvas_w=w,
+            canvas_h=h,
+            height_pct=getattr(video, "spectrum_height_pct", 0.12),
+            color_hex=getattr(video, "spectrum_color", "#ffffff"),
+        )
+    elif spectrum_enabled:  # classic
+        spec_chain, _ = build_spectrum_filter(
+            enabled=True,
+            position=getattr(video, "spectrum_position", "bottom"),
+            height_pct=getattr(video, "spectrum_height_pct", 0.12),
+            color=getattr(video, "spectrum_color", "#ffffff"),
+            opacity=getattr(video, "spectrum_opacity", 0.6),
+            canvas_w=w,
+            canvas_h=h,
+            audio_input_label="[1:a]",
+            base_label="[base]",
+            out_label="[v_after_spec]",
+        )
 
     # ── Build ffmpeg command ──────────────────────────────────────────────────
     cmd = ["ffmpeg", "-y"]
@@ -712,10 +729,18 @@ def _render_landscape_music(
         cmd += ["-f", "lavfi", "-i", f"color=c=black:s={w}x{h}:r=30"]
 
     # Input 1: music WAV (exact duration — no loop flag)
-    cmd += ["-i", music_wav]
+    cmd += ["-i", str(music_wav)]
 
-    # Inputs 2+: overlay PNGs (one still per track)
-    overlay_input_start = 2
+    # Optional: bars spectrum input (only present when spectrum_style == 'bars' and enabled)
+    if spectrum_video_path is not None:
+        cmd += ["-i", str(spectrum_video_path)]
+        bars_input_idx = 2
+        overlay_input_start = 3
+    else:
+        bars_input_idx = None
+        overlay_input_start = 2
+
+    # Inputs overlay_input_start+: overlay PNGs (one still per track)
     for seg in overlay_segments:
         cmd += ["-loop", "1", "-i", seg.png_path]
 
@@ -729,7 +754,21 @@ def _render_landscape_music(
     parts.append(f"[0:v]{base_vf}[base]")
 
     if spec_chain:
+        # Classic spectrum: inline showfreqs filter
         parts.append(spec_chain)
+        prev_label = "[v_after_spec]"
+    elif bars_input_idx is not None:
+        # Bars spectrum: pre-rendered WebM overlaid onto [base]
+        strip_h = max(1, int(h * getattr(video, "spectrum_height_pct", 0.12)))
+        spec_pos = getattr(video, "spectrum_position", "bottom")
+        y_pos = (h - strip_h) if spec_pos == "bottom" else (h - strip_h) // 2
+        opacity = getattr(video, "spectrum_opacity", 0.6)
+        parts.append(
+            f"[{bars_input_idx}:v]format=rgba,colorchannelmixer=aa={opacity:.3f}[spec_bars]"
+        )
+        parts.append(
+            f"[base][spec_bars]overlay=0:{y_pos}[v_after_spec]"
+        )
         prev_label = "[v_after_spec]"
     else:
         prev_label = "[base]"

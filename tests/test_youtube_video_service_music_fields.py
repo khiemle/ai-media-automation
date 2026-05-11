@@ -170,3 +170,55 @@ def test_update_allows_null_playlist_overlay_style(db):
     )
     updated = svc.update_video(created["id"], {"playlist_overlay_style": None}, user_id=None)
     assert updated["playlist_overlay_style"] is None
+
+
+# ── spectrum_style round-trip tests ─────────────────────────────────────────
+
+
+def test_spectrum_style_round_trip_create(db):
+    from console.backend.models.video_template import VideoTemplate
+    from console.backend.services.youtube_video_service import YoutubeVideoService
+    from database.models import MusicTrack
+
+    music = db.query(VideoTemplate).filter_by(slug="music").one()
+    t = MusicTrack(title="A", file_path="/tmp/a.wav", duration_s=60.0)
+    db.add(t); db.commit()
+    svc = YoutubeVideoService(db)
+    result = svc.create_video({
+        "title": "x", "template_id": music.id,
+        "music_track_ids": [t.id],
+        "spectrum_enabled": True,
+        "spectrum_style": "bars",
+    }, user_id=None)
+    assert result["spectrum_style"] == "bars"
+
+
+def test_spectrum_style_defaults_to_classic(db):
+    from console.backend.models.video_template import VideoTemplate
+    from console.backend.services.youtube_video_service import YoutubeVideoService
+    asmr = db.query(VideoTemplate).filter_by(slug="asmr").one()
+    svc = YoutubeVideoService(db)
+    result = svc.create_video({
+        "title": "x", "template_id": asmr.id,
+        "target_duration_h": 8.0,
+    }, user_id=None)
+    assert result["spectrum_style"] == "classic"
+
+
+def test_spectrum_style_update_rejects_null(db):
+    import pytest
+    from console.backend.models.video_template import VideoTemplate
+    from console.backend.services.youtube_video_service import YoutubeVideoService
+    asmr = db.query(VideoTemplate).filter_by(slug="asmr").one()
+    svc = YoutubeVideoService(db)
+    created = svc.create_video({"title": "x", "template_id": asmr.id}, user_id=None)
+    with pytest.raises(ValueError, match="cannot be null"):
+        svc.update_video(created["id"], {"spectrum_style": None}, user_id=None)
+
+
+def test_spectrum_style_pydantic_rejects_invalid():
+    import pytest
+    from pydantic import ValidationError
+    from console.backend.routers.youtube_videos import YoutubeVideoCreate
+    with pytest.raises(ValidationError):
+        YoutubeVideoCreate(title="x", template_id=1, spectrum_style="rainbow")

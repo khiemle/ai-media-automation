@@ -26,6 +26,19 @@ export function SpectrumPanel({ value, onChange }) {
 
       {open && (
         <div className="mt-4 space-y-4 pl-6 border-l border-[#2a2a32]">
+          {/* Style */}
+          <div>
+            <label className="block text-xs text-[#9090a8] mb-1.5">Style</label>
+            <select
+              value={value.spectrum_style ?? 'classic'}
+              onChange={e => update({ spectrum_style: e.target.value })}
+              className="bg-[#16161a] border border-[#2a2a32] rounded-lg px-3 py-1.5 text-sm text-[#e8e8f0] focus:outline-none focus:border-[#7c6af7]"
+            >
+              <option value="classic">Classic (showfreqs)</option>
+              <option value="bars">Bars (50, rounded)</option>
+            </select>
+          </div>
+
           {/* Position */}
           <div>
             <label className="block text-xs text-[#9090a8] mb-1.5">Position</label>

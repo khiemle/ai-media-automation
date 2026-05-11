@@ -997,6 +997,7 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
   const [spectrumHeightPct,      setSpectrumHeightPct]      = useState(isEdit ? (existingVideo.spectrum_height_pct     ?? 0.12)      : 0.12)
   const [spectrumColor,          setSpectrumColor]          = useState(isEdit ? (existingVideo.spectrum_color           ?? '#ffffff') : '#ffffff')
   const [spectrumOpacity,        setSpectrumOpacity]        = useState(isEdit ? (existingVideo.spectrum_opacity         ?? 0.6)      : 0.6)
+  const [spectrumStyle,          setSpectrumStyle]          = useState(isEdit ? (existingVideo.spectrum_style           ?? 'classic') : 'classic')
 
   // Visual playlist — fall back to legacy single visual_asset_id when array is empty
   // so editing a pre-feature video doesn't drop the existing visual.
@@ -1268,6 +1269,7 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
           spectrum_height_pct: spectrumHeightPct,
           spectrum_color: spectrumColor,
           spectrum_opacity: spectrumOpacity,
+          spectrum_style: spectrumStyle,
         } : {}),
       }
       let videoId = existingVideo?.id
@@ -1779,6 +1781,7 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
                     spectrum_height_pct: spectrumHeightPct,
                     spectrum_color:      spectrumColor,
                     spectrum_opacity:    spectrumOpacity,
+                    spectrum_style:      spectrumStyle,
                   }}
                   onChange={patch => {
                     if ('spectrum_enabled'    in patch) setSpectrumEnabled(patch.spectrum_enabled)
@@ -1786,6 +1789,7 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
                     if ('spectrum_height_pct' in patch) setSpectrumHeightPct(patch.spectrum_height_pct)
                     if ('spectrum_color'      in patch) setSpectrumColor(patch.spectrum_color)
                     if ('spectrum_opacity'    in patch) setSpectrumOpacity(patch.spectrum_opacity)
+                    if ('spectrum_style'      in patch) setSpectrumStyle(patch.spectrum_style)
                   }}
                 />
               </div>
