@@ -77,10 +77,9 @@ def upload(
         creds.refresh(Request())
         logger.info("[YouTube] Token refreshed")
 
-    import httplib2
-    from google.auth.transport.httplib2 import AuthorizedHttp
-    authed_http = AuthorizedHttp(creds, http=httplib2.Http(timeout=SOCKET_TIMEOUT))
-    youtube = build("youtube", "v3", http=authed_http)
+    import socket as _socket
+    _socket.setdefaulttimeout(SOCKET_TIMEOUT)
+    youtube = build("youtube", "v3", credentials=creds)
 
     title          = metadata.get("title", video_path.stem)[:100]
     description    = _build_description(metadata)
@@ -237,10 +236,9 @@ def set_thumbnail(platform_video_id: str, thumbnail_path: str | Path, credential
         creds.refresh(Request())
         logger.info("[YouTube] Token refreshed for thumbnail set")
 
-    import httplib2
-    from google.auth.transport.httplib2 import AuthorizedHttp
-    authed_http = AuthorizedHttp(creds, http=httplib2.Http(timeout=SOCKET_TIMEOUT))
-    youtube = build("youtube", "v3", http=authed_http)
+    import socket as _socket
+    _socket.setdefaulttimeout(SOCKET_TIMEOUT)
+    youtube = build("youtube", "v3", credentials=creds)
     media = MediaFileUpload(str(thumbnail_path), mimetype="image/png")
     try:
         youtube.thumbnails().set(videoId=platform_video_id, media_body=media).execute()
