@@ -56,6 +56,7 @@ class YoutubeVideoCreate(BaseModel):
     spectrum_color:           str = "#ffffff"
     spectrum_opacity:         float = Field(default=0.6, ge=0.0, le=1.0)
     spectrum_style:           SpectrumStyle = "classic"
+    spectrum_bar_width_px:    float = Field(default=10.0, ge=2.0, le=50.0)
 
 
 class YoutubeVideoUpdate(BaseModel):
@@ -88,6 +89,7 @@ class YoutubeVideoUpdate(BaseModel):
     spectrum_color:           str | None = None
     spectrum_opacity:         float | None = Field(default=None, ge=0.0, le=1.0)
     spectrum_style:           SpectrumStyle | None = None
+    spectrum_bar_width_px:    float | None = Field(default=None, ge=2.0, le=50.0)
 
 
 class StatusUpdate(BaseModel):

@@ -128,15 +128,19 @@ def render_spectrum_bars_video(
     height_pct: float,
     color_hex: str,
     bar_count: int = 50,
+    bar_width_px: float = 10.0,
     bar_gap_px: int = 2,
     corner_radius_px: int = 2,
     spectrum_fps: int = 15,
 ) -> Path:
-    """Pre-render the spectrum as a libvpx-vp9 yuva420p WebM with alpha.
+    """Pre-render the spectrum as a qtrle .mov with rgba (lossless alpha).
 
-    Returns the path to the rendered file. Caches: if out_path already exists
-    AND its mtime is newer than the music WAV's mtime, returns immediately
-    without re-rendering.
+    Bars are centered horizontally as a block of (bar_count * bar_width_px +
+    (bar_count-1) * bar_gap_px) pixels, with transparent space on either side.
+
+    Encoder is qtrle in MOV container with rgba — preserves alpha exactly
+    (no chroma subsampling, no background tint artifacts). Caches by mtime:
+    if out_path exists and is newer than the music WAV, returns immediately.
     """
     out_path = Path(out_path)
     music_path = Path(music_wav)
@@ -149,8 +153,12 @@ def render_spectrum_bars_video(
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     strip_h = max(1, int(canvas_h * height_pct))
-    slot_w = max(1, canvas_w // bar_count)
-    bar_w = max(1, slot_w - bar_gap_px)
+    bar_w = max(1, int(round(bar_width_px)))
+    slot_w = bar_w + bar_gap_px
+
+    # Center the bars block within the canvas width
+    total_block_w = bar_count * bar_w + (bar_count - 1) * bar_gap_px
+    x_offset = max(0, (canvas_w - total_block_w) // 2)
 
     color_rgb = _hex_to_rgb(color_hex)
     template = _build_bar_template(
@@ -174,14 +182,10 @@ def render_spectrum_bars_video(
         "-video_size", f"{canvas_w}x{strip_h}",
         "-framerate", str(spectrum_fps),
         "-i", "pipe:0",
-        "-c:v", "libvpx-vp9",
-        "-pix_fmt", "yuva420p",
+        "-c:v", "qtrle",
+        "-pix_fmt", "rgba",
         "-t", str(total_duration_s),
         "-an",
-        "-deadline", "realtime",
-        "-cpu-used", "8",
-        "-b:v", "0",
-        "-crf", "32",
         str(out_path),
     ]
     proc = subprocess.Popen(
@@ -196,11 +200,13 @@ def render_spectrum_bars_video(
                 h_px = int(round(float(bar_heights[k, i]) * strip_h))
                 if h_px <= 0:
                     continue
-                x_start = i * slot_w
+                x_start = x_offset + i * slot_w
                 x_end = x_start + bar_w
                 if x_end > canvas_w:
                     x_end = canvas_w
                 bar_slice_w = x_end - x_start
+                if bar_slice_w <= 0:
+                    continue
                 tpl_slice = template[strip_h - h_px:, :bar_slice_w]
                 frame_buf[strip_h - h_px:, x_start:x_end] = tpl_slice
             proc.stdin.write(frame_buf.tobytes())

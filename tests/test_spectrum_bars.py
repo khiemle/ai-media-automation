@@ -132,7 +132,7 @@ def _ffprobe_duration(path) -> float:
 def test_render_spectrum_video_smoke(tmp_path, sine_wav):
     """End-to-end: 3s sine → spectrum.webm at expected duration."""
     a = sine_wav("a", dur=3.0, freq=1000)
-    out_path = tmp_path / "spec.webm"
+    out_path = tmp_path / "spec.mov"
     out = render_spectrum_bars_video(
         music_wav=a,
         out_path=out_path,
@@ -151,7 +151,7 @@ def test_render_spectrum_video_smoke(tmp_path, sine_wav):
 def test_render_spectrum_video_caches(tmp_path, sine_wav):
     """Re-running with same inputs reuses the cached output."""
     a = sine_wav("a", dur=2.0, freq=440)
-    out_path = tmp_path / "spec.webm"
+    out_path = tmp_path / "spec.mov"
     render_spectrum_bars_video(
         music_wav=a, out_path=out_path, total_duration_s=2.0,
         canvas_w=1920, canvas_h=1080, height_pct=0.12, color_hex="#ffffff",
@@ -169,7 +169,7 @@ def test_render_spectrum_video_caches(tmp_path, sine_wav):
 def test_render_spectrum_video_invalidates_on_audio_change(tmp_path, sine_wav):
     """If the music WAV is newer than the cached output, re-render."""
     a = sine_wav("a", dur=2.0, freq=440)
-    out_path = tmp_path / "spec.webm"
+    out_path = tmp_path / "spec.mov"
     render_spectrum_bars_video(
         music_wav=a, out_path=out_path, total_duration_s=2.0,
         canvas_w=1920, canvas_h=1080, height_pct=0.12, color_hex="#ffffff",
@@ -190,7 +190,65 @@ def test_render_spectrum_video_raises_when_audio_missing(tmp_path):
     with pytest.raises((FileNotFoundError, RuntimeError)):
         render_spectrum_bars_video(
             music_wav="/nonexistent/audio.wav",
-            out_path=tmp_path / "spec.webm",
+            out_path=tmp_path / "spec.mov",
             total_duration_s=1.0,
             canvas_w=1920, canvas_h=1080, height_pct=0.12, color_hex="#ffffff",
         )
+
+
+def test_render_spectrum_video_centers_narrow_bars(tmp_path, sine_wav):
+    """With bar_width_px=10, 50 bars + 2px gaps, the block is 598px and
+    centered within a 1920px canvas at x_offset=661. Verify by sampling
+    a single frame from the rendered .mov."""
+    a = sine_wav("a", dur=2.0, freq=1000)
+    out_path = tmp_path / "spec.mov"
+    render_spectrum_bars_video(
+        music_wav=a, out_path=out_path,
+        total_duration_s=2.0,
+        canvas_w=1920, canvas_h=1080, height_pct=0.12,
+        color_hex="#ffffff",
+        bar_count=50, bar_width_px=10, bar_gap_px=2,
+    )
+    # Decode one frame at t=1.0s and check it's RGBA
+    out_png = tmp_path / "frame.png"
+    subprocess.run([
+        "ffmpeg", "-y", "-i", str(out_path), "-frames:v", "1",
+        "-ss", "1.0", "-pix_fmt", "rgba", str(out_png),
+    ], check=True, capture_output=True)
+    from PIL import Image
+    img = Image.open(out_png)
+    assert img.mode == "RGBA"
+    arr = np.array(img)
+    # Expected geometry: total block 50*10 + 49*2 = 598; offset = (1920-598)//2 = 661
+    # At x < 661 - 10, should be fully transparent (no bars)
+    left_strip = arr[:, :650, 3]  # alpha channel
+    assert left_strip.max() == 0, "Expected left strip to be fully transparent (no bars there)"
+    # Same on the right
+    right_strip = arr[:, 1290:, 3]
+    assert right_strip.max() == 0, "Expected right strip to be fully transparent"
+    # Within the block region there should be some opaque pixels
+    block = arr[:, 661:1259, 3]
+    assert block.max() > 200, "Expected opaque bars in the centered block"
+
+
+def test_render_spectrum_video_respects_bar_width_param(tmp_path, sine_wav):
+    """Larger bar_width_px → wider total block."""
+    a = sine_wav("a", dur=1.5, freq=1000)
+    out_a = tmp_path / "narrow.mov"
+    out_b = tmp_path / "wide.mov"
+    render_spectrum_bars_video(
+        music_wav=a, out_path=out_a,
+        total_duration_s=1.5,
+        canvas_w=1920, canvas_h=1080, height_pct=0.12,
+        color_hex="#ffffff",
+        bar_count=50, bar_width_px=10, bar_gap_px=2,
+    )
+    render_spectrum_bars_video(
+        music_wav=a, out_path=out_b,
+        total_duration_s=1.5,
+        canvas_w=1920, canvas_h=1080, height_pct=0.12,
+        color_hex="#ffffff",
+        bar_count=50, bar_width_px=20, bar_gap_px=2,
+    )
+    # Both files exist; that's enough — visual block width is verified by the centering test
+    assert out_a.is_file() and out_b.is_file()

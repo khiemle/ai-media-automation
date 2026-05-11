@@ -685,12 +685,13 @@ def _render_landscape_music(
     if spectrum_enabled and spectrum_style == "bars":
         spectrum_video_path = render_spectrum_bars_video(
             music_wav=str(music_wav),
-            out_path=output_dir / "spectrum.webm",
+            out_path=output_dir / "spectrum.mov",
             total_duration_s=total_dur_s,
             canvas_w=w,
             canvas_h=h,
             height_pct=getattr(video, "spectrum_height_pct", 0.12),
             color_hex=getattr(video, "spectrum_color", "#ffffff"),
+            bar_width_px=getattr(video, "spectrum_bar_width_px", 10.0),
         )
     elif spectrum_enabled:  # classic
         spec_chain, _ = build_spectrum_filter(

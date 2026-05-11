@@ -234,8 +234,8 @@ def test_music_render_with_bars_spectrum(db, make_sine, make_visual, tmp_path):
     assert 9.5 <= duration <= 10.5, f"Expected ~10s but got {duration:.2f}s"
 
     # Pre-rendered spectrum video should exist next to the output
-    spectrum_files = list(tmp_path.glob("spectrum*.webm"))
-    assert len(spectrum_files) >= 1, "Expected pre-rendered spectrum.webm to exist"
+    spectrum_files = list(tmp_path.glob("spectrum*.mov"))
+    assert len(spectrum_files) >= 1, "Expected pre-rendered spectrum.mov to exist"
 
 
 def test_music_render_with_bars_spectrum_AND_overlay(db, make_sine, make_visual, tmp_path):

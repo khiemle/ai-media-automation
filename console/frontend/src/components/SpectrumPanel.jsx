@@ -39,6 +39,27 @@ export function SpectrumPanel({ value, onChange }) {
             </select>
           </div>
 
+          {/* Bar width — only relevant for the bars style */}
+          {(value.spectrum_style ?? 'classic') === 'bars' && (
+            <div>
+              <label className="block text-xs text-[#9090a8] mb-1.5">
+                Bar width:{' '}
+                <span className="text-[#e8e8f0] font-mono">
+                  {Math.round(value.spectrum_bar_width_px ?? 10)}px
+                </span>
+              </label>
+              <input
+                type="range"
+                min={2}
+                max={50}
+                step={1}
+                value={value.spectrum_bar_width_px ?? 10}
+                onChange={e => update({ spectrum_bar_width_px: parseFloat(e.target.value) })}
+                className="w-full accent-[#7c6af7]"
+              />
+            </div>
+          )}
+
           {/* Position */}
           <div>
             <label className="block text-xs text-[#9090a8] mb-1.5">Position</label>

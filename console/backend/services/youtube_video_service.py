@@ -27,6 +27,7 @@ _MUSIC_NOT_NULL_FIELDS = (
     "spectrum_color",
     "spectrum_opacity",
     "spectrum_style",
+    "spectrum_bar_width_px",
 )
 
 # Valid status transitions for the YoutubeVideo state machine
@@ -185,6 +186,7 @@ def _video_to_dict(
         "spectrum_color":           v.spectrum_color,
         "spectrum_opacity":         v.spectrum_opacity,
         "spectrum_style":           v.spectrum_style or "classic",
+        "spectrum_bar_width_px":    v.spectrum_bar_width_px if v.spectrum_bar_width_px is not None else 10.0,
         "total_duration_s":         None,
         "uploads": uploads if uploads is not None else [],
         "created_at": v.created_at.isoformat() if v.created_at else None,
@@ -358,6 +360,7 @@ class YoutubeVideoService:
             spectrum_color=data.get("spectrum_color", "#ffffff"),
             spectrum_opacity=data.get("spectrum_opacity", 0.6),
             spectrum_style=data.get("spectrum_style", "classic"),
+            spectrum_bar_width_px=data.get("spectrum_bar_width_px", 10.0),
             status="draft",
         )
         self.db.add(video)
@@ -525,6 +528,7 @@ class YoutubeVideoService:
             "track_transition", "track_transition_seconds", "playlist_overlay_style",
             "spectrum_enabled", "spectrum_position", "spectrum_height_pct",
             "spectrum_color", "spectrum_opacity", "spectrum_style",
+            "spectrum_bar_width_px",
         ]
         changed = {f: data[f] for f in editable_fields if f in data}
 
