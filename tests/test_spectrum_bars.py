@@ -116,3 +116,81 @@ def test_compute_bar_heights_handles_mono(tmp_path):
         bar_count=50, spectrum_fps=15,
     )
     assert heights.shape == (30, 50)
+
+
+from pipeline.spectrum_bars import render_spectrum_bars_video
+
+
+def _ffprobe_duration(path) -> float:
+    out = subprocess.run([
+        "ffprobe", "-v", "error", "-show_entries", "format=duration",
+        "-of", "default=noprint_wrappers=1:nokey=1", str(path),
+    ], capture_output=True, text=True, check=True)
+    return float(out.stdout.strip())
+
+
+def test_render_spectrum_video_smoke(tmp_path, sine_wav):
+    """End-to-end: 3s sine → spectrum.webm at expected duration."""
+    a = sine_wav("a", dur=3.0, freq=1000)
+    out_path = tmp_path / "spec.webm"
+    out = render_spectrum_bars_video(
+        music_wav=a,
+        out_path=out_path,
+        total_duration_s=3.0,
+        canvas_w=1920,
+        canvas_h=1080,
+        height_pct=0.12,
+        color_hex="#ffffff",
+    )
+    from pathlib import Path
+    assert Path(out).is_file()
+    dur = _ffprobe_duration(out)
+    assert 2.9 <= dur <= 3.2
+
+
+def test_render_spectrum_video_caches(tmp_path, sine_wav):
+    """Re-running with same inputs reuses the cached output."""
+    a = sine_wav("a", dur=2.0, freq=440)
+    out_path = tmp_path / "spec.webm"
+    render_spectrum_bars_video(
+        music_wav=a, out_path=out_path, total_duration_s=2.0,
+        canvas_w=1920, canvas_h=1080, height_pct=0.12, color_hex="#ffffff",
+    )
+    mtime1 = out_path.stat().st_mtime
+    import time
+    time.sleep(1.1)
+    render_spectrum_bars_video(
+        music_wav=a, out_path=out_path, total_duration_s=2.0,
+        canvas_w=1920, canvas_h=1080, height_pct=0.12, color_hex="#ffffff",
+    )
+    assert out_path.stat().st_mtime == mtime1
+
+
+def test_render_spectrum_video_invalidates_on_audio_change(tmp_path, sine_wav):
+    """If the music WAV is newer than the cached output, re-render."""
+    a = sine_wav("a", dur=2.0, freq=440)
+    out_path = tmp_path / "spec.webm"
+    render_spectrum_bars_video(
+        music_wav=a, out_path=out_path, total_duration_s=2.0,
+        canvas_w=1920, canvas_h=1080, height_pct=0.12, color_hex="#ffffff",
+    )
+    mtime1 = out_path.stat().st_mtime
+    import time, os
+    time.sleep(1.1)
+    a2 = sine_wav("a", dur=2.0, freq=1500)
+    os.utime(a2)
+    render_spectrum_bars_video(
+        music_wav=a2, out_path=out_path, total_duration_s=2.0,
+        canvas_w=1920, canvas_h=1080, height_pct=0.12, color_hex="#ffffff",
+    )
+    assert out_path.stat().st_mtime > mtime1
+
+
+def test_render_spectrum_video_raises_when_audio_missing(tmp_path):
+    with pytest.raises((FileNotFoundError, RuntimeError)):
+        render_spectrum_bars_video(
+            music_wav="/nonexistent/audio.wav",
+            out_path=tmp_path / "spec.webm",
+            total_duration_s=1.0,
+            canvas_w=1920, canvas_h=1080, height_pct=0.12, color_hex="#ffffff",
+        )

@@ -117,3 +117,101 @@ def compute_bar_heights(
 
     _apply_smoothing(bar_heights, decay=smoothing_decay)
     return bar_heights
+
+
+def render_spectrum_bars_video(
+    music_wav: str,
+    out_path: Path,
+    total_duration_s: float,
+    canvas_w: int,
+    canvas_h: int,
+    height_pct: float,
+    color_hex: str,
+    bar_count: int = 50,
+    bar_gap_px: int = 2,
+    corner_radius_px: int = 2,
+    spectrum_fps: int = 15,
+) -> Path:
+    """Pre-render the spectrum as a libvpx-vp9 yuva420p WebM with alpha.
+
+    Returns the path to the rendered file. Caches: if out_path already exists
+    AND its mtime is newer than the music WAV's mtime, returns immediately
+    without re-rendering.
+    """
+    out_path = Path(out_path)
+    music_path = Path(music_wav)
+    if not music_path.is_file():
+        raise FileNotFoundError(f"Music WAV not found: {music_wav}")
+
+    if out_path.is_file() and out_path.stat().st_mtime >= music_path.stat().st_mtime:
+        return out_path
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    strip_h = max(1, int(canvas_h * height_pct))
+    slot_w = max(1, canvas_w // bar_count)
+    bar_w = max(1, slot_w - bar_gap_px)
+
+    color_rgb = _hex_to_rgb(color_hex)
+    template = _build_bar_template(
+        bar_w=bar_w, bar_h=strip_h,
+        radius=corner_radius_px, color_rgb=color_rgb,
+    )
+
+    bar_heights = compute_bar_heights(
+        wav_path=music_wav,
+        total_duration_s=total_duration_s,
+        bar_count=bar_count,
+        spectrum_fps=spectrum_fps,
+    )
+    if bar_heights.shape[0] == 0:
+        raise RuntimeError("compute_bar_heights returned zero frames")
+
+    cmd = [
+        "ffmpeg", "-y",
+        "-f", "rawvideo",
+        "-pixel_format", "rgba",
+        "-video_size", f"{canvas_w}x{strip_h}",
+        "-framerate", str(spectrum_fps),
+        "-i", "pipe:0",
+        "-c:v", "libvpx-vp9",
+        "-pix_fmt", "yuva420p",
+        "-t", str(total_duration_s),
+        "-an",
+        "-deadline", "realtime",
+        "-cpu-used", "8",
+        "-b:v", "0",
+        "-crf", "32",
+        str(out_path),
+    ]
+    proc = subprocess.Popen(
+        cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE,
+    )
+
+    frame_buf = np.zeros((strip_h, canvas_w, 4), dtype=np.uint8)
+    try:
+        for k in range(bar_heights.shape[0]):
+            frame_buf.fill(0)
+            for i in range(bar_count):
+                h_px = int(round(float(bar_heights[k, i]) * strip_h))
+                if h_px <= 0:
+                    continue
+                x_start = i * slot_w
+                x_end = x_start + bar_w
+                if x_end > canvas_w:
+                    x_end = canvas_w
+                bar_slice_w = x_end - x_start
+                tpl_slice = template[strip_h - h_px:, :bar_slice_w]
+                frame_buf[strip_h - h_px:, x_start:x_end] = tpl_slice
+            proc.stdin.write(frame_buf.tobytes())
+    finally:
+        try:
+            proc.stdin.close()
+        except BrokenPipeError:
+            pass
+        proc.wait()
+
+    if proc.returncode != 0:
+        err = proc.stderr.read().decode("utf-8", "ignore")[-500:]
+        raise RuntimeError(f"spectrum bars ffmpeg failed (rc={proc.returncode}): {err}")
+    return out_path
