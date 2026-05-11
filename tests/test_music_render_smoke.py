@@ -177,3 +177,113 @@ def test_music_render_no_overlay_no_spectrum(db, make_sine, make_visual, tmp_pat
     assert out.is_file()
     duration = _probe_duration(out)
     assert duration == pytest.approx(8.0, abs=0.5)
+
+
+def test_music_render_with_bars_spectrum(db, make_sine, make_visual, tmp_path):
+    """Render a music video with spectrum_style='bars' — spectrum.webm exists,
+    final MP4 has the right duration, render completes."""
+    from console.backend.models.video_asset import VideoAsset
+    from console.backend.models.youtube_video import YoutubeVideo
+    from database.models import MusicTrack
+    from pipeline.youtube_ffmpeg import render_landscape
+
+    template = _seed_music_template(db)
+
+    tracks = []
+    for i, dur in enumerate([3, 4, 3], start=1):
+        wav = make_sine(f"t{i}", dur, freq=440 + i * 200)
+        t = MusicTrack(title=f"Track {i}", file_path=str(wav),
+                       duration_s=float(dur), volume=1.0)
+        db.add(t)
+        tracks.append(t)
+    db.commit()
+
+    visual_mp4 = make_visual("v_bars", dur=5)
+    visual = VideoAsset(
+        file_path=str(visual_mp4),
+        duration_s=5.0,
+        source="test",
+        asset_type="video_clip",
+    )
+    db.add(visual)
+    db.commit()
+
+    video = YoutubeVideo(
+        title="Smoke Music Bars",
+        template_id=template.id,
+        music_track_ids=[t.id for t in tracks],
+        visual_asset_id=visual.id,
+        track_transition="gapless",
+        playlist_overlay_style=None,
+        spectrum_enabled=True,
+        spectrum_style="bars",
+        spectrum_position="bottom",
+        spectrum_height_pct=0.15,
+        spectrum_color="#ffffff",
+        spectrum_opacity=0.7,
+    )
+    db.add(video)
+    db.commit()
+    db.refresh(video)
+
+    out = tmp_path / "final.mp4"
+    render_landscape(video, out, db)
+
+    assert out.is_file()
+    duration = _probe_duration(out)
+    assert 9.5 <= duration <= 10.5, f"Expected ~10s but got {duration:.2f}s"
+
+    # Pre-rendered spectrum video should exist next to the output
+    spectrum_files = list(tmp_path.glob("spectrum*.webm"))
+    assert len(spectrum_files) >= 1, "Expected pre-rendered spectrum.webm to exist"
+
+
+def test_music_render_with_bars_spectrum_AND_overlay(db, make_sine, make_visual, tmp_path):
+    """Bars spectrum + chip overlay both work together; input indices align."""
+    from console.backend.models.video_asset import VideoAsset
+    from console.backend.models.youtube_video import YoutubeVideo
+    from database.models import MusicTrack
+    from pipeline.youtube_ffmpeg import render_landscape
+
+    template = _seed_music_template(db)
+
+    tracks = []
+    for i, dur in enumerate([3, 4, 3], start=1):
+        wav = make_sine(f"tb{i}", dur, freq=440 + i * 200)
+        t = MusicTrack(title=f"Track B{i}", file_path=str(wav),
+                       duration_s=float(dur), volume=1.0)
+        db.add(t)
+        tracks.append(t)
+    db.commit()
+
+    visual_mp4 = make_visual("v_bars_ov", dur=5)
+    visual = VideoAsset(
+        file_path=str(visual_mp4),
+        duration_s=5.0,
+        source="test",
+        asset_type="video_clip",
+    )
+    db.add(visual)
+    db.commit()
+
+    video = YoutubeVideo(
+        title="Bars + Overlay",
+        template_id=template.id,
+        music_track_ids=[t.id for t in tracks],
+        visual_asset_id=visual.id,
+        track_transition="gapless",
+        playlist_overlay_style="chip",   # 3 overlay PNGs (one per track)
+        spectrum_enabled=True,
+        spectrum_style="bars",
+        spectrum_position="bottom",
+        spectrum_height_pct=0.15,
+        spectrum_color="#ffffff",
+        spectrum_opacity=0.7,
+    )
+    db.add(video)
+    db.commit()
+    db.refresh(video)
+
+    out = tmp_path / "final_bars_overlay.mp4"
+    render_landscape(video, out, db)
+    assert out.is_file(), "Output file was not created"
