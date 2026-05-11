@@ -77,3 +77,4 @@ class YoutubeVideo(Base):
     spectrum_height_pct:      Mapped[float]     = mapped_column(Float,       nullable=False, default=0.12,       server_default="0.12")
     spectrum_color:           Mapped[str]       = mapped_column(String(9),   nullable=False, default="#ffffff",  server_default="#ffffff")
     spectrum_opacity:         Mapped[float]     = mapped_column(Float,       nullable=False, default=0.6,        server_default="0.6")
+    spectrum_style:           Mapped[str]       = mapped_column(String(20),  nullable=False, default="classic",  server_default="classic")

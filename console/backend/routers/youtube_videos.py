@@ -6,6 +6,7 @@ from typing import Literal
 TrackTransition  = Literal["gapless", "crossfade", "gap"]
 OverlayStyle     = Literal["chip", "sidebar", "bottom_bar"]
 SpectrumPosition = Literal["bottom", "center"]
+SpectrumStyle    = Literal["classic", "bars"]
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
@@ -54,6 +55,7 @@ class YoutubeVideoCreate(BaseModel):
     spectrum_height_pct:      float = Field(default=0.12, gt=0.0, le=0.5)
     spectrum_color:           str = "#ffffff"
     spectrum_opacity:         float = Field(default=0.6, ge=0.0, le=1.0)
+    spectrum_style:           SpectrumStyle = "classic"
 
 
 class YoutubeVideoUpdate(BaseModel):
@@ -85,6 +87,7 @@ class YoutubeVideoUpdate(BaseModel):
     spectrum_height_pct:      float | None = Field(default=None, gt=0.0, le=0.5)
     spectrum_color:           str | None = None
     spectrum_opacity:         float | None = Field(default=None, ge=0.0, le=1.0)
+    spectrum_style:           SpectrumStyle | None = None
 
 
 class StatusUpdate(BaseModel):
