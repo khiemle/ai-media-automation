@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from console.backend.auth import require_editor_or_admin
 from console.backend.database import get_db
+from console.backend.services.upload_stats_service import fetch_stats as fetch_upload_stats
 from console.backend.services.youtube_video_service import YoutubeVideoService
 from console.backend.utils.file_naming import make_unique_path
 
@@ -327,6 +328,22 @@ def retry_upload(
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/uploads/{upload_id}/stats")
+def get_upload_stats(
+    upload_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(require_editor_or_admin),
+):
+    """Live YouTube stats fetch for one upload. No DB write."""
+    try:
+        return fetch_upload_stats(upload_id, db)
+    except ValueError as exc:
+        msg = str(exc)
+        if "not found" in msg:
+            raise HTTPException(status_code=404, detail=msg)
+        raise HTTPException(status_code=400, detail=msg)
 
 
 # ── ASMR / Soundscape render lifecycle ────────────────────────────────────────
