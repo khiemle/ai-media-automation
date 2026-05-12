@@ -5,6 +5,7 @@ WORKDIR /app
 # System deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-client redis-tools ffmpeg curl \
+    fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
 
 # Python deps

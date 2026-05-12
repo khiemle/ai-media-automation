@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         python3.11 python3.11-dev python3.11-distutils \
         ffmpeg libsndfile1 libgomp1 \
         postgresql-client \
+        fonts-liberation \
     && curl -sS https://bootstrap.pypa.io/get-pip.py | python3.11 \
     && ln -sf /usr/bin/python3.11 /usr/bin/python3 \
     && ln -sf /usr/bin/python3.11 /usr/bin/python \
