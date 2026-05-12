@@ -234,6 +234,26 @@ def _template_to_dict(t: VideoTemplate) -> dict[str, Any]:
 class YoutubeVideoService:
     EDITABLE_STATUSES = {"draft", "failed", "audio_preview_ready", "video_preview_ready"}
 
+    # Fields cloned from source to new draft. Keep this list explicit so each
+    # field's inclusion is reviewable in isolation — see
+    # docs/superpowers/specs/2026-05-12-youtube-page-bugfixes-design.md (Fix 4).
+    _RECREATE_CLONED_FIELDS = (
+        "template_id", "theme",
+        "music_track_id", "visual_asset_id",
+        "music_track_ids", "visual_asset_ids",
+        "visual_clip_durations_s", "visual_loop_mode",
+        "sfx_overrides", "sfx_pool", "sfx_density_seconds", "sfx_seed",
+        "seo_title", "seo_description", "seo_tags",
+        "target_duration_h", "output_quality",
+        "sound_layers",
+        "track_transition", "track_transition_seconds", "playlist_overlay_style",
+        "spectrum_enabled", "spectrum_height_pct", "spectrum_color",
+        "spectrum_opacity", "spectrum_style", "spectrum_bar_width_px",
+        "spectrum_bar_count", "spectrum_align_horizontal", "spectrum_align_vertical",
+        "thumbnail_asset_id", "thumbnail_text",
+        "black_from_seconds", "skip_previews",
+    )
+
     def __init__(self, db: Session):
         self.db = db
 
@@ -379,6 +399,33 @@ class YoutubeVideoService:
             self.db.rollback()
             raise
         return _video_to_dict(video)
+
+    def recreate(self, source_id: int) -> "YoutubeVideo":
+        """Clone a YoutubeVideo's configuration into a new draft.
+
+        Runtime/output fields (status, paths, celery_task_id, render_parts,
+        parent_youtube_video_id) are reset. Returns the persisted new YoutubeVideo.
+        """
+        source = self.db.get(YoutubeVideo, source_id)
+        if source is None:
+            raise ValueError(f"YoutubeVideo {source_id} not found")
+
+        kwargs = {f: getattr(source, f) for f in self._RECREATE_CLONED_FIELDS}
+        kwargs["title"] = f"{source.title} (recreate)"
+        kwargs["status"] = "draft"
+        # Runtime fields default to None / []; explicit for documentation:
+        kwargs["output_path"] = None
+        kwargs["audio_preview_path"] = None
+        kwargs["video_preview_path"] = None
+        kwargs["celery_task_id"] = None
+        kwargs["thumbnail_path"] = None
+        kwargs["render_parts"] = []
+        kwargs["parent_youtube_video_id"] = None
+
+        new_video = YoutubeVideo(**kwargs)
+        self.db.add(new_video)
+        self.db.flush()
+        return new_video
 
     def _validate_music_template(self, data: dict, template) -> dict:
         """Reject music-template-incompatible fields, normalize single-track overlay.
