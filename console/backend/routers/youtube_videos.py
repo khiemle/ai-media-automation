@@ -312,6 +312,22 @@ def start_upload(
         raise HTTPException(status_code=400, detail=msg)
 
 
+@router.post("/{video_id}/upload/{upload_id}/retry", status_code=202)
+def retry_upload(
+    video_id: int,
+    upload_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(require_editor_or_admin),
+):
+    svc = YoutubeVideoService(db)
+    try:
+        return svc.retry_upload(video_id, upload_id, user_id=user.id)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 # ── ASMR / Soundscape render lifecycle ────────────────────────────────────────
 
 
