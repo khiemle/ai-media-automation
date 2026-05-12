@@ -2250,7 +2250,7 @@ export default function YouTubeVideosPage() {
                       </Button>
                       {templateMenuOpen === `plan-${plan.id}` && (
                         <div
-                          className="absolute right-0 top-full mt-1 z-10 min-w-[180px] bg-[#1c1c22] border border-[#2a2a32] rounded-md shadow-lg py-1"
+                          className="absolute right-0 bottom-full mb-1 z-20 min-w-[180px] bg-[#1c1c22] border border-[#2a2a32] rounded-md shadow-lg py-1"
                           onMouseLeave={() => setTemplateMenuOpen(null)}
                         >
                           {landscapeTemplates.map(t => (
