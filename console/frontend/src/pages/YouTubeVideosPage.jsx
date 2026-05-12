@@ -1841,7 +1841,7 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
   )
 }
 
-function MakeShortModal({ video, shortTemplates, onClose, onCreated }) {
+function MakeShortModal({ video, shortTemplates, onClose, onCreated, originalUploadUrl = null }) {
   const shortTemplate = shortTemplates[0]
   const [form, setForm] = useState({
     sameMusic: true,
@@ -1872,7 +1872,12 @@ function MakeShortModal({ video, shortTemplates, onClose, onCreated }) {
         parent_youtube_video_id: video.id,
         sfx_overrides: { ...(video.sfx_overrides || {}), cta: { text: form.ctaText, position: form.ctaPosition } },
         seo_title: video.seo_title ?? null,
-        seo_description: video.seo_description ?? null,
+        seo_description: (() => {
+          const base = video.seo_description ?? ''
+          return originalUploadUrl
+            ? `Watch the full video → ${originalUploadUrl}\n\n${base}`.trimEnd()
+            : (base || null)
+        })(),
         seo_tags: video.seo_tags ?? null,
       })
       onCreated()
