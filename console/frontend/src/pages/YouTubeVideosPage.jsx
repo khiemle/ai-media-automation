@@ -2338,6 +2338,22 @@ export default function YouTubeVideosPage() {
                         <Button variant="ghost" size="sm" onClick={() => setRegenThumbnailVideo(v)}>
                           Thumbnail
                         </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={async () => {
+                            try {
+                              const res = await youtubeVideosApi.recreate(v.id)
+                              showToast(`New draft created (id ${res.id})`, 'success')
+                              load()
+                            } catch (e) {
+                              showToast(e.message, 'error')
+                            }
+                          }}
+                          title="Create a new draft with this video's configuration"
+                        >
+                          Recreate
+                        </Button>
                       </>
                     )}
                     <button

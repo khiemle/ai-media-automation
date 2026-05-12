@@ -266,6 +266,7 @@ export const youtubeVideosApi = {
   startFinal: (id) => fetchApi(`/api/youtube-videos/${id}/render/final`, { method: 'POST' }),
   resume: (id) => fetchApi(`/api/youtube-videos/${id}/render/resume`, { method: 'POST' }),
   cancel: (id) => fetchApi(`/api/youtube-videos/${id}/render/cancel`, { method: 'POST' }),
+  recreate: (id) => fetchApi(`/api/youtube-videos/${id}/recreate`, { method: 'POST' }),
   audioPreviewUrl: (id) => `/api/youtube-videos/${id}/preview/audio`,
   videoPreviewUrl: (id) => `/api/youtube-videos/${id}/preview/video`,
 
