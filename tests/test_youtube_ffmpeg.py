@@ -667,3 +667,84 @@ def test_render_landscape_uses_build_sound_layers_wav(tmp_path):
 
     mock_sl.assert_called_once()
     mock_old.assert_not_called()
+
+
+# ── resolve_visual plural-array fallback ──────────────────────────────────────
+
+def test_resolve_visual_falls_back_to_first_plural_id():
+    """When visual_asset_id is None but visual_asset_ids has entries, resolve to the first."""
+    fake_asset = MagicMock()
+    fake_asset.file_path = "/tmp/plural1.mp4"
+    db = MagicMock()
+    db.get.return_value = fake_asset
+
+    video = _make_video(visual_asset_id=None)
+    video.visual_asset_ids = [101, 102]
+
+    from pipeline.youtube_ffmpeg import resolve_visual
+    result = resolve_visual(video, db)
+    assert result == "/tmp/plural1.mp4"
+    # Must have looked up the FIRST plural id (101), not the second
+    from console.backend.models.video_asset import VideoAsset
+    db.get.assert_called_once_with(VideoAsset, 101)
+
+
+def test_resolve_visual_singular_takes_precedence_over_plural():
+    """When singular is present, it wins (preserve legacy behavior)."""
+    single_asset = MagicMock()
+    single_asset.file_path = "/tmp/single.mp4"
+    db = MagicMock()
+    db.get.return_value = single_asset
+
+    video = _make_video(visual_asset_id=42)
+    video.visual_asset_ids = [999]
+
+    from pipeline.youtube_ffmpeg import resolve_visual
+    result = resolve_visual(video, db)
+    assert result == "/tmp/single.mp4"
+    from console.backend.models.video_asset import VideoAsset
+    db.get.assert_called_once_with(VideoAsset, 42)
+
+
+def test_resolve_visual_returns_none_when_no_assets():
+    """Both singular and plural missing → None."""
+    db = MagicMock()
+    video = _make_video(visual_asset_id=None)
+    video.visual_asset_ids = []
+    from pipeline.youtube_ffmpeg import resolve_visual
+    assert resolve_visual(video, db) is None
+    db.get.assert_not_called()
+
+
+# ── resolve_audio plural-array fallback ───────────────────────────────────────
+
+def test_resolve_audio_falls_back_to_first_plural_id():
+    """When music_track_id is None but music_track_ids has entries, resolve to the first."""
+    fake_track = MagicMock()
+    fake_track.file_path = "/tmp/m1.mp3"
+    db = MagicMock()
+    db.get.return_value = fake_track
+
+    video = _make_video(music_track_id=None, music_track_ids=[201, 202])
+
+    from pipeline.youtube_ffmpeg import resolve_audio
+    result = resolve_audio(video, db)
+    assert result == "/tmp/m1.mp3"
+    from database.models import MusicTrack
+    db.get.assert_called_once_with(MusicTrack, 201)
+
+
+def test_resolve_audio_singular_takes_precedence():
+    """When singular music_track_id is set, it wins over music_track_ids."""
+    single_track = MagicMock()
+    single_track.file_path = "/tmp/single.mp3"
+    db = MagicMock()
+    db.get.return_value = single_track
+
+    video = _make_video(music_track_id=7, music_track_ids=[999])
+
+    from pipeline.youtube_ffmpeg import resolve_audio
+    result = resolve_audio(video, db)
+    assert result == "/tmp/single.mp3"
+    from database.models import MusicTrack
+    db.get.assert_called_once_with(MusicTrack, 7)

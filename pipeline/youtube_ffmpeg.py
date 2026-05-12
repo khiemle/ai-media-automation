@@ -54,16 +54,29 @@ def build_spectrum_filter(
 
 
 def resolve_visual(video, db) -> str | None:
-    """Return the file path of the linked visual asset, or None."""
-    if not video.visual_asset_id:
-        return None
+    """Return the file path of the linked visual asset, or None.
+
+    Prefers the singular `visual_asset_id`; falls back to the first entry in
+    `visual_asset_ids` so videos built from playlist-only templates still work.
+    """
     try:
         from console.backend.models.video_asset import VideoAsset
-        asset = db.get(VideoAsset, video.visual_asset_id)
+    except Exception:  # pragma: no cover
+        return None
+
+    asset_id = video.visual_asset_id
+    if not asset_id:
+        plural = list(getattr(video, "visual_asset_ids", None) or [])
+        if plural:
+            asset_id = plural[0]
+    if not asset_id:
+        return None
+    try:
+        asset = db.get(VideoAsset, asset_id)
         if asset and asset.file_path:
             return asset.file_path
     except Exception as exc:
-        logger.warning("Could not load visual asset %s: %s", video.visual_asset_id, exc)
+        logger.warning("Could not load visual asset %s: %s", asset_id, exc)
     return None
 
 
@@ -161,16 +174,29 @@ def _build_visual_segment(
 
 
 def resolve_audio(video, db) -> str | None:
-    """Return the file path of the linked music track, or None."""
-    if not video.music_track_id:
-        return None
+    """Return the file path of the linked music track, or None.
+
+    Prefers the singular `music_track_id`; falls back to the first entry in
+    `music_track_ids` so videos built from playlist-only templates still work.
+    """
     try:
         from database.models import MusicTrack
-        track = db.get(MusicTrack, video.music_track_id)
+    except Exception:  # pragma: no cover
+        return None
+
+    track_id = video.music_track_id
+    if not track_id:
+        plural = list(getattr(video, "music_track_ids", None) or [])
+        if plural:
+            track_id = plural[0]
+    if not track_id:
+        return None
+    try:
+        track = db.get(MusicTrack, track_id)
         if track and track.file_path:
             return track.file_path
     except Exception as exc:
-        logger.warning("Could not load music track %s: %s", video.music_track_id, exc)
+        logger.warning("Could not load music track %s: %s", track_id, exc)
     return None
 
 
