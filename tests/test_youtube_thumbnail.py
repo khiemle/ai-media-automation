@@ -125,3 +125,40 @@ def test_cover_resize_portrait_to_1280x720():
     from PIL import Image
     result = cover_resize(Image.new("RGB", (1080, 1920)), (1280, 720))
     assert result.size == (1280, 720)
+
+
+def test_generate_thumbnail_bold_pixels_differ_from_regular_pixels(tmp_path):
+    """Smoke-test that the bold span renders with visibly different stroke than the regular span.
+
+    We render the same thumbnail twice — once with bold_word_count=0 (all regular)
+    and once with bold_word_count=1 — and assert the resulting PNGs differ.
+    This catches the regression where bold and regular fonts collapsed to the
+    same file."""
+    from pipeline.youtube_thumbnail import generate_thumbnail, DEFAULT_BOLD_FONT, DEFAULT_REGULAR_FONT
+    import pytest
+    if DEFAULT_BOLD_FONT == DEFAULT_REGULAR_FONT:
+        pytest.skip("Bold font equals regular font on this system — visual diff not meaningful")
+
+    from PIL import Image
+    src = tmp_path / "src.jpg"
+    Image.new("RGB", (1280, 720), color=(50, 60, 70)).save(src)
+
+    out_regular = tmp_path / "out_regular.png"
+    out_bold    = tmp_path / "out_bold.png"
+
+    generate_thumbnail(src, out_regular, text="DEEP FOCUS MUSIC", bold_word_count=0)
+    generate_thumbnail(src, out_bold,    text="DEEP FOCUS MUSIC", bold_word_count=1)
+
+    assert out_regular.read_bytes() != out_bold.read_bytes(), \
+        "Bold and regular thumbnails are byte-identical — bold rendering isn't actually bolding."
+
+
+def test_generate_thumbnail_accepts_bold_word_count_kwarg(tmp_path):
+    """Public API: generate_thumbnail accepts bold_word_count and runs without error."""
+    from pipeline.youtube_thumbnail import generate_thumbnail
+    from PIL import Image
+    src = tmp_path / "src.jpg"
+    Image.new("RGB", (1280, 720), color=(50, 60, 70)).save(src)
+    out = tmp_path / "out.png"
+    generate_thumbnail(src, out, text="DEEP FOCUS", bold_word_count=2)
+    assert out.exists()

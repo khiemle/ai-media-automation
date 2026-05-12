@@ -33,8 +33,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--font", type=Path, default=DEFAULT_REGULAR_FONT)
     parser.add_argument("--bold-font", type=Path, default=DEFAULT_BOLD_FONT)
     parser.add_argument(
+        "--bold-word-count", type=int, default=1,
+        help="Number of leading words to render in the bold font (default 1; 0 = all regular).",
+    )
+    parser.add_argument(
         "--no-bold-first-word", dest="no_bold_first_word", action="store_true",
-        help="Use regular style for every word.",
+        help="Shortcut for --bold-word-count=0 (overrides --bold-word-count).",
     )
     parser.add_argument(
         "--no-bold-first-line", dest="no_bold_first_word", action="store_true",
@@ -51,13 +55,14 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    bold_word_count = 0 if args.no_bold_first_word else max(0, args.bold_word_count)
     generate_thumbnail(
         source_path=args.image,
         output_path=args.output,
         text=args.text,
         font=args.font,
         bold_font=args.bold_font,
-        bold_first_word=not args.no_bold_first_word,
+        bold_word_count=bold_word_count,
         preferred_font_size=args.preferred_font_size,
         min_font_size=args.min_font_size,
         margin_x=args.margin_x,

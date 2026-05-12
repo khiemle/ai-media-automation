@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Iterable
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -122,12 +121,6 @@ def wrap_plan(text: str, bold_word_count: int) -> list[list[tuple[str, bool]]]:
     return plan
 
 
-def split_text(text: str) -> list[str]:
-    """Deprecated. Use wrap_plan. Kept for transition compat with generate_thumbnail (until T9)."""
-    plan = wrap_plan(text, bold_word_count=1)
-    return [" ".join(w for w, _ in line) for line in plan]
-
-
 def cover_resize(image: Image.Image, size: tuple[int, int]) -> Image.Image:
     target_w, target_h = size
     src_w, src_h = image.size
@@ -140,59 +133,78 @@ def cover_resize(image: Image.Image, size: tuple[int, int]) -> Image.Image:
     return resized.crop((left, top, left + target_w, top + target_h))
 
 
-def load_font(path: Path, size: int, variation: str | None = None) -> ImageFont.FreeTypeFont:
-    if not path.exists():
-        raise FileNotFoundError(f"Font file not found: {path}")
-    font = ImageFont.truetype(str(path), size=size)
-    if variation:
-        try:
-            font.set_variation_by_name(variation)
-        except (AttributeError, OSError, ValueError):
-            pass
-    return font
-
-
-def measure_lines(
+def _measure_word(
     draw: ImageDraw.ImageDraw,
-    lines: Iterable[str],
+    word: str,
+    font: ImageFont.FreeTypeFont,
+    stroke_width: int,
+) -> tuple[int, int, tuple[int, int, int, int]]:
+    bbox = draw.textbbox((0, 0), word, font=font, stroke_width=stroke_width)
+    return bbox[2] - bbox[0], bbox[3] - bbox[1], bbox
+
+
+def measure_plan(
+    draw: ImageDraw.ImageDraw,
+    plan: list[list[tuple[str, bool]]],
     font_size: int,
     regular_font_path: Path,
     bold_font_path: Path,
-    bold_first_word: bool,
-) -> tuple[int, int, list[tuple[str, ImageFont.FreeTypeFont, int, tuple[int, int, int, int]]]]:
-    measured = []
-    widths: list[int] = []
-    heights: list[int] = []
+) -> tuple[int, int, list[list[tuple[str, ImageFont.FreeTypeFont, int, tuple[int, int, int, int]]]]]:
+    """Measure a wrap plan; return (max_line_width, total_block_height, per_word_metadata).
+
+    per_word_metadata is one inner list per line. Each item is
+    (word, font, stroke_width, bbox) — ready for the draw loop.
+    """
     stroke_width = max(2, round(font_size * 0.045))
     spacing = max(8, round(font_size * 0.17))
 
-    for index, line in enumerate(lines):
-        is_bold = index == 0 and bold_first_word
-        font_path = bold_font_path if is_bold else regular_font_path
-        font = load_font(font_path, font_size, "Bold" if is_bold else "Regular")
-        bbox = draw.textbbox((0, 0), line, font=font, stroke_width=stroke_width)
-        widths.append(bbox[2] - bbox[0])
-        heights.append(bbox[3] - bbox[1])
-        measured.append((line, font, stroke_width, bbox))
+    regular_font = load_font(regular_font_path, font_size)
+    bold_font    = load_font(bold_font_path,    font_size)
+    space_w, _, _ = _measure_word(draw, " ", regular_font, stroke_width)
 
-    total_height = sum(heights) + spacing * max(0, len(heights) - 1)
-    return max(widths), total_height, measured
+    measured_plan: list[list[tuple[str, ImageFont.FreeTypeFont, int, tuple[int, int, int, int]]]] = []
+    line_widths:   list[int] = []
+    line_heights:  list[int] = []
+
+    for line in plan:
+        words_meta = []
+        line_w = 0
+        line_h = 0
+        for i, (word, is_bold) in enumerate(line):
+            font = bold_font if is_bold else regular_font
+            w, h, bbox = _measure_word(draw, word, font, stroke_width)
+            if i > 0:
+                line_w += space_w
+            line_w += w
+            line_h = max(line_h, h)
+            words_meta.append((word, font, stroke_width, bbox))
+        measured_plan.append(words_meta)
+        line_widths.append(line_w)
+        line_heights.append(line_h)
+
+    total_height = sum(line_heights) + spacing * max(0, len(line_heights) - 1)
+    return max(line_widths), total_height, measured_plan
 
 
-def fit_text(
+def load_font(path: Path, size: int, variation: str | None = None) -> ImageFont.FreeTypeFont:
+    if not path.exists():
+        raise FileNotFoundError(f"Font file not found: {path}")
+    return ImageFont.truetype(str(path), size=size)
+
+
+def fit_text_plan(
     draw: ImageDraw.ImageDraw,
-    lines: list[str],
+    plan: list[list[tuple[str, bool]]],
     regular_font_path: Path,
     bold_font_path: Path,
-    bold_first_word: bool,
     max_width: int,
     max_height: int,
     preferred_size: int,
     min_size: int,
-) -> tuple[int, int, list[tuple[str, ImageFont.FreeTypeFont, int, tuple[int, int, int, int]]]]:
+) -> tuple[int, int, list]:
     for font_size in range(preferred_size, min_size - 1, -2):
-        width, height, measured = measure_lines(
-            draw, lines, font_size, regular_font_path, bold_font_path, bold_first_word
+        width, height, measured = measure_plan(
+            draw, plan, font_size, regular_font_path, bold_font_path
         )
         if width <= max_width and height <= max_height:
             return font_size, height, measured
@@ -207,7 +219,7 @@ def generate_thumbnail(
     text: str | None = None,
     font: Path = DEFAULT_REGULAR_FONT,
     bold_font: Path = DEFAULT_BOLD_FONT,
-    bold_first_word: bool = True,
+    bold_word_count: int = 1,
     preferred_font_size: int = 162,
     min_font_size: int = 48,
     margin_x: int = 58,
@@ -218,7 +230,8 @@ def generate_thumbnail(
     """Generate a 1280x720 YouTube thumbnail PNG.
 
     text=None or empty: cover-resize only, no overlay.
-    text provided: resize then draw text bottom-left with stroke.
+    text provided: resize then draw text bottom-left with stroke; the first
+        `bold_word_count` words (default 1) are drawn in the bold font.
     Returns output_path as a Path.
     """
     source_path = Path(source_path)
@@ -229,26 +242,35 @@ def generate_thumbnail(
 
     if text and text.strip():
         draw = ImageDraw.Draw(canvas)
-        lines = split_text(text.upper())
+        plan = wrap_plan(text.upper(), bold_word_count)
         max_width = THUMBNAIL_SIZE[0] - margin_x * 2
         max_height = THUMBNAIL_SIZE[1] - margin_bottom * 2
-        font_size, block_height, measured = fit_text(
-            draw, lines, font, bold_font, bold_first_word,
+        font_size, block_height, measured = fit_text_plan(
+            draw, plan, font, bold_font,
             max_width, max_height, preferred_font_size, min_font_size,
         )
         spacing = max(8, round(font_size * 0.17))
-        x = margin_x
+        regular_for_space = load_font(font, font_size)
+        space_w, _, _ = _measure_word(draw, " ", regular_for_space,
+                                       max(2, round(font_size * 0.045)))
+
         y = THUMBNAIL_SIZE[1] - margin_bottom - block_height
-        for line, line_font, stroke_width, bbox in measured:
-            draw.text(
-                (x - bbox[0], y - bbox[1]),
-                line,
-                font=line_font,
-                fill=fill,
-                stroke_width=stroke_width,
-                stroke_fill=stroke_fill,
-            )
-            y += (bbox[3] - bbox[1]) + spacing
+        for line in measured:
+            x = margin_x
+            line_h = max((bbox[3] - bbox[1]) for (_, _, _, bbox) in line)
+            for i, (word, word_font, stroke_width, bbox) in enumerate(line):
+                if i > 0:
+                    x += space_w
+                draw.text(
+                    (x - bbox[0], y - bbox[1]),
+                    word,
+                    font=word_font,
+                    fill=fill,
+                    stroke_width=stroke_width,
+                    stroke_fill=stroke_fill,
+                )
+                x += (bbox[2] - bbox[0])
+            y += line_h + spacing
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     canvas.save(output_path)
