@@ -1841,7 +1841,7 @@ function CreationPanel({ template, channelPlan, channelPlans = [], onClose, onCr
   )
 }
 
-function MakeShortModal({ video, shortTemplates, onClose, onCreated, originalUploadUrl = null }) {
+export function MakeShortModal({ video, shortTemplates, onClose, onCreated, originalUploadUrl = null }) {
   const shortTemplate = shortTemplates[0]
   const [form, setForm] = useState({
     sameMusic: true,

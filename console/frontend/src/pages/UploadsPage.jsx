@@ -3,6 +3,7 @@ import { Card, Badge, Button, Tabs, Spinner, EmptyState, Modal, Input, Select, T
 import ChannelPicker from '../components/ChannelPicker.jsx'
 import YouTubeSetupWizard from '../components/YouTubeSetupWizard.jsx'
 import { fetchApi, youtubeVideosApi, youtubeWatchUrl } from '../api/client.js'
+import { MakeShortModal } from './YouTubeVideosPage.jsx'
 
 // ── Platform config ───────────────────────────────────────────────────────────
 const PLATFORMS = [
@@ -271,6 +272,8 @@ function YouTubeLongSection({ channels }) {
   const [previewVideo, setPreviewVideo] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [toast, setToast] = useState(null)
+  const [shortTemplates, setShortTemplates] = useState([])
+  const [makeShortFromUpload, setMakeShortFromUpload] = useState(null) // { video, originalUploadUrl } | null
   const pollRef = useRef(null)
 
   const showToast = (msg, type = 'success') => {
@@ -288,6 +291,12 @@ function YouTubeLongSection({ channels }) {
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    youtubeVideosApi.listTemplates()
+      .then(res => setShortTemplates((res.items || res || []).filter(t => t.output_format === 'portrait_short')))
+      .catch(() => {})  // page still works without Make-Short
+  }, [])
 
   // Auto-poll while any upload is in-progress
   useEffect(() => {
@@ -441,6 +450,18 @@ function YouTubeLongSection({ channels }) {
                                 ↗
                               </button>
                             )}
+                            {u.status === 'done' && u.platform_id && shortTemplates.length > 0 && (
+                              <button
+                                title="Create a Short from this video, with a link back to it in the description"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setMakeShortFromUpload({ video: v, originalUploadUrl: youtubeWatchUrl(u.platform_id) })
+                                }}
+                                className="ml-0.5 text-[#7c6af7] hover:text-[#a594f9] transition-colors leading-none text-[10px]"
+                              >
+                                +Short
+                              </button>
+                            )}
                           </span>
                         ))}
                       </div>
@@ -514,6 +535,18 @@ function YouTubeLongSection({ channels }) {
         streamUrl={previewVideo ? `/api/youtube-videos/${previewVideo.id}/stream` : null}
         aspectRatio="16/9"
       />
+      {makeShortFromUpload && shortTemplates.length > 0 && (
+        <MakeShortModal
+          video={makeShortFromUpload.video}
+          shortTemplates={shortTemplates}
+          originalUploadUrl={makeShortFromUpload.originalUploadUrl}
+          onClose={() => setMakeShortFromUpload(null)}
+          onCreated={() => {
+            setMakeShortFromUpload(null)
+            showToast('Short queued', 'success')
+          }}
+        />
+      )}
     </Card>
   )
 }
