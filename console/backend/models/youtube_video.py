@@ -61,12 +61,15 @@ class YoutubeVideo(Base):
     visual_clip_durations_s: Mapped[list[float]] = mapped_column(ARRAY(Float),   default=list, server_default="{}")
     visual_loop_mode:        Mapped[str]         = mapped_column(String(20), default="concat_loop", server_default="concat_loop", nullable=False)
 
-    # Thumbnail fields (added by migration 016)
+    # Thumbnail fields (added by migration 016; bold_word_count added by 026)
     thumbnail_asset_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("video_assets.id", ondelete="SET NULL"), nullable=True
     )
     thumbnail_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     thumbnail_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    thumbnail_bold_word_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=1, server_default="1"
+    )
 
     # Music template fields (added by migration 022)
     track_transition:         Mapped[str]       = mapped_column(String(20),  nullable=False, default="gapless",  server_default="gapless")

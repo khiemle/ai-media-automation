@@ -42,3 +42,16 @@ def test_video_to_dict_thumbnail_fields_default_none():
     assert d["thumbnail_asset_id"] is None
     assert d["thumbnail_text"] is None
     assert d["thumbnail_path"] is None
+
+
+def test_youtube_video_has_thumbnail_bold_word_count_default_1(db):
+    import uuid
+    from console.backend.models.youtube_video import YoutubeVideo
+    from console.backend.models.video_template import VideoTemplate
+    t = VideoTemplate(slug=f"t-bwc-{uuid.uuid4().hex[:6]}", label="x", output_format="landscape_long")
+    db.add(t)
+    db.flush()
+    v = YoutubeVideo(title="x", template_id=t.id)
+    db.add(v)
+    db.flush()
+    assert v.thumbnail_bold_word_count == 1
