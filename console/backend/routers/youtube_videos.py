@@ -407,6 +407,34 @@ def resume_render(
     return {"task_id": task_id, "video_id": video_id}
 
 
+@router.post("/{video_id}/recreate")
+def recreate_youtube_video(
+    video_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(require_editor_or_admin),
+):
+    """Clone a YoutubeVideo's configuration into a new draft and return its id."""
+    from console.backend.models.audit_log import AuditLog
+    from console.backend.services.youtube_video_service import YoutubeVideoService
+
+    svc = YoutubeVideoService(db)
+    try:
+        new_video = svc.recreate(video_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+    db.add(AuditLog(
+        user_id=user.id,
+        action="recreate_youtube_video",
+        target_type="youtube_video",
+        target_id=str(new_video.id),
+        details={"source_id": video_id},
+    ))
+    db.commit()
+
+    return {"id": new_video.id}
+
+
 @router.get("/{video_id}/render/state")
 def get_render_state(
     video_id: int, db: Session = Depends(get_db), _user=Depends(require_editor_or_admin),

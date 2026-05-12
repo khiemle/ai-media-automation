@@ -153,3 +153,64 @@ def test_recreate_missing_source_raises(db):
     from console.backend.services.youtube_video_service import YoutubeVideoService
     with pytest.raises(ValueError, match="not found"):
         YoutubeVideoService(db).recreate(999999)
+
+
+def test_recreate_endpoint_returns_new_id(db, monkeypatch):
+    """The POST endpoint returns {id: <new_id>} and persists the draft."""
+    from fastapi.testclient import TestClient
+    from console.backend.main import app
+    from console.backend.database import get_db
+    from console.backend.auth import require_editor_or_admin
+    from console.backend.models.youtube_video import YoutubeVideo
+
+    template = _seed_template(db)
+    source = _seed_full_video(db, template)
+    db.commit()  # endpoint will open its own session
+
+    # Override get_db to share the test session
+    def _get_db_override():
+        yield db
+
+    class _FakeUser:
+        id = 1
+        role = "admin"
+
+    app.dependency_overrides[get_db] = _get_db_override
+    app.dependency_overrides[require_editor_or_admin] = lambda: _FakeUser()
+    try:
+        with TestClient(app) as client:
+            resp = client.post(f"/api/youtube-videos/{source.id}/recreate")
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert "id" in body
+        new_id = body["id"]
+        assert new_id != source.id
+
+        new_video = db.get(YoutubeVideo, new_id)
+        assert new_video is not None
+        assert new_video.status == "draft"
+        assert new_video.title == "Source Video (recreate)"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_recreate_endpoint_404_when_missing(db):
+    from fastapi.testclient import TestClient
+    from console.backend.main import app
+    from console.backend.database import get_db
+    from console.backend.auth import require_editor_or_admin
+
+    def _get_db_override():
+        yield db
+
+    class _FakeUser:
+        id = 1; role = "admin"
+
+    app.dependency_overrides[get_db] = _get_db_override
+    app.dependency_overrides[require_editor_or_admin] = lambda: _FakeUser()
+    try:
+        with TestClient(app) as client:
+            resp = client.post("/api/youtube-videos/999999/recreate")
+        assert resp.status_code == 404
+    finally:
+        app.dependency_overrides.clear()
