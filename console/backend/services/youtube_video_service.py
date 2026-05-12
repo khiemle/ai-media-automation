@@ -175,9 +175,10 @@ def _video_to_dict(
         "visual_asset_ids":        list(v.visual_asset_ids or []),
         "visual_clip_durations_s": list(v.visual_clip_durations_s or []),
         "visual_loop_mode":        v.visual_loop_mode or "concat_loop",
-        "thumbnail_asset_id":      v.thumbnail_asset_id,
-        "thumbnail_text":          v.thumbnail_text,
-        "thumbnail_path":          v.thumbnail_path,
+        "thumbnail_asset_id":        v.thumbnail_asset_id,
+        "thumbnail_text":            v.thumbnail_text,
+        "thumbnail_path":            v.thumbnail_path,
+        "thumbnail_bold_word_count": v.thumbnail_bold_word_count,
         # Music template fields
         "track_transition":         v.track_transition,
         "track_transition_seconds": v.track_transition_seconds,
@@ -250,7 +251,7 @@ class YoutubeVideoService:
         "spectrum_enabled", "spectrum_height_pct", "spectrum_color",
         "spectrum_opacity", "spectrum_style", "spectrum_bar_width_px",
         "spectrum_bar_count", "spectrum_align_horizontal", "spectrum_align_vertical",
-        "thumbnail_asset_id", "thumbnail_text",
+        "thumbnail_asset_id", "thumbnail_text", "thumbnail_bold_word_count",
         "black_from_seconds", "skip_previews",
     )
 

@@ -65,6 +65,7 @@ def _seed_full_video(db, template) -> YoutubeVideo:
         spectrum_align_vertical="top",
         thumbnail_asset_id=asset.id,
         thumbnail_text="DEEP FOCUS",
+        thumbnail_bold_word_count=2,
         black_from_seconds=120,
         skip_previews=False,
         # runtime fields (must be reset on recreate)
@@ -103,7 +104,7 @@ def test_recreate_clones_configuration_fields(db):
         "spectrum_enabled", "spectrum_height_pct", "spectrum_color",
         "spectrum_opacity", "spectrum_style", "spectrum_bar_width_px",
         "spectrum_bar_count", "spectrum_align_horizontal", "spectrum_align_vertical",
-        "thumbnail_asset_id", "thumbnail_text",
+        "thumbnail_asset_id", "thumbnail_text", "thumbnail_bold_word_count",
         "black_from_seconds", "skip_previews",
     ]
     for field in cloned:

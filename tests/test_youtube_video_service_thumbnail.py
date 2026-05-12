@@ -14,6 +14,7 @@ def _make_video(**kwargs):
         audio_preview_path=None, video_preview_path=None, visual_asset_ids=[],
         visual_clip_durations_s=[], visual_loop_mode="concat_loop",
         thumbnail_asset_id=None, thumbnail_text=None, thumbnail_path=None,
+        thumbnail_bold_word_count=1,
         created_at=None, updated_at=None,
     )
     defaults.update(kwargs)
@@ -55,3 +56,19 @@ def test_youtube_video_has_thumbnail_bold_word_count_default_1(db):
     db.add(v)
     db.flush()
     assert v.thumbnail_bold_word_count == 1
+
+
+def test_video_to_dict_includes_thumbnail_bold_word_count():
+    """API response must include thumbnail_bold_word_count so the modal can read it."""
+    from console.backend.services.youtube_video_service import _video_to_dict
+    v = _make_video(thumbnail_bold_word_count=3)
+    d = _video_to_dict(v)
+    assert d["thumbnail_bold_word_count"] == 3
+
+
+def test_video_to_dict_thumbnail_bold_word_count_default_1():
+    """Default value (1) is preserved in the dict when not explicitly set."""
+    from console.backend.services.youtube_video_service import _video_to_dict
+    v = _make_video()
+    d = _video_to_dict(v)
+    assert d["thumbnail_bold_word_count"] == 1
