@@ -1863,8 +1863,12 @@ function MakeShortModal({ video, shortTemplates, onClose, onCreated }) {
         template_id: shortTemplate.id,
         theme: video.theme,
         target_duration_h: (shortTemplate?.short_duration_s ?? 58) / 3600,
-        music_track_id: form.sameMusic ? video.music_track_id : null,
-        visual_asset_id: form.sameVisual ? video.visual_asset_id : null,
+        music_track_id: form.sameMusic
+          ? (video.music_track_id ?? video.music_track_ids?.[0] ?? null)
+          : null,
+        visual_asset_id: form.sameVisual
+          ? (video.visual_asset_id ?? video.visual_asset_ids?.[0] ?? null)
+          : null,
         parent_youtube_video_id: video.id,
         sfx_overrides: { ...(video.sfx_overrides || {}), cta: { text: form.ctaText, position: form.ctaPosition } },
       })
