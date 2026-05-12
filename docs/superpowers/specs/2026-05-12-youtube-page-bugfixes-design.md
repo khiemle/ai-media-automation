@@ -16,16 +16,21 @@ The user reports that thumbnail text renders entirely in one style — the "firs
 
 ### Solution
 
-**Backend — fonts**
+**Backend — fonts (Docker-safe)**
 
-- Bundle two real OFL-licensed font files in `assets/fonts/`:
-  - `assets/fonts/Inter-Black.ttf` (bold)
-  - `assets/fonts/Inter-Regular.ttf` (regular)
-- Update `pipeline/youtube_thumbnail.py`:
-  - `_find_system_font()` becomes `_default_regular_font()` and prefers the bundled `Inter-Regular.ttf` before falling back to system fonts.
-  - Add `_default_bold_font()` that prefers bundled `Inter-Black.ttf`.
-  - Remove the `set_variation_by_name` hack — distinct files do the work.
-  - Keep `THUMBNAIL_FONT_PATH` / `THUMBNAIL_BOLD_FONT_PATH` env overrides for power users.
+Important context: `assets/` is excluded from git (`.gitignore: /assets`) AND from the Docker build context (`.dockerignore: /assets/`). Bundling fonts into the repo directory doesn't survive a container build. The base images (`python:3.11-slim` for the API, `nvidia/cuda:*ubuntu22.04` for render) ship with **no system fonts**, so the current code is in fact broken inside containers regardless of styling intent.
+
+The fix has two parts:
+
+1. **Install `fonts-liberation` via apt in both `Dockerfile.api` and `Dockerfile.render`.** This is the production source of truth — distinct files for Regular and Bold at the standard Debian paths (`/usr/share/fonts/truetype/liberation/LiberationSans-{Regular,Bold}.ttf`), ~2 MB, baked into the image so it survives any container restart or volume reset.
+
+2. **Resolve fonts via a chain in `pipeline/youtube_thumbnail.py`:**
+   - `THUMBNAIL_FONT_PATH` / `THUMBNAIL_BOLD_FONT_PATH` env overrides (power users)
+   - System Liberation Sans (container default, post-apt-install)
+   - Bundled `assets/fonts/Roboto-{Regular,Black}.ttf` (dev convenience, mac/local)
+   - Other system fonts (DejaVu, SFNS) as last resort — log a warning when bold falls back to regular
+   - Remove the `set_variation_by_name` hack — distinct files do the work.
+   - Log the resolved font paths once at module import so we can verify in container logs.
 
 **Backend — bold-N-words rendering**
 
@@ -253,8 +258,8 @@ Only Fix 1 needs a schema change:
 pipeline/youtube_thumbnail.py                       (Fix 1)
 pipeline/youtube_ffmpeg.py                          (Fix 2)
 uploader/youtube_uploader.py                        (Fix 3)
-assets/fonts/Inter-Regular.ttf  (new)               (Fix 1)
-assets/fonts/Inter-Black.ttf    (new)               (Fix 1)
+Dockerfile.api                                      (Fix 1 — apt fonts-liberation)
+Dockerfile.render                                   (Fix 1 — apt fonts-liberation)
 console/backend/alembic/versions/*.py               (Fix 1)
 console/backend/models/youtube_video.py             (Fix 1)
 console/backend/routers/youtube_videos.py           (Fix 1, Fix 4)
