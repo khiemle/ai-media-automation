@@ -94,3 +94,94 @@ def test_thumbnail_returns_none_for_missing_asset(db, tmp_path):
     svc = ProductionService(db)
     result = svc.get_thumbnail_path(99999, generate=True)
     assert result is None
+
+
+def test_thumbnail_generate_persists_bold_word_count(db, tmp_path, monkeypatch):
+    """When bold_word_count is sent in the request, it's persisted on the video row."""
+    import uuid
+    from fastapi.testclient import TestClient
+    from PIL import Image
+    from console.backend.main import app
+    from console.backend.database import get_db
+    from console.backend.auth import require_editor_or_admin
+    from console.backend.models.video_asset import VideoAsset
+    from console.backend.models.video_template import VideoTemplate
+    from console.backend.models.youtube_video import YoutubeVideo
+
+    # Seed: template, source-image asset, video pointing at it
+    t = VideoTemplate(slug=f"thumb-bwc-{uuid.uuid4().hex[:6]}", label="x", output_format="landscape_long")
+    db.add(t); db.flush()
+    src_path = tmp_path / "src.jpg"
+    Image.new("RGB", (100, 100), color=(100, 100, 100)).save(src_path)
+    asset = VideoAsset(file_path=str(src_path), source="manual", asset_type="still_image")
+    db.add(asset); db.flush()
+    video = YoutubeVideo(title="x", template_id=t.id, thumbnail_asset_id=asset.id)
+    db.add(video); db.flush()
+    db.commit()
+
+    def _get_db_override():
+        yield db
+
+    class _FakeUser:
+        id = 1; role = "admin"
+
+    app.dependency_overrides[get_db] = _get_db_override
+    app.dependency_overrides[require_editor_or_admin] = lambda: _FakeUser()
+    try:
+        with TestClient(app) as client:
+            resp = client.post(
+                f"/api/youtube-videos/{video.id}/thumbnail-generate",
+                json={"text": "DEEP FOCUS MUSIC", "bold_word_count": 2},
+            )
+        assert resp.status_code == 200, resp.text
+        db.refresh(video)
+        assert video.thumbnail_bold_word_count == 2
+        assert video.thumbnail_text == "DEEP FOCUS MUSIC"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_thumbnail_generate_uses_video_stored_bold_word_count_when_not_in_request(db, tmp_path):
+    """No bold_word_count in request -> use whatever the video already has."""
+    import uuid
+    from fastapi.testclient import TestClient
+    from PIL import Image
+    from console.backend.main import app
+    from console.backend.database import get_db
+    from console.backend.auth import require_editor_or_admin
+    from console.backend.models.video_asset import VideoAsset
+    from console.backend.models.video_template import VideoTemplate
+    from console.backend.models.youtube_video import YoutubeVideo
+
+    t = VideoTemplate(slug=f"thumb-bwc-stored-{uuid.uuid4().hex[:6]}", label="x", output_format="landscape_long")
+    db.add(t); db.flush()
+    src_path = tmp_path / "src.jpg"
+    Image.new("RGB", (100, 100), color=(50, 50, 50)).save(src_path)
+    asset = VideoAsset(file_path=str(src_path), source="manual", asset_type="still_image")
+    db.add(asset); db.flush()
+    video = YoutubeVideo(
+        title="x", template_id=t.id, thumbnail_asset_id=asset.id,
+        thumbnail_bold_word_count=3,
+    )
+    db.add(video); db.flush()
+    db.commit()
+
+    def _get_db_override():
+        yield db
+
+    class _FakeUser:
+        id = 1; role = "admin"
+
+    app.dependency_overrides[get_db] = _get_db_override
+    app.dependency_overrides[require_editor_or_admin] = lambda: _FakeUser()
+    try:
+        with TestClient(app) as client:
+            resp = client.post(
+                f"/api/youtube-videos/{video.id}/thumbnail-generate",
+                json={"text": "DEEP FOCUS MUSIC LOOP"},
+            )
+        assert resp.status_code == 200, resp.text
+        db.refresh(video)
+        assert video.thumbnail_bold_word_count == 3  # unchanged
+    finally:
+        app.dependency_overrides.clear()

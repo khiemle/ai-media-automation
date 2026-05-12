@@ -103,6 +103,7 @@ class StatusUpdate(BaseModel):
 
 class ThumbnailGenerateRequest(BaseModel):
     text: str | None = None
+    bold_word_count: int | None = None
 
 
 # ── Templates ────────────────────────────────────────────────────────────────
@@ -574,6 +575,11 @@ def generate_thumbnail_endpoint(
     if text and len(text.strip().split()) > 5:
         raise HTTPException(status_code=400, detail="Thumbnail text must be 5 words or fewer")
 
+    if body.bold_word_count is not None:
+        if body.bold_word_count < 0 or body.bold_word_count > 20:
+            raise HTTPException(status_code=400, detail="bold_word_count must be between 0 and 20")
+        video.thumbnail_bold_word_count = body.bold_word_count
+
     asset = db.get(VideoAsset, video.thumbnail_asset_id)
     if not asset:
         raise HTTPException(status_code=400, detail="Thumbnail source asset not found")
@@ -582,7 +588,12 @@ def generate_thumbnail_endpoint(
     thumb_dir.mkdir(parents=True, exist_ok=True)
     output_path = make_unique_path("thumbnail", ".png", thumb_dir)
     try:
-        generate_thumbnail(source_path=asset.file_path, output_path=output_path, text=text or None)
+        generate_thumbnail(
+            source_path=asset.file_path,
+            output_path=output_path,
+            text=text or None,
+            bold_word_count=video.thumbnail_bold_word_count,
+        )
     except Exception as exc:
         video.thumbnail_path = None
         db.commit()
@@ -596,7 +607,7 @@ def generate_thumbnail_endpoint(
         action="generate_thumbnail",
         target_type="youtube_video",
         target_id=str(video_id),
-        details={"text": text or None},
+        details={"text": text or None, "bold_word_count": video.thumbnail_bold_word_count},
     ))
     db.commit()
 

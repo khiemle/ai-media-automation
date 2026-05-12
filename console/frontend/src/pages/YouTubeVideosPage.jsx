@@ -1935,6 +1935,7 @@ function MakeShortModal({ video, shortTemplates, onClose, onCreated }) {
 function RegenerateThumbnailModal({ video, onClose, onDone }) {
   const [file, setFile]             = useState(null)
   const [text, setText]             = useState(video?.thumbnail_text || '')
+  const [boldCount, setBoldCount]   = useState(video?.thumbnail_bold_word_count ?? 1)
   const [previewKey, setPreviewKey] = useState(0)
   const [hasThumbnail, setHasThumbnail] = useState(!!video?.thumbnail_path)
   const [generating, setGenerating] = useState(false)
@@ -1957,7 +1958,7 @@ function RegenerateThumbnailModal({ video, onClose, onDone }) {
         setFile(null)
         setHasThumbnail(true)
       }
-      await youtubeVideosApi.generateThumbnail(video.id, text.trim() || null)
+      await youtubeVideosApi.generateThumbnail(video.id, text.trim() || null, boldCount)
       setPreviewKey(k => k + 1)
       showToast('Thumbnail generated', 'success')
     } catch (e) {
@@ -2000,6 +2001,24 @@ function RegenerateThumbnailModal({ video, onClose, onDone }) {
             onChange={e => setText(e.target.value)}
             placeholder="e.g. DEEP FOCUS"
           />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-[#9090a8] font-medium">
+            Bold first __ words
+          </label>
+          <Input
+            type="number"
+            min={0}
+            max={Math.max(wordCount, 1)}
+            value={boldCount}
+            onChange={e => setBoldCount(Math.max(0, parseInt(e.target.value || "0", 10)))}
+          />
+          <p className="text-xs text-[#5a5a70]">
+            {boldCount === 0 ? "All words regular" :
+             boldCount >= wordCount && wordCount > 0 ? "All words bold" :
+             `First ${boldCount} of ${wordCount} word${wordCount === 1 ? "" : "s"} bold`}
+          </p>
         </div>
 
         <Button

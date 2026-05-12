@@ -285,9 +285,12 @@ export const youtubeVideosApi = {
         return res.json()
       })
   },
-  generateThumbnail: (id, text) => fetchApi(`/api/youtube-videos/${id}/thumbnail-generate`, {
+  generateThumbnail: (id, text, boldWordCount) => fetchApi(`/api/youtube-videos/${id}/thumbnail-generate`, {
     method: 'POST',
-    body: JSON.stringify({ text: text || null }),
+    body: JSON.stringify({
+      text: text || null,
+      ...(boldWordCount != null ? { bold_word_count: boldWordCount } : {}),
+    }),
   }),
   thumbnailUrl: (id) => `/api/youtube-videos/${id}/thumbnail`,
 }
