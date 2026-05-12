@@ -1871,6 +1871,9 @@ function MakeShortModal({ video, shortTemplates, onClose, onCreated }) {
           : null,
         parent_youtube_video_id: video.id,
         sfx_overrides: { ...(video.sfx_overrides || {}), cta: { text: form.ctaText, position: form.ctaPosition } },
+        seo_title: video.seo_title ?? null,
+        seo_description: video.seo_description ?? null,
+        seo_tags: video.seo_tags ?? null,
       })
       onCreated()
       onClose()
