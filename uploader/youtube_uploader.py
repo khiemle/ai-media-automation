@@ -100,9 +100,7 @@ def upload(
         "status": {
             "privacyStatus":           privacy_status,
             "selfDeclaredMadeForKids": False,
-            "selfDeclaration": {
-                "hasSyntheticOrAltered": True,
-            },
+            "containsSyntheticMedia":  True,
         },
     }
 
@@ -157,6 +155,11 @@ def upload(
                 raise
 
     video_id = response.get("id", "")
+    logger.info(
+        "[YouTube] insert response: video_id=%s containsSyntheticMedia=%s",
+        response.get("id"),
+        response.get("status", {}).get("containsSyntheticMedia"),
+    )
     logger.info(f"[YouTube] Uploaded: https://youtube.com/watch?v={video_id}")
     return video_id
 

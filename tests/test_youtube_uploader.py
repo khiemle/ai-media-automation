@@ -88,3 +88,37 @@ def test_set_thumbnail_does_not_raise_on_api_error():
          patch("pathlib.Path.exists", return_value=True):
         # Must not raise
         set_thumbnail("abc123", "/tmp/thumb.png", {"access_token": "tok"})
+
+
+def test_upload_body_uses_contains_synthetic_media():
+    """Verify the upload body sets status.containsSyntheticMedia=True at the top level
+    (not nested under selfDeclaration, which YouTube v3 does not recognize)."""
+    from unittest.mock import MagicMock, patch
+    from uploader.youtube_uploader import upload
+
+    captured_body = {}
+
+    def _fake_insert(part, body, media_body):
+        captured_body.update(body)
+        req = MagicMock()
+        req.next_chunk.return_value = (None, {"id": "vid123", "status": {"containsSyntheticMedia": True}})
+        return req
+
+    mock_youtube = MagicMock()
+    mock_youtube.videos().insert.side_effect = _fake_insert
+    mock_creds = MagicMock()
+    mock_creds.expired = False
+
+    with patch("googleapiclient.discovery.build", return_value=mock_youtube), \
+         patch("google.oauth2.credentials.Credentials", return_value=mock_creds), \
+         patch("googleapiclient.http.MediaFileUpload"), \
+         patch("pathlib.Path.exists", return_value=True):
+        upload(
+            "/tmp/v.mp4",
+            {"title": "T", "description": "D", "niche": "lifestyle", "privacy_status": "unlisted"},
+            {"access_token": "tok", "refresh_token": "ref", "client_id": "cid", "client_secret": "sec"},
+        )
+
+    assert captured_body["status"]["containsSyntheticMedia"] is True
+    assert "selfDeclaration" not in captured_body["status"], \
+        "selfDeclaration.hasSyntheticOrAltered is silently ignored by YouTube v3 — must not be used"
