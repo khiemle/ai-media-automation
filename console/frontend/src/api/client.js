@@ -295,6 +295,10 @@ export const youtubeVideosApi = {
   thumbnailUrl: (id) => `/api/youtube-videos/${id}/thumbnail`,
 }
 
+// ── YouTube URL helpers ────────────────────────────────────────────────────────
+export const youtubeWatchUrl = (platformId) =>
+  `https://www.youtube.com/watch?v=${platformId}`
+
 // ── Templates ───────────────────────────────────────────────────────────────────
 export const templatesApi = {
   list: () => fetchApi('/api/youtube-videos/templates'),

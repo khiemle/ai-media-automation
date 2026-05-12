@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Card, Badge, Button, Tabs, Spinner, EmptyState, Modal, Input, Select, Toast } from '../components/index.jsx'
 import ChannelPicker from '../components/ChannelPicker.jsx'
 import YouTubeSetupWizard from '../components/YouTubeSetupWizard.jsx'
-import { fetchApi, youtubeVideosApi } from '../api/client.js'
+import { fetchApi, youtubeVideosApi, youtubeWatchUrl } from '../api/client.js'
 
 // ── Platform config ───────────────────────────────────────────────────────────
 const PLATFORMS = [
@@ -430,6 +430,15 @@ function YouTubeLongSection({ channels }) {
                                 className="ml-0.5 text-[#f87171] hover:text-[#fca5a5] transition-colors leading-none"
                               >
                                 ↺
+                              </button>
+                            )}
+                            {u.status === 'done' && u.platform_id && (
+                              <button
+                                title="Watch on YouTube"
+                                onClick={(e) => { e.stopPropagation(); window.open(youtubeWatchUrl(u.platform_id), '_blank', 'noopener,noreferrer') }}
+                                className="ml-0.5 text-[#34d399] hover:text-[#6ee7b7] transition-colors leading-none"
+                              >
+                                ↗
                               </button>
                             )}
                           </span>
