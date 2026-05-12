@@ -293,6 +293,8 @@ export const youtubeVideosApi = {
     }),
   }),
   thumbnailUrl: (id) => `/api/youtube-videos/${id}/thumbnail`,
+  fetchUploadStats: (uploadId) =>
+    fetchApi(`/api/youtube-videos/uploads/${uploadId}/stats`, { method: 'GET' }),
 }
 
 // ── YouTube URL helpers ────────────────────────────────────────────────────────

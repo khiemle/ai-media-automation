@@ -264,8 +264,22 @@ function VideosTab({ channels }) {
   )
 }
 
+// ── Number / duration formatters ─────────────────────────────────────────────
+function formatCount(n) {
+  if (n == null) return null
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000)     return `${(n / 1_000).toFixed(1)}K`
+  return String(n)
+}
+
+function formatWatchTime(min) {
+  if (min == null) return null
+  if (min < 60) return `${min}m`
+  return `${Math.floor(min / 60)}h ${min % 60}m`
+}
+
 // ── YouTube Long Section ──────────────────────────────────────────────────────
-function YouTubeLongSection({ channels }) {
+function YouTubeLongSection({ channels, setTab }) {
   const [videos, setVideos] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedChannel, setSelectedChannel] = useState({})
@@ -274,6 +288,8 @@ function YouTubeLongSection({ channels }) {
   const [toast, setToast] = useState(null)
   const [shortTemplates, setShortTemplates] = useState([])
   const [makeShortFromUpload, setMakeShortFromUpload] = useState(null) // { video, originalUploadUrl } | null
+  // statsByUpload[upload.id] = { loading, data, error } | undefined
+  const [statsByUpload, setStatsByUpload] = useState({})
   const pollRef = useRef(null)
 
   const showToast = (msg, type = 'success') => {
@@ -365,6 +381,17 @@ function YouTubeLongSection({ channels }) {
     } catch (e) { showToast(e.message || 'Retry failed', 'error') }
   }
 
+  const handleFetchStats = async (uploadId) => {
+    setStatsByUpload(prev => ({ ...prev, [uploadId]: { loading: true } }))
+    try {
+      const data = await youtubeVideosApi.fetchUploadStats(uploadId)
+      setStatsByUpload(prev => ({ ...prev, [uploadId]: { loading: false, data } }))
+    } catch (e) {
+      setStatsByUpload(prev => ({ ...prev, [uploadId]: { loading: false, error: e.message } }))
+      showToast(e.message, 'error')
+    }
+  }
+
   const handleDelete = async (videoId) => {
     try {
       await youtubeVideosApi.delete(videoId)
@@ -417,52 +444,84 @@ function YouTubeLongSection({ channels }) {
                     ) : (
                       <div className="flex flex-wrap gap-1">
                         {uploads.map(u => (
-                          <span
-                            key={u.id}
-                            title={u.error || undefined}
-                            className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded font-medium ${
-                              u.status === 'done'    ? 'bg-[#34d399]/15 text-[#34d399]' :
-                              u.status === 'failed'  ? 'bg-[#f87171]/15 text-[#f87171]' :
-                                                       'bg-[#fbbf24]/15 text-[#fbbf24]'
-                            }`}
-                          >
-                            {(u.status === 'queued' || u.status === 'uploading') && (
-                              <svg className="animate-spin" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
-                              </svg>
+                          <div key={u.id} className="flex flex-col items-start gap-0.5">
+                            <span
+                              title={u.error || undefined}
+                              className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                                u.status === 'done'    ? 'bg-[#34d399]/15 text-[#34d399]' :
+                                u.status === 'failed'  ? 'bg-[#f87171]/15 text-[#f87171]' :
+                                                         'bg-[#fbbf24]/15 text-[#fbbf24]'
+                              }`}
+                            >
+                              {(u.status === 'queued' || u.status === 'uploading') && (
+                                <svg className="animate-spin" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                                  <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+                                </svg>
+                              )}
+                              {u.channel_name || `ch-${u.channel_id}`}
+                              {u.status === 'failed' && (
+                                <button
+                                  title="Retry upload"
+                                  onClick={(e) => { e.stopPropagation(); handleRetryUpload(v.id, u.id) }}
+                                  className="ml-0.5 text-[#f87171] hover:text-[#fca5a5] transition-colors leading-none"
+                                >
+                                  ↺
+                                </button>
+                              )}
+                              {u.status === 'done' && u.platform_id && (
+                                <button
+                                  title="Watch on YouTube"
+                                  onClick={(e) => { e.stopPropagation(); window.open(youtubeWatchUrl(u.platform_id), '_blank', 'noopener,noreferrer') }}
+                                  className="ml-0.5 text-[#34d399] hover:text-[#6ee7b7] transition-colors leading-none"
+                                >
+                                  ↗
+                                </button>
+                              )}
+                              {u.status === 'done' && u.platform_id && shortTemplates.length > 0 && (
+                                <button
+                                  title="Create a Short from this video, with a link back to it in the description"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setMakeShortFromUpload({ video: v, originalUploadUrl: youtubeWatchUrl(u.platform_id) })
+                                  }}
+                                  className="ml-0.5 text-[#7c6af7] hover:text-[#a594f9] transition-colors leading-none text-[10px]"
+                                >
+                                  +Short
+                                </button>
+                              )}
+                              {u.status === 'done' && u.platform_id && (
+                                <button
+                                  title="Fetch live stats from YouTube"
+                                  onClick={(e) => { e.stopPropagation(); handleFetchStats(u.id) }}
+                                  className="ml-0.5 text-[#9090a8] hover:text-[#e8e8f0] transition-colors leading-none text-[10px]"
+                                >
+                                  {statsByUpload[u.id]?.loading ? '⟳' : '↻'}
+                                </button>
+                              )}
+                            </span>
+                            {statsByUpload[u.id]?.data && (
+                              <div className="text-[10px] text-[#9090a8] flex items-center gap-1.5 pl-1">
+                                {(() => {
+                                  const d = statsByUpload[u.id].data
+                                  const parts = []
+                                  if (d.view_count != null)         parts.push(`${formatCount(d.view_count)} views`)
+                                  if (d.watch_time_minutes != null) parts.push(`${formatWatchTime(d.watch_time_minutes)} watched`)
+                                  if (d.like_count != null)         parts.push(`${formatCount(d.like_count)} likes`)
+                                  if (d.comment_count != null)      parts.push(`${formatCount(d.comment_count)} comments`)
+                                  return parts.join(' · ')
+                                })()}
+                                {statsByUpload[u.id].data.watch_time_available === false && (
+                                  <a
+                                    href="#credentials"
+                                    onClick={(e) => { e.preventDefault(); setTab('credentials') }}
+                                    className="text-[#fbbf24] hover:underline"
+                                  >
+                                    Re-auth channel for watch time
+                                  </a>
+                                )}
+                              </div>
                             )}
-                            {u.channel_name || `ch-${u.channel_id}`}
-                            {u.status === 'failed' && (
-                              <button
-                                title="Retry upload"
-                                onClick={(e) => { e.stopPropagation(); handleRetryUpload(v.id, u.id) }}
-                                className="ml-0.5 text-[#f87171] hover:text-[#fca5a5] transition-colors leading-none"
-                              >
-                                ↺
-                              </button>
-                            )}
-                            {u.status === 'done' && u.platform_id && (
-                              <button
-                                title="Watch on YouTube"
-                                onClick={(e) => { e.stopPropagation(); window.open(youtubeWatchUrl(u.platform_id), '_blank', 'noopener,noreferrer') }}
-                                className="ml-0.5 text-[#34d399] hover:text-[#6ee7b7] transition-colors leading-none"
-                              >
-                                ↗
-                              </button>
-                            )}
-                            {u.status === 'done' && u.platform_id && shortTemplates.length > 0 && (
-                              <button
-                                title="Create a Short from this video, with a link back to it in the description"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  setMakeShortFromUpload({ video: v, originalUploadUrl: youtubeWatchUrl(u.platform_id) })
-                                }}
-                                className="ml-0.5 text-[#7c6af7] hover:text-[#a594f9] transition-colors leading-none text-[10px]"
-                              >
-                                +Short
-                              </button>
-                            )}
-                          </span>
+                          </div>
                         ))}
                       </div>
                     )}
@@ -970,7 +1029,7 @@ export default function UploadsPage() {
       {tab === 'videos' && (
         <div className="flex flex-col gap-6">
           <VideosTab channels={channels} />
-          <YouTubeLongSection channels={channels} />
+          <YouTubeLongSection channels={channels} setTab={setTab} />
         </div>
       )}
       {tab === 'credentials' && <CredentialsTab />}
