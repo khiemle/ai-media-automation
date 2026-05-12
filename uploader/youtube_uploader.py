@@ -156,11 +156,10 @@ def upload(
 
     video_id = response.get("id", "")
     logger.info(
-        "[YouTube] insert response: video_id=%s containsSyntheticMedia=%s",
-        response.get("id"),
+        "[YouTube] Uploaded: https://youtube.com/watch?v=%s containsSyntheticMedia=%s",
+        video_id,
         response.get("status", {}).get("containsSyntheticMedia"),
     )
-    logger.info(f"[YouTube] Uploaded: https://youtube.com/watch?v={video_id}")
     return video_id
 
 
