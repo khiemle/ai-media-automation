@@ -48,19 +48,69 @@ def test_generate_thumbnail_with_text_correct_size(tmp_path):
     assert Image.open(out).size == (1280, 720)
 
 
-def test_split_text_single_word():
-    from pipeline.youtube_thumbnail import split_text
-    assert split_text("FOCUS") == ["FOCUS"]
+def test_wrap_plan_single_word_default_bold_1():
+    from pipeline.youtube_thumbnail import wrap_plan
+    assert wrap_plan("FOCUS", bold_word_count=1) == [
+        [("FOCUS", True)],
+    ]
 
 
-def test_split_text_three_words():
-    from pipeline.youtube_thumbnail import split_text
-    assert split_text("DEEP SLEEP MUSIC") == ["DEEP", "SLEEP", "MUSIC"]
+def test_wrap_plan_three_words_default_bold_1():
+    from pipeline.youtube_thumbnail import wrap_plan
+    assert wrap_plan("DEEP SLEEP MUSIC", bold_word_count=1) == [
+        [("DEEP", True)],
+        [("SLEEP", False)],
+        [("MUSIC", False)],
+    ]
 
 
-def test_split_text_four_words_third_line_joins_remainder():
-    from pipeline.youtube_thumbnail import split_text
-    assert split_text("DEEP FOCUS STUDY MUSIC") == ["DEEP", "FOCUS", "STUDY MUSIC"]
+def test_wrap_plan_four_words_remainder_on_third_line():
+    from pipeline.youtube_thumbnail import wrap_plan
+    assert wrap_plan("DEEP FOCUS STUDY MUSIC", bold_word_count=1) == [
+        [("DEEP", True)],
+        [("FOCUS", False)],
+        [("STUDY", False), ("MUSIC", False)],
+    ]
+
+
+def test_wrap_plan_bold_count_two_spans_two_lines():
+    from pipeline.youtube_thumbnail import wrap_plan
+    assert wrap_plan("DEEP SLEEP MUSIC", bold_word_count=2) == [
+        [("DEEP", True)],
+        [("SLEEP", True)],
+        [("MUSIC", False)],
+    ]
+
+
+def test_wrap_plan_bold_count_three_on_five_words_mixes_third_line():
+    from pipeline.youtube_thumbnail import wrap_plan
+    assert wrap_plan("DEEP FOCUS STUDY MUSIC LOOP", bold_word_count=3) == [
+        [("DEEP", True)],
+        [("FOCUS", True)],
+        [("STUDY", True), ("MUSIC", False), ("LOOP", False)],
+    ]
+
+
+def test_wrap_plan_bold_count_zero_all_regular():
+    from pipeline.youtube_thumbnail import wrap_plan
+    assert wrap_plan("DEEP FOCUS", bold_word_count=0) == [
+        [("DEEP", False)],
+        [("FOCUS", False)],
+    ]
+
+
+def test_wrap_plan_bold_count_exceeds_word_count_caps():
+    from pipeline.youtube_thumbnail import wrap_plan
+    assert wrap_plan("DEEP", bold_word_count=10) == [
+        [("DEEP", True)],
+    ]
+
+
+def test_wrap_plan_empty_text_raises():
+    from pipeline.youtube_thumbnail import wrap_plan
+    import pytest
+    with pytest.raises(ValueError):
+        wrap_plan("", bold_word_count=1)
 
 
 def test_cover_resize_landscape_to_1280x720():

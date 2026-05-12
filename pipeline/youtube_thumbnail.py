@@ -13,41 +13,119 @@ from PIL import Image, ImageDraw, ImageFont
 
 THUMBNAIL_SIZE = (1280, 720)
 
+_REPO_ROOT = Path(__file__).resolve().parents[1]
 
-def _find_system_font() -> Path:
-    candidates = [
-        Path("/System/Library/Fonts/SFNS.ttf"),                                    # macOS
-        Path("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"),   # Ubuntu/Debian
-        Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),                   # common Linux fallback
-        Path("/usr/share/fonts/TTF/DejaVuSans.ttf"),                               # Arch Linux
-        Path("/usr/share/fonts/dejavu-sans-fonts/DejaVuSans.ttf"),                 # Fedora/RHEL
-    ]
+# Production path: fonts-liberation installed via apt in Dockerfile.api / Dockerfile.render.
+# Dev convenience: bundled Roboto in assets/fonts/ (gitignored + dockerignored — local only).
+# Resolution chain (first existing file wins):
+#   1. THUMBNAIL_FONT_PATH / THUMBNAIL_BOLD_FONT_PATH env overrides
+#   2. System Liberation Sans (container default)
+#   3. Bundled Roboto (dev mac default)
+#   4. Other system fonts (last-resort, may not provide a distinct bold)
+_REGULAR_CANDIDATES = [
+    Path("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"),
+    _REPO_ROOT / "assets" / "fonts" / "Roboto-Regular.ttf",
+    Path("/System/Library/Fonts/SFNS.ttf"),                                    # macOS fallback
+    Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),                   # common Linux
+    Path("/usr/share/fonts/TTF/DejaVuSans.ttf"),                               # Arch
+    Path("/usr/share/fonts/dejavu-sans-fonts/DejaVuSans.ttf"),                 # Fedora/RHEL
+]
+_BOLD_CANDIDATES = [
+    Path("/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"),
+    _REPO_ROOT / "assets" / "fonts" / "Roboto-Black.ttf",
+    Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
+    Path("/usr/share/fonts/TTF/DejaVuSans-Bold.ttf"),
+    Path("/usr/share/fonts/dejavu-sans-fonts/DejaVuSans-Bold.ttf"),
+]
+
+
+def _first_existing(candidates: list[Path]) -> Path | None:
     for p in candidates:
         if p.exists():
             return p
+    return None
+
+
+def _resolve_regular_font() -> Path:
+    override = os.environ.get("THUMBNAIL_FONT_PATH")
+    if override:
+        return Path(override)
+    found = _first_existing(_REGULAR_CANDIDATES)
+    if found:
+        return found
     raise FileNotFoundError(
-        "No system font found. Set THUMBNAIL_FONT_PATH env var or install liberation-fonts / fonts-dejavu."
+        "No regular font found. Install fonts-liberation (apt) or set THUMBNAIL_FONT_PATH."
     )
 
 
-def _resolve_font(env_var: str) -> Path:
-    override = os.environ.get(env_var)
+def _resolve_bold_font(regular: Path) -> Path:
+    override = os.environ.get("THUMBNAIL_BOLD_FONT_PATH")
     if override:
         return Path(override)
-    return _find_system_font()
+    found = _first_existing(_BOLD_CANDIDATES)
+    if found:
+        return found
+    # Last-resort: fall back to regular. Bold will visually equal regular —
+    # this is the silent-failure mode this fix was meant to prevent, so log loudly.
+    import logging
+    logging.getLogger(__name__).warning(
+        "No bold font found; bold spans will render identically to regular. "
+        "Install fonts-liberation (apt) or set THUMBNAIL_BOLD_FONT_PATH."
+    )
+    return regular
 
 
-DEFAULT_REGULAR_FONT = _resolve_font("THUMBNAIL_FONT_PATH")
-DEFAULT_BOLD_FONT = _resolve_font("THUMBNAIL_BOLD_FONT_PATH")
+def _find_system_font() -> Path:
+    """Backwards-compatible export used by existing tests / scripts."""
+    return _resolve_regular_font()
 
 
-def split_text(text: str) -> list[str]:
+DEFAULT_REGULAR_FONT = _resolve_regular_font()
+DEFAULT_BOLD_FONT    = _resolve_bold_font(DEFAULT_REGULAR_FONT)
+
+import logging as _thumb_log
+_thumb_log.getLogger(__name__).info(
+    "Thumbnail fonts resolved: regular=%s bold=%s",
+    DEFAULT_REGULAR_FONT, DEFAULT_BOLD_FONT,
+)
+
+
+def wrap_plan(text: str, bold_word_count: int) -> list[list[tuple[str, bool]]]:
+    """Wrap thumbnail text into lines, tagging each word as bold or regular.
+
+    Layout (preserved from previous split_text):
+      - 1-3 words → one word per line
+      - 4+ words  → line1=word1, line2=word2, line3=remaining-words
+
+    `bold_word_count` words from the start (in reading order, left-to-right,
+    top-to-bottom) are tagged is_bold=True; the rest are False. Counts beyond
+    the total number of words are clamped.
+    """
     words = text.strip().split()
     if not words:
         raise ValueError("Text cannot be empty.")
+
     if len(words) <= 3:
-        return words
-    return [words[0], words[1], " ".join(words[2:])]
+        line_words: list[list[str]] = [[w] for w in words]
+    else:
+        line_words = [[words[0]], [words[1]], words[2:]]
+
+    n = max(0, bold_word_count)
+    plan: list[list[tuple[str, bool]]] = []
+    seen = 0
+    for line in line_words:
+        segs: list[tuple[str, bool]] = []
+        for w in line:
+            segs.append((w, seen < n))
+            seen += 1
+        plan.append(segs)
+    return plan
+
+
+def split_text(text: str) -> list[str]:
+    """Deprecated. Use wrap_plan. Kept for transition compat with generate_thumbnail (until T9)."""
+    plan = wrap_plan(text, bold_word_count=1)
+    return [" ".join(w for w, _ in line) for line in plan]
 
 
 def cover_resize(image: Image.Image, size: tuple[int, int]) -> Image.Image:
