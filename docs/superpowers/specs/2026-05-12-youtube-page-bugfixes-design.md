@@ -114,33 +114,44 @@ No DB change. Both fixes are code-only.
 
 ---
 
-## Fix 3 — "Altered or synthetic content" must be user-controllable on upload
+## Fix 3 — "Altered or synthetic content" always sent as True
 
 ### Problem
 
-`uploader/youtube_uploader.py:103-105` hardcodes `"hasSyntheticOrAltered": True` in the YouTube Data API v3 status body. The console exposes no toggle and stores no flag — the user cannot opt out, and the disclosure is invisible to the editor in the UI.
+`uploader/youtube_uploader.py:103-105` already places `"selfDeclaration": { "hasSyntheticOrAltered": True }` inside `body.status`. Yet the user reports the disclosure does not "tick" on the uploaded video. The most likely cause is that the field name / path is not a recognized field on the `videos.insert` `status` resource, so the YouTube Data API v3 silently ignores it (the upload succeeds but the flag is never applied).
 
 ### Solution
 
-**DB**
+No DB. No UI. No request-body changes. The intent is: every upload always discloses synthetic/altered content.
 
-- Migration: add column `contains_synthetic_content BOOLEAN NOT NULL DEFAULT TRUE` on `youtube_videos`. Default `TRUE` preserves current behavior for all existing rows.
+**Backend only — `uploader/youtube_uploader.py`**
 
-**Backend**
+1. Verify the correct YouTube Data API v3 field. As of the current YouTube reference, the disclosure lives at `status.containsSyntheticMedia` (boolean) rather than nested under `selfDeclaration.hasSyntheticOrAltered`. The current code's path is unrecognized and ignored.
+2. Update the body to set the correct, recognized field while keeping the value `True`:
 
-- `console/backend/routers/youtube_videos.py` `UploadBody` (line 292-294): add `contains_synthetic_content: bool | None = None`. When non-null on upload, the value is persisted onto the video row (so future uploads keep that preference) AND used for the current upload.
-- `console/backend/tasks/youtube_upload_task.py` (line 67-77): include `"contains_synthetic_content": video.contains_synthetic_content` in `video_meta` before calling the uploader.
-- `uploader/youtube_uploader.py`: replace the hardcoded `True` with `metadata.get("contains_synthetic_content", True)` (default True keeps the safer disclosure for safety-net cases like missing metadata).
+   ```python
+   body = {
+       "snippet": {...},
+       "status": {
+           "privacyStatus": privacy_status,
+           "selfDeclaredMadeForKids": False,
+           "containsSyntheticMedia": True,
+       },
+   }
+   ```
 
-**Frontend**
+3. Keep `part="snippet,status"` on the `videos().insert` call so the field is actually written.
+4. After the insert response returns, log the value of `response["status"].get("containsSyntheticMedia")` so we can confirm the field stuck. If YouTube strips it, that's a separate API-permissions issue surfaced in logs rather than silent failure.
 
-- `console/frontend/src/pages/UploadsPage.jsx` upload modal/flow: add a checkbox "Altered or synthetic content (AI disclosure)" defaulting to `video.contains_synthetic_content` (or `true` if the field is missing).
-- The checkbox state is included in the upload POST body.
-- Also expose a read-only label of the current setting on the upload row so the user sees what'll be sent without opening the modal.
+### Verification
+
+- Upload a test video to an unlisted channel. Open YouTube Studio → check the "Altered or synthetic content" disclosure is ticked.
+- If still untickled, escalate: the field may require a separate `videos.update` call with `contentDetails` or may be gated by channel monetization status. Resolution lives outside this spec.
 
 ### Out of scope
 
-- Per-channel default for the flag.
+- Adding a UI toggle (explicitly removed from the original draft per user direction).
+- Persisting per-video preference.
 - Bulk-set across many videos.
 - YouTube's separate "Made for Kids" flag (`selfDeclaredMadeForKids`) — left unchanged.
 
@@ -218,47 +229,43 @@ Writes an `AuditLog` entry (`action="recreate_youtube_video"`, `target_id=new.id
 
 ### Migration order
 
-Each schema change is a separate Alembic migration so they ship independently:
+Only Fix 1 needs a schema change:
 
 1. `xxx_add_thumbnail_bold_word_count.py` — adds `thumbnail_bold_word_count INTEGER NOT NULL DEFAULT 1`.
-2. `xxx_add_contains_synthetic_content.py` — adds `contains_synthetic_content BOOLEAN NOT NULL DEFAULT TRUE`.
 
-(No migration for Fix 2 or Fix 4.)
+(No migration for Fix 2, Fix 3, or Fix 4.)
 
 ### Audit logging
 
 - Fix 1: existing `generate_thumbnail` audit entry already covers thumbnail regen; extend its `details` to include `bold_word_count`.
-- Fix 3: existing upload AuditLog should include `contains_synthetic_content` in its `details`.
 - Fix 4: new `recreate_youtube_video` AuditLog entry.
 
 ### Suggested implementation order
 
-1. **Fix 2** — pure code, smallest, biggest user-visible win (shorts actually work).
-2. **Fix 4** — adds one endpoint + button, no schema, unblocks workflow.
-3. **Fix 3** — one column, three small wiring changes, one UI checkbox.
+1. **Fix 3** — one-line body field rename in the uploader, smallest change.
+2. **Fix 2** — pure code, biggest user-visible win (shorts actually work).
+3. **Fix 4** — adds one endpoint + button, no schema, unblocks workflow.
 4. **Fix 1** — most surface area (font bundling, render-loop rewrite, column, UI). Bench last.
 
 ### Files touched (summary)
 
 ```
-pipeline/youtube_thumbnail.py                  (Fix 1)
-pipeline/youtube_ffmpeg.py                     (Fix 2)
-uploader/youtube_uploader.py                   (Fix 3)
-assets/fonts/Inter-Regular.ttf  (new)          (Fix 1)
-assets/fonts/Inter-Black.ttf    (new)          (Fix 1)
-console/backend/alembic/versions/*.py          (Fix 1, Fix 3)
-console/backend/models/youtube_video.py        (Fix 1, Fix 3)
-console/backend/routers/youtube_videos.py      (Fix 1, Fix 3, Fix 4)
-console/backend/services/youtube_video_service.py  (Fix 4)
-console/backend/tasks/youtube_upload_task.py   (Fix 3)
-console/frontend/src/pages/YouTubeVideosPage.jsx  (Fix 1, Fix 2, Fix 4)
-console/frontend/src/pages/UploadsPage.jsx     (Fix 3)
-console/frontend/src/api/client.js             (Fix 4 — new endpoint method)
+pipeline/youtube_thumbnail.py                       (Fix 1)
+pipeline/youtube_ffmpeg.py                          (Fix 2)
+uploader/youtube_uploader.py                        (Fix 3)
+assets/fonts/Inter-Regular.ttf  (new)               (Fix 1)
+assets/fonts/Inter-Black.ttf    (new)               (Fix 1)
+console/backend/alembic/versions/*.py               (Fix 1)
+console/backend/models/youtube_video.py             (Fix 1)
+console/backend/routers/youtube_videos.py           (Fix 1, Fix 4)
+console/backend/services/youtube_video_service.py   (Fix 4)
+console/frontend/src/pages/YouTubeVideosPage.jsx    (Fix 1, Fix 2, Fix 4)
+console/frontend/src/api/client.js                  (Fix 4 — new endpoint method)
 ```
 
 ### Testing notes
 
 - **Fix 1**: render thumbnails for N=0, 1, 2, 5, and >word_count. Verify visual difference between bold and regular spans (eye-check; the font collision was the silent failure mode).
 - **Fix 2**: create a short from (a) a soundscape parent using only playlist fields, (b) a legacy parent using only singular fields, (c) a parent with both. All three should produce a non-black, non-silent short.
-- **Fix 3**: upload with checkbox on / off; verify the `body.status.selfDeclaration.hasSyntheticOrAltered` value matches. Verify the DB row reflects the last-used choice.
+- **Fix 3**: upload a test video and confirm in YouTube Studio that "Altered or synthetic content" is ticked. Inspect the `videos.insert` response logged by the uploader to confirm YouTube echoed back `containsSyntheticMedia: True`.
 - **Fix 4**: recreate from a soundscape video (with playlists, SFX pool, thumbnail) and verify all listed fields match the source while runtime fields are reset. Render the new draft end-to-end to confirm the clone produces a valid render.
