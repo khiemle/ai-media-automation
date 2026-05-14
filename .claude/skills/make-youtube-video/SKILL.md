@@ -70,6 +70,96 @@ source of truth — do not summarize, paraphrase, or skip steps.
     → poll → final URL
 ```
 
+## File upload workaround (MCP runs in Docker)
+
+The `ai-media-console` MCP server runs as a Docker container
+(`docker run -i --rm --env-file ~/.mcp/ai-media-console.env ...`).
+It has **no access to host filesystem paths** — `/Volumes/`, `/tmp/`, or
+anywhere else on the host. Any MCP tool that reads a local file
+(`visual_asset(action="upload")`, `youtube_thumbnail(action="upload_image")`)
+will fail with `"file not found"` even if the file clearly exists on disk.
+
+**Workaround: upload directly via `curl` from the shell.**
+
+The env file `~/.mcp/ai-media-console.env` contains:
+```
+MCP_API_TOKEN=<jwt>
+MCP_CONSOLE_API_BASE=http://<LAN-IP>:8080
+```
+Use that IP (not `localhost`) for all curl calls — the Docker container
+connects via the LAN address, and `localhost` from the shell also resolves
+correctly via that IP.
+
+### Visual asset upload (step 3)
+
+```bash
+TOKEN="<MCP_API_TOKEN from ~/.mcp/ai-media-console.env>"
+curl -s --max-time 120 -X POST "http://<MCP_CONSOLE_API_BASE>/api/production/assets/upload" \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@/path/to/video.mp4;type=video/mp4" \
+  -F "title=<title>" \
+  -F "keywords=<comma,separated>" \
+  -F "asset_type=video" \
+  -F "source=manual"
+```
+
+Capture `id` from the JSON response as `visual_asset_id`.
+
+### Thumbnail upload (step 9)
+
+```bash
+curl -s --max-time 60 -X POST "http://<MCP_CONSOLE_API_BASE>/api/youtube-videos/<video_id>/thumbnail-image" \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "image=@/path/to/thumbnail.png;type=image/png"
+```
+
+Note the form field is **`image`**, not `file`. Capture `asset_id` from the response.
+
+After uploading via curl, continue with the MCP tool for
+`youtube_thumbnail(action="generate_with_text", ...)` — that step reads from
+the DB record, not from the filesystem, so the MCP tool works fine.
+
+### Filename spaces
+
+Files with spaces in their names (e.g. Runway exports like
+`Runway_Media Processing V2_051426 4K.mp4`) cause the `file not found`
+error even via curl on some systems. Rename to remove spaces before uploading:
+```bash
+mv "path/with spaces/file.mp4" "path/with spaces/file_clean.mp4"
+```
+
+### Polling music tasks
+
+`task_status(task_id=...)` routes to `/api/pipeline/jobs/{job_id}` which
+expects an **integer**. Music compose tasks return a Celery UUID — use
+`/api/music/tasks/{task_id}` instead:
+```bash
+curl -s "http://<MCP_CONSOLE_API_BASE>/api/music/tasks/<uuid>" \
+  -H "Authorization: Bearer $TOKEN"
+```
+States: `PENDING` → `PROGRESS` → `SUCCESS` (with `result.track_id`) or `FAILURE`.
+
+Render task UUIDs (audio preview, video preview, render_final) also use this
+same endpoint — the `/api/music/tasks/` path accepts any Celery task UUID, not
+just music tasks.
+
+## ElevenLabs quota failures
+
+If `music(action="elevenlabs_compose")` returns FAILURE with empty `info {}`,
+run the task synchronously via the shell to get the real error:
+```bash
+.venv/bin/python -c "
+from console.backend.tasks.music_tasks import generate_elevenlabs_music_task
+# ... (create test track, call task directly)
+"
+```
+
+Common failure: **quota exceeded** — `"You have X credits remaining, while Y
+credits are required"`. Fix: reduce `music_length_ms` and drop sections.
+A 600 000 ms (10-min) plan needs ~8 242 credits; 480 000 ms (8-min) needs
+~6 594. Calculate: `available / required * original_ms` to find a safe length,
+then drop sections from the end of the plan before retrying compose.
+
 ## Hard rules (do not skip — these are easy to get wrong)
 
 - **Field name `sound_layers`**, not `sfx_overrides`. Both columns exist on
@@ -78,9 +168,12 @@ source of truth — do not summarize, paraphrase, or skip steps.
   Schema audit caught this — wrong name returns 422.
 - **`elevenlabs_compose` returns `task_id` only** — the MCP wrapper strips
   `track_id` from the immediate response. Get `track_id` from the polled
-  `task_status(...)` SUCCESS payload at `result.track_id`.
+  `/api/music/tasks/<uuid>` SUCCESS payload at `result.track_id`.
 - **`youtube_thumbnail.generate_with_text` is synchronous** — the backend
   endpoint returns the URL directly, not a `task_id`. Don't poll it.
+- **`youtube_thumbnail.generate_with_text` text limit** — 5 words or fewer.
+  The `·` separator character counts as a word. Strip separators or shorten
+  the text if the API returns 400.
 - **`sfx.generate` is synchronous** — also returns the asset row directly,
   no task polling.
 - **Render gates must run in order**: `render_audio_preview → approve →

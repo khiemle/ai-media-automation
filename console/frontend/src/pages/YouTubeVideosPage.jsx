@@ -22,6 +22,14 @@ const ACTIVE_RENDER_STATES = new Set([
   'video_preview_ready',
 ])
 
+function formatDuration(hours) {
+  if (!hours) return '—'
+  const s = Math.round(hours * 3600)
+  if (s < 60)   return `${s}s`
+  if (s < 3600) return `${Math.round(s / 60)}m`
+  return `${+(hours.toFixed(1))}h`
+}
+
 function ActiveRenderCard({ video, onUpdate }) {
   const { state: wsState } = useRenderWebSocket(video.id)
   const liveStatus = wsState?.status || video.status
@@ -632,7 +640,7 @@ function ImportFromTemplateModal({ onClose, onImported }) {
                     <span className="text-xs text-[#9090a8]">Theme: <span className="text-[#e8e8f0] font-mono">{seo.theme}</span></span>
                   )}
                   {seo.target_duration_h && (
-                    <span className="text-xs text-[#9090a8]">Duration: <span className="text-[#e8e8f0]">{seo.target_duration_h}h</span></span>
+                    <span className="text-xs text-[#9090a8]">Duration: <span className="text-[#e8e8f0]">{formatDuration(seo.target_duration_h)}</span></span>
                   )}
                   {seo.seo_title && (
                     <span className="text-xs text-[#9090a8]">Title: <span className="text-[#e8e8f0]">{seo.seo_title}</span></span>
@@ -686,7 +694,7 @@ function ImportFromTemplateModal({ onClose, onImported }) {
               <span className="text-xs text-[#34d399]">🔍 {titlePreview || 'SEO JSON loaded'}</span>
               <div className="pl-2 border-l-2 border-[#2a2a32] flex flex-col gap-0.5 mt-0.5">
                 {seo.target_duration_h && (
-                  <span className="text-xs text-[#9090a8]">Duration: <span className="text-[#e8e8f0]">{seo.target_duration_h}h</span></span>
+                  <span className="text-xs text-[#9090a8]">Duration: <span className="text-[#e8e8f0]">{formatDuration(seo.target_duration_h)}</span></span>
                 )}
                 {tagCount > 0 && (
                   <span className="text-xs text-[#9090a8]">Tags: <span className="text-[#e8e8f0]">{tagCount} tags loaded</span></span>
@@ -2333,7 +2341,7 @@ export default function YouTubeVideosPage() {
                       <div className="text-sm font-semibold text-[#e8e8f0] truncate">{v.title}</div>
                       <div className="flex items-center gap-3 mt-1">
                         <span className="text-xs text-[#9090a8]">
-                          {v.target_duration_h ? `${v.target_duration_h}h` : '—'}
+                          {formatDuration(v.target_duration_h)}
                         </span>
                         {v.music_track_id  && <span className="text-xs text-[#5a5a70]">🎵 music linked</span>}
                         {v.visual_asset_id && <span className="text-xs text-[#5a5a70]">🖼 visual linked</span>}
