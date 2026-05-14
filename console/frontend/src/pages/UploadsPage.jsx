@@ -510,7 +510,7 @@ function YouTubeLongSection({ channels, setTab }) {
                                   if (d.comment_count != null)      parts.push(`${formatCount(d.comment_count)} comments`)
                                   return parts.join(' · ')
                                 })()}
-                                {statsByUpload[u.id].data.watch_time_available === false && (
+                                {statsByUpload[u.id].data.watch_time_available === false && statsByUpload[u.id].data.watch_time_scope_missing && (
                                   <a
                                     href="#credentials"
                                     onClick={(e) => { e.preventDefault(); setTab('credentials') }}

@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 
 from cryptography.fernet import Fernet
 from googleapiclient.discovery import build
+from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from sqlalchemy.orm import Session
 
@@ -42,13 +43,20 @@ def _get_credentials_for_channel(channel_id: int, db: Session) -> Credentials:
     if cred is None:
         raise ValueError(f"Credential not found for channel {channel_id}")
 
-    return Credentials(
+    creds = Credentials(
         token=_decrypt(cred.access_token),
         refresh_token=_decrypt(cred.refresh_token),
         client_id=cred.client_id,
         client_secret=_decrypt(cred.client_secret),
         token_uri="https://oauth2.googleapis.com/token",
     )
+    if creds.expired and creds.refresh_token:
+        try:
+            creds.refresh(Request())
+            logger.info("Refreshed access token for channel %s", channel_id)
+        except Exception as exc:
+            logger.warning("Token refresh failed for channel %s: %s", channel_id, exc)
+    return creds
 
 
 def _fetch_data_api_stats(creds: Credentials, platform_id: str) -> dict:
@@ -100,17 +108,38 @@ def _fetch_analytics_watch_time(creds: Credentials, platform_id: str, start_date
         return None
 
 
+def _is_scope_missing_error(exc: Exception) -> bool:
+    """Heuristic: is the Analytics failure due to missing yt-analytics.readonly scope?
+
+    Real-world signature: HttpError with status 401 or 403 and a body containing
+    'scope', 'insufficient', or 'forbidden'. Any other exception is treated as
+    a transient/unrelated failure.
+    """
+    from googleapiclient.errors import HttpError
+    if not isinstance(exc, HttpError):
+        return False
+    status = getattr(exc.resp, "status", None)
+    if status not in (401, 403):
+        return False
+    try:
+        content = (exc.content or b"").decode("utf-8", errors="ignore").lower()
+    except Exception:
+        return False
+    return "scope" in content or "insufficient" in content or "forbidden" in content
+
+
 def fetch_stats(upload_id: int, db: Session) -> dict:
     """Fetch live YouTube stats for one upload. Synchronous; no DB writes.
 
     Returns:
         {
-            "view_count":           int | None,
-            "like_count":           int | None,
-            "comment_count":        int | None,
-            "watch_time_minutes":   int | None,
-            "fetched_at":           datetime,
-            "watch_time_available": bool,
+            "view_count":               int | None,
+            "like_count":               int | None,
+            "comment_count":            int | None,
+            "watch_time_minutes":       int | None,
+            "fetched_at":               datetime,
+            "watch_time_available":     bool,   # True iff Analytics call succeeded
+            "watch_time_scope_missing": bool,   # True iff failure was 401/403 + scope/insufficient/forbidden
         }
 
     Raises:
@@ -131,21 +160,24 @@ def fetch_stats(upload_id: int, db: Session) -> dict:
 
     watch_time_minutes: int | None = None
     watch_time_available = False
+    watch_time_scope_missing = False
     try:
         start_date = (upload.uploaded_at or upload.created_at).date()
         watch_time_minutes = _fetch_analytics_watch_time(creds, upload.platform_id, start_date)
         watch_time_available = True
     except Exception as exc:  # noqa: BLE001 — analytics fail-soft by design
+        watch_time_scope_missing = _is_scope_missing_error(exc)
         logger.warning(
-            "YouTube Analytics fetch failed for upload %s (platform_id=%s): %s",
-            upload_id, upload.platform_id, exc,
+            "YouTube Analytics fetch failed for upload %s (platform_id=%s, scope_missing=%s): %s",
+            upload_id, upload.platform_id, watch_time_scope_missing, exc,
         )
 
     return {
-        "view_count":           data_stats["view_count"],
-        "like_count":           data_stats["like_count"],
-        "comment_count":        data_stats["comment_count"],
-        "watch_time_minutes":   watch_time_minutes,
-        "fetched_at":           datetime.now(timezone.utc),
-        "watch_time_available": watch_time_available,
+        "view_count":                data_stats["view_count"],
+        "like_count":                data_stats["like_count"],
+        "comment_count":             data_stats["comment_count"],
+        "watch_time_minutes":        watch_time_minutes,
+        "fetched_at":                datetime.now(timezone.utc),
+        "watch_time_available":      watch_time_available,
+        "watch_time_scope_missing":  watch_time_scope_missing,
     }
