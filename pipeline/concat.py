@@ -41,11 +41,13 @@ def concat_parts(part_paths: list[Path | str], output_path: Path | str) -> Path:
         "ffmpeg", "-y", "-f", "concat", "-safe", "0",
         "-i", str(listfile_path),
         "-c", "copy",
-        "-movflags", "+faststart",
         str(output_path),
     ]
-    # Allow 60s per chunk minimum; WSL2/Windows filesystem I/O can be slow for large files.
-    timeout = max(1800, len(parts) * 60)
+    # Allow 300s per chunk — WSL2/Windows filesystem I/O for large (3+ GB) chunks
+    # can be very slow. +faststart is intentionally omitted: YouTube re-encodes on
+    # ingest so stream-start seeking is irrelevant, and the moov-rewrite pass would
+    # double the I/O cost for multi-hundred-GB concatenated outputs.
+    timeout = max(3600, len(parts) * 300)
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
         if result.returncode != 0:

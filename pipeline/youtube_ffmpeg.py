@@ -903,24 +903,33 @@ def render_landscape(
 
     output_dir = output_path.parent
 
-    # Try the new playlist path first; fall back to legacy single-asset
-    playlist = resolve_visual_playlist(video, db)
-    playlist_segment_path: Path | None = None
-    if playlist:
-        playlist_segment_path = _build_visual_segment(
-            playlist=playlist,
-            durations=list(getattr(video, "visual_clip_durations_s", None) or []),
-            loop_mode=getattr(video, "visual_loop_mode", None) or "concat_loop",
-            w=w, h=h, target_dur_s=target_dur,
-            output_dir=output_dir,
-        )
+    black_from_s = getattr(video, "black_from_seconds", None)
+    # Chunks entirely within the black period need no visual — skip the expensive
+    # visual-segment build and go straight to a lavfi black source.
+    chunk_is_all_black = black_from_s is not None and start_s >= black_from_s
 
-    if playlist_segment_path is not None:
-        visual_path = str(playlist_segment_path)
-        is_image = False  # the segment is always an mp4
-    else:
-        visual_path = resolve_visual(video, db)
-        is_image = visual_path is not None and Path(visual_path).suffix.lower() in IMAGE_EXTS
+    playlist_segment_path: Path | None = None
+    visual_path: str | None = None
+    is_image = False
+
+    if not chunk_is_all_black:
+        # Try the new playlist path first; fall back to legacy single-asset
+        playlist = resolve_visual_playlist(video, db)
+        if playlist:
+            playlist_segment_path = _build_visual_segment(
+                playlist=playlist,
+                durations=list(getattr(video, "visual_clip_durations_s", None) or []),
+                loop_mode=getattr(video, "visual_loop_mode", None) or "concat_loop",
+                w=w, h=h, target_dur_s=target_dur,
+                output_dir=output_dir,
+            )
+
+        if playlist_segment_path is not None:
+            visual_path = str(playlist_segment_path)
+            is_image = False  # the segment is always an mp4
+        else:
+            visual_path = resolve_visual(video, db)
+            is_image = visual_path is not None and Path(visual_path).suffix.lower() in IMAGE_EXTS
 
     # Pre-render music playlist + sound layers to temp WAVs (separate ffmpeg passes)
     music_wav = _build_music_playlist_wav(video, db, target_dur, output_dir, start_s=start_s)
@@ -937,14 +946,17 @@ def render_landscape(
         f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2:black,fps=30"
     )
 
-    blackout = _blackout_filter_chain(
-        getattr(video, "black_from_seconds", None), w, h, start_s, target_dur
+    # No overlay needed when the whole chunk is already black
+    blackout = "" if chunk_is_all_black else _blackout_filter_chain(
+        black_from_s, w, h, start_s, target_dur
     )
 
     cmd = ["ffmpeg", "-y"]
 
-    # Visual input
-    if visual_path and Path(visual_path).is_file():
+    # Visual input — use lavfi black source directly for all-black chunks
+    if chunk_is_all_black:
+        cmd += ["-f", "lavfi", "-i", f"color=c=black:s={w}x{h}:r=30"]
+    elif visual_path and Path(visual_path).is_file():
         if is_image:
             cmd += ["-loop", "1", "-i", visual_path]
         elif playlist_segment_path is not None:
