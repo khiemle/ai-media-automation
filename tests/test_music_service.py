@@ -1,6 +1,9 @@
 import pytest
 from unittest.mock import MagicMock, patch
 
+pytestmark = pytest.mark.render
+
+
 
 def _make_track(**kwargs):
     t = MagicMock()

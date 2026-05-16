@@ -5,9 +5,10 @@ Marked slow — not run in the default fast suite.
 """
 import subprocess
 from pathlib import Path
+
 import pytest
 
-pytestmark = pytest.mark.slow
+pytestmark = [pytest.mark.render, pytest.mark.slow]
 
 
 @pytest.fixture

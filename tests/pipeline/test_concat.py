@@ -6,7 +6,9 @@ from pathlib import Path
 import pytest
 
 if shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None:
-    pytestmark = pytest.mark.skip(reason="ffmpeg/ffprobe not installed")
+    pytestmark = [pytest.mark.render, pytest.mark.skip(reason="ffmpeg/ffprobe not installed")]
+else:
+    pytestmark = pytest.mark.render
 
 
 @pytest.fixture

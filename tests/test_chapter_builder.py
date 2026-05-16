@@ -4,6 +4,9 @@ from console.backend.services.youtube_video_service import (
     build_chapters_from_tracks,
 )
 
+pytestmark = pytest.mark.render
+
+
 
 class FakeTrack:
     def __init__(self, title, duration_s):

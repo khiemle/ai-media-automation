@@ -2,6 +2,9 @@ import pytest
 from unittest.mock import MagicMock, patch
 from pathlib import Path
 
+pytestmark = pytest.mark.render
+
+
 
 def _make_video(sfx_overrides=None, visual_asset_id=None, music_track_id=None,
                 target_duration_h=3.0, output_quality="1080p",

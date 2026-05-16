@@ -3,6 +3,9 @@ import pytest
 from PIL import Image
 from pipeline.music_overlay import render_chip_png, render_sidebar_png
 
+pytestmark = pytest.mark.render
+
+
 
 class FakeTrack:
     def __init__(self, title): self.title = title

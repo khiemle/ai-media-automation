@@ -3,6 +3,9 @@ from console.backend.services.youtube_video_service import (
     _compute_music_total_duration,
 )
 
+pytestmark = pytest.mark.render
+
+
 
 class FakeTrack:
     def __init__(self, duration_s: float):

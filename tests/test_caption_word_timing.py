@@ -1,5 +1,9 @@
 from pathlib import Path
 from unittest.mock import patch, MagicMock
+import pytest
+
+pytestmark = pytest.mark.render
+
 
 
 def test_extract_word_timing_returns_word_dicts(tmp_path):

@@ -3,6 +3,9 @@ import pytest
 
 from pipeline.spectrum_bars import _build_bar_template
 
+pytestmark = pytest.mark.render
+
+
 
 def test_bar_template_shape_and_dtype():
     tpl = _build_bar_template(bar_w=20, bar_h=100, radius=2, color_rgb=(255, 255, 255))

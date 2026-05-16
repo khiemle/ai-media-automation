@@ -1,6 +1,10 @@
 import subprocess
 from pathlib import Path
 from unittest.mock import patch, MagicMock
+import pytest
+
+pytestmark = pytest.mark.render
+
 
 
 def test_generate_thumbnail_returns_path_on_success(tmp_path):

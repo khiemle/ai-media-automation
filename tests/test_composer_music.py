@@ -1,6 +1,9 @@
 import pytest
 from unittest.mock import patch, MagicMock, call
 
+pytestmark = pytest.mark.render
+
+
 
 def _make_script(music_disabled=False, music_track_id=None):
     script = MagicMock()

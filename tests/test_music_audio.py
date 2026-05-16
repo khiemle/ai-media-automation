@@ -3,6 +3,9 @@ from pathlib import Path
 import pytest
 from pipeline.music_audio import build_music_playlist_wav_with_transitions
 
+pytestmark = pytest.mark.render
+
+
 
 class FakeTrack:
     def __init__(self, file_path, duration_s, volume=1.0):
