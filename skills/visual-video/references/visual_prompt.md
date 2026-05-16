@@ -148,7 +148,7 @@ For Soundscapes "city" themes (Tokyo, Paris), distant blurred silhouettes of ped
 Confirm:
 
 - **Camera motion** — strongly default to **STATIC** for ASMR. Soundscapes can have a 5-second imperceptible push-in OR slow parallax drift, but never both.
-- **Ambient motion elements** — what specifically should move? (rain droplets on glass, smoke from a chimney, leaves trembling in place, candle flicker, water ripples, distant fog shifting). List 2–4.
+- **Ambient motion elements** — what specifically should move? (rain droplets on glass, smoke from a chimney, leaves trembling in place, candle flicker, water ripples, distant fog shifting). List 2–4. **For each one, note which zone it lives in** — exposed (open to the sky) or sheltered (under a roof / behind glass / indoors). This split feeds directly into the Runway prompt's Environment Physics Rule, which keeps rain, wind, and sun from leaking into places they physically can't reach.
 - **Motion intensity** — 1–2/10 for ASMR sleep, 3–4/10 for Soundscapes focus.
 - **Loop strategy** — pick one:
   - **Static-cinemagraph** — most of frame frozen, only ambient elements animate. Loops perfectly. Default.
@@ -284,7 +284,7 @@ Anti-patterns to avoid:
 
 ### 2. Compose the Runway Gen-4 prompt
 
-Structure: `[camera lock directive — ALWAYS FIRST] + [motion per element with "in place" anchor] + ["Nothing else moves."] + [pacing words] + [loop hint]`
+Structure: `[camera lock directive — ALWAYS FIRST] + [weather elements confined to their named exposed zone] + [sheltered-zone elements] + [shelter-exclusion sentence] + ["Nothing else moves."] + [pacing words] + [loop hint]`
 
 #### ⚠️ Static Camera Rule — Non-Negotiable
 
@@ -296,6 +296,57 @@ Locked-off tripod shot, zero camera movement throughout.
 ```
 Never use `Static camera` alone — it is too weak and frequently overridden by motion verbs earlier in the prompt. `Locked-off tripod` triggers Runway's cinematography vocabulary and is significantly more reliable.
 
+#### ⚠️ Environment Physics Rule — weather must obey the scene's physical barriers
+
+This is as fundamental as the static-camera rule. Runway has no built-in understanding of architecture: if the prompt says "rain falls throughout the visible frame" and the scene is an interior looking out, **Runway renders rain falling inside the room.** Rain indoors, wind stirring a sealed room, or a sun shaft inside a closed cellar instantly destroys both realism and calm. Fix it by thinking like a physical-effects supervisor — every weather element gets a *zone*, and that zone is named explicitly in the prompt.
+
+**Step A — split the frame into exposed and sheltered zones.** Before writing any weather motion, look back at the POV framing (Step 2) and the foreground anchors (Step 6), and label every region of the frame:
+
+- **Exposed zone** — open to the sky: the garden, the courtyard, the landscape beyond the veranda edge, the open water. Rain, snow, and direct wind belong here.
+- **Sheltered zone** — under a roof, eave, canopy, or indoors; behind glass or a paper screen. No rain, no snow, no free-falling weather ever happens here. The air is still unless a window or door is open.
+- **Barrier** — the thing separating the two: the window glass, the shoji screen, the eave line, the cave mouth, the canopy edge. Weather *stops at the barrier.*
+
+By POV framing (from Step 2):
+- **A. Inside-out through window** — viewer + foreground are sheltered; everything past the glass is exposed. Rain falls *outside only.* On the glass itself you may show droplets and trickles *on the pane surface* — never rain falling on the interior side.
+- **B. Outside in landscape** — mostly exposed. The only sheltered patch is whatever the viewer sits under (a tree, a parasol, a rock overhang) — keep rain off that patch.
+- **C. Cozy interior** — the whole frame is sheltered. Rain or snow appear *only* through a window or doorway opening, contained to that opening; the room interior has still air.
+- **D. Floating / contemplative** — usually fully exposed, or underwater / space where rain doesn't apply. Use judgement.
+
+**Step B — name the exposed zone; never say "throughout the visible frame" when a sheltered zone exists.** `throughout the visible frame` / `throughout the scene` is only safe when the *entire* frame is exposed (open forest, open beach). The moment the scene has a roof, eave, window, screen, or interior, that phrase tells Runway to put rain everywhere — including indoors. Replace it with the explicit outdoor zone:
+
+| Scene | ❌ Rain leaks indoors | ✅ Rain stays outside |
+|---|---|---|
+| Engawa porch + garden | `Rain falls vertically in place throughout the visible frame` | `Rain falls vertically in place in the garden beyond the engawa edge, stopping at the eave line` |
+| Bedroom window, rainy night | `Rain falls throughout the frame` | `Rain falls vertically in place in the street outside the window; on the glass itself, droplets trickle vertically in place down the pane` |
+| Shoji screen + courtyard | `Rain falls throughout the visible garden ... visible through the translucent paper panels` | `Rain falls vertically in place in the courtyard behind the shoji screen. The shoji paper stays dry and still. No rain reaches the interior side of the screen.` |
+| Cabin doorway open to forest | `Rain falls throughout the frame` | `Rain falls vertically in place in the forest visible through the open doorway, contained to the doorway opening` |
+
+**Step C — add an explicit shelter-exclusion sentence.** After describing where the weather *does* happen, state where it does *not.* This is the weather-physics counterpart of `Nothing else moves.`:
+```
+No rain falls inside the room / under the eave / on the interior side of the glass. The sheltered area stays completely dry and still.
+```
+Match the wording to the scene's actual barrier. This single sentence is the most reliable defence against indoor rain. (If the entire frame is exposed — open forest, open beach, open field — there is no sheltered zone, so skip this sentence.)
+
+**Per-element physics — apply to every weather element:**
+
+- **Rain / snow** — only from open sky. Stops dead at any roof, eave, canopy, or glass. Under an eave: dry. Seen from inside a window: it is *on the glass* or *outside*, never falling in the room. Dripping off an edge (eave drip, leaf drip) happens *at the barrier line*, not past it.
+- **Wind** — moves only what is exposed to it: outdoor foliage, smoke leaving a chimney, a curtain *at an open window*. A closed interior has still air — indoor curtains, papers, and candle flames barely move. Never let wind move heavy or fixed objects.
+- **Sunlight / god-rays / moonlight** — enters a sheltered zone *only through an opening* (window, doorway, gap in the canopy, cave mouth), and the shaft's shape is bounded by that opening. A fully enclosed space has no shaft. Outdoors, light is everywhere, but its *direction* must match the single light source set in Step 5.
+- **Mist / fog** — forms at ground level outdoors, hugging water, hollows, forest floor. It does not fill an interior unless the concept is explicitly "misty room". It thins with height — don't let it climb past mid-frame unless the scene is pure exposed landscape.
+- **Fire / embers / steam** — rises from its source only (hearth, candle, teacup). Embers drift up and slightly outward, never sideways across a room. Steam rises in place from hot liquid and dissipates before mid-frame.
+
+**The test:** for every moving weather element, ask *"if I were physically sitting in this exact spot, could this element actually reach here?"* If the answer is no, you have rain indoors — name the zone and add the exclusion sentence.
+
+**📋 Real-world failure — Shoji screen + courtyard (interior-out scene)**
+
+Prompt that failed (Runway rendered rain falling inside the room):
+> Locked-off tripod shot, zero camera movement throughout. Rain falls vertically in place throughout the visible garden beyond the shoji screen, each droplet descending within its fixed column visible through the translucent paper panels. ...
+
+Why it failed: `visible through the translucent paper panels` made Runway read the rain as being on the viewer's side of the panels. No barrier zone was named, and no shelter-exclusion sentence was present.
+
+Corrected:
+> Locked-off tripod shot, zero camera movement throughout. Rain falls vertically in place in the courtyard behind the shoji screen, each droplet within its fixed column. The shoji paper panels glow with a faint pale shimmer in place. Water droplets form and grow in place on the moss-covered garden stones behind the screen. No rain reaches the interior side of the screen; the room stays completely dry and still. Nothing else moves. Deeply meditative, profoundly still, seamless sleep loop.
+
 #### Banned verbs — these trigger camera movement in Runway
 
 Never use these words in a static-camera Runway prompt:
@@ -303,13 +354,13 @@ Never use these words in a static-camera Runway prompt:
 | Banned word / phrase | Why it breaks static camera | Safe replacement |
 |---|---|---|
 | `sway` | Runway reads as camera sway | `quiver in place`, `tremble in place` |
-| `drift` | Runway reads as camera drift or pan | `rise vertically in place`, `float upward in place` |
+| `drift` / `drifting` (any conjugation) | Runway reads as camera drift or pan, even with "in place" | For particles falling: `descend slowly in place`, `settle vertically in place`. For particles rising: `rise vertically in place`, `float upward in place`. For random suspended motion: `hover in place`, `sway gently in place` |
 | `dissolve into [direction]` | Implies camera move toward subject | `fade and dissolve in place` |
 | `shimmer` (without anchor) | Can mean camera shimmer / shake | `flicker`, `shimmer in place` |
 | `flow toward` | Camera push forward | `undulate in place` |
 | `drifting upward` | Camera tilt up | `rising vertically in place` |
 | `moving independently` (no anchor) | Untethered motion → camera wander | `moving independently in place` |
-| `shift` | Runway reads as camera pan or drift | `hover in place`, `remain suspended in place` |
+| `shift` / `shifting` (any conjugation) | Runway reads as camera pan or drift. Catches sneaky uses like `intensity shifting`, `colour shifting`, `mood shifting` | `hover in place`, `remain suspended in place`. For light/colour intensity: `flicker softly in place`, `pulse very gently in place with a slow random rhythm` |
 | `runs down` / `runs up` / `slides down` | Triggers camera tilt down or up | `trickles vertically in place along` |
 | `across [space]` | "Across the scene/canopy/frame" triggers lateral pan | `throughout [location]` + add `, not moving laterally` |
 | `reaching toward` / `before reaching` | Implies directed camera approach or tilt | Remove directional clause; use `fading in place` |
@@ -319,18 +370,20 @@ Never use these words in a static-camera Runway prompt:
 
 #### ⚠️ Directional prepositions — frequently misread as camera instructions
 
-The words **across, toward, into, through, beyond, over** are high-risk when paired with any moving element. Runway frequently interprets them as camera movement directives, even when `in place` appears later in the sentence.
+The words **across, toward, into, through, beyond, over, from above, from below** are high-risk when paired with any moving element or light source. Runway frequently interprets them as camera movement directives (`from above` → upward camera tilt; `from below` → downward tilt), even when `in place` appears later in the sentence.
 
 **Rule:** When describing where an element moves or exists, always use **static spatial references** rather than directional ones.
 
 | Problematic pattern | Why it breaks | Safe replacement |
 |---|---|---|
-| `rain falls across the scene` | "across" → lateral pan | `rain falls vertically in place throughout the frame` |
+| `rain falls across the scene` | "across" → lateral pan | `rain falls vertically in place in the open garden` (name the exposed zone — see Environment Physics Rule) |
 | `mist drifts through the forest` | "through" → camera tracking forward | `mist hovers in place throughout the lower forest` |
 | `droplets catching the light as they descend` | "catching" + "descend" implies camera follow | `droplets visible in place, lit by the diffuse light above` |
 | `mist dissipating before reaching the canopy` | "reaching" → upward tilt | `mist dissipating in place at forest floor level` |
 | `water runs down the pillar` | "runs down" → tilt down | `water trickles vertically in place along the pillar surface` |
 | `light filtering through the leaves` | "through" + motion = camera push forward | `light filtered in place between the leaves` |
+| `light shafts from above` / `god-rays from above` | "from above" → upward camera tilt | `overhead light shafts hang fixed in place from the upper frame` (or just `overhead light shafts hang fixed in place`) |
+| `bubbles rising from below` | "from below" → downward camera tilt | `bubbles rise vertically in place from the lower frame` |
 
 #### Required: "in place" anchor on every moving element
 
@@ -344,7 +397,7 @@ Additionally, **always specify the spatial axis** (vertically / horizontally) an
 ✅ **Correct:** `Fern fronds quiver gently in place, each tip trembling within its fixed position.`
 ❌ **Wrong:** `Ferns sway in a gentle breeze.`
 
-✅ **Correct:** `Rain falls vertically in place throughout the frame, each droplet descending within its fixed column.`
+✅ **Correct:** `Rain falls vertically in place in the open garden, each droplet descending within its fixed column.`
 ❌ **Wrong:** `Rain falls continuously across the jungle canopy.`
 
 #### Required: explicit closure sentence
@@ -355,38 +408,105 @@ Nothing else moves.
 ```
 This suppresses Runway's tendency to invent additional motion (including camera motion) to fill perceived stillness.
 
+#### ⚠️ Loop-Safe Motion Rule — every motion must reverse cleanly
+
+This rule exists because the user's standard looping technique is: **generate a 5s clip → export first frame + last frame → image-to-video a "bridge" clip whose first frame is the source's *last* frame and whose last frame is the source's *first* frame → concat the two clips into a perfect loop.** That bridge step is essentially a reverse pass. It only works when the original motion looks natural played backward. If the motion has a clear forward direction or asymmetric rhythm, the reversed bridge looks broken and the loop seam becomes visible.
+
+**The reverse-test:** for every moving element, ask *"if I played this in reverse, would it look natural?"* If no, redesign or remove it.
+
+| Loops cleanly (symmetric or random) | Doesn't loop (asymmetric / one-shot / has momentum) |
+|---|---|
+| Rain falling vertically (no splash visible) | Wave breaking on shore — one-directional |
+| Snow falling | Smoke rising in a column with strong upward momentum |
+| Particle / marine snow descent (random, no rhythm) | Jellyfish bell pulse — contraction is fast, expansion is slow; reversed = wrong direction |
+| Gentle tremor / quiver / flicker | Animal locomotion — walking, swimming, flying, fish darting |
+| Candle flame flicker (random) | Bird flapping wings |
+| Wind oscillation in foliage | Single-event motions: leaf falling and landing, water splash, ember burst |
+| Mist hovering (random) | Hair / fabric flowing in one strong direction |
+| Light intensity flickering with a slow random shimmer | Light intensity ramping up or down monotonically |
+
+**Forbidden motion families** (always exclude unless framed in a "between cycles, completely passive" pose):
+
+- **Bell pulses / pump cycles** — jellyfish, breathing creatures, anything with a contract-expand rhythm. The cycle itself shows the seam.
+- **Locomotion** — animals walking, swimming, flying. Has clear forward direction; reversed = walking backward.
+- **Single-event motions** — wave breaking, leaf falling, splash, ember burst, droplet impact. One-shot, can't reverse.
+- **Strong directional flow with momentum** — water pouring, smoke columns rising fast, fast-flowing river. These usually need a crossfade loop, not a reverse-bridge.
+
+**For each visual element you list in Step 7 (Motion strategy), classify it as loop-safe or not.** If not, choose one of:
+
+1. **Remove it.** Cleanest fix. Replace with a loop-safe element (e.g., jellyfish → bioluminescent particles; swimming fish → motionless drifting fronds).
+2. **Freeze it in a "between cycles, completely passive" pose** — and explicitly negate the cyclic motion in the prompt. For jellyfish: `jellyfish remain suspended motionless in place — bells held still, no bell pulse, no contraction; only the very tips of their tentacles tremble softly within their fixed positions.` Note the explicit `no bell pulse, no contraction` — Runway needs to be told what NOT to do, otherwise it defaults to canonical jellyfish behaviour.
+3. **Demote and shrink it** — push it far into the background and make it small enough that the asymmetric motion is sub-perceptible. Use as a last resort.
+
+When the user is doing reverse-bridge looping (the workflow above), the prompt must produce a clip whose every moving element is in the loop-safe column. When the user is doing a crossfade loop, momentum motions (smoke rising, fog drifting) become acceptable because the crossfade hides the directional reset.
+
+**📋 Real-world failure — Deep ocean with jellyfish (cyclic motion + sneaky banned verbs)**
+
+Prompt that failed (camera drifted, and the reverse-bridge loop looked broken at the jellyfish):
+> Locked-off tripod shot, zero camera movement throughout. Marine snow particles drift very slowly vertically in place throughout the frame, each mote descending within its fixed column. Jellyfish pulse their bells gently in place, tentacles trembling softly within their fixed positions. Blue-white light shafts from above remain fixed in place, their intensity shifting very gently in place with a slow pulse. Nothing else moves. Meditative, deeply calm, seamless loop.
+
+Three violations:
+1. **Banned verbs slipped in despite "in place" anchors:**
+   - `drift` (in `Marine snow particles drift`) — triggers camera drift; "in place" alone does not neutralise the verb itself.
+   - `shifting` (in `intensity shifting`) — same root as banned `shift`; triggers camera pan.
+2. **`from above`** in `light shafts from above` — directional preposition that triggers upward camera tilt.
+3. **Jellyfish bell pulse is asymmetric cyclic motion that cannot be loop-bridged.** The pulse contraction is fast and the expansion is slow; reversed, the motion looks unnatural and the loop seam becomes visible at the bridge clip.
+
+Corrected (jellyfish removed — cleanest fix):
+> Locked-off tripod shot, zero camera movement throughout. Marine snow particles descend very slowly vertically in place throughout the open water column, each mote settling within its fixed column. Overhead light shafts hang fixed in place, their intensity flickering softly in place with a slow random shimmer. Nothing else moves. Meditative, deeply calm, seamless loop.
+
+Corrected (jellyfish kept but frozen, only as a fallback if jellies are essential):
+> Locked-off tripod shot, zero camera movement throughout. Marine snow particles descend very slowly vertically in place throughout the open water column, each mote settling within its fixed column. Jellyfish remain suspended motionless in place — bells held still, no bell pulse, no contraction; only the very tips of their tentacles tremble softly within their fixed positions. Overhead light shafts hang fixed in place, their intensity flickering softly in place with a slow random shimmer. Nothing else moves. Meditative, deeply calm, seamless loop.
+
+Lesson: underwater scenes (and any scene with creatures) are the highest-risk category for non-loopable motion. Default to particles + light + suspended objects; introduce creatures only after consciously checking the reverse-test and either freezing them or demoting them.
+
 #### Self-review checklist — scan every Runway prompt before finalising
 
 Before outputting a Runway prompt, scan for each of these. If any item fails, rewrite that sentence.
 
 - [ ] Does the prompt open with `Locked-off tripod shot, zero camera movement throughout.`?
 - [ ] Does every moving element have `in place` immediately after its motion verb?
-- [ ] Does every moving element have a spatial axis (vertically / horizontally) AND spatial bounds (at forest floor level / within the frame)?
-- [ ] Is the word `across` absent, or replaced with `throughout [location]`?
-- [ ] Is the word `shift` absent?
+- [ ] Does every moving element have a spatial axis (vertically / horizontally) AND spatial bounds (at forest floor level / in the garden / along the pillar surface)?
+- [ ] **Environment physics:** has the frame been split into exposed vs sheltered zones, and is every weather element (rain / snow / wind / sun / mist) confined to an exposed zone?
+- [ ] **Environment physics:** if the scene has any roof / eave / window / screen / interior, is `throughout the visible frame` / `throughout the scene` AVOIDED in favour of a named outdoor zone (the garden, the courtyard, the street outside)?
+- [ ] **Environment physics:** is there an explicit shelter-exclusion sentence (`No rain falls inside / under the eave / on the interior side of the glass`) whenever a sheltered zone exists?
+- [ ] **Environment physics:** does every weather element pass the test — could it actually reach that spot if you were sitting there?
+- [ ] **Loop-safe motion:** does every moving element pass the reverse-test — would it look natural played backward? (No bell pulses, no locomotion, no single-event motions, no strong directional momentum.)
+- [ ] **Loop-safe motion:** if any creature appears, is it either removed, frozen with explicit `no bell pulse / no contraction / motionless` negation, or demoted to sub-perceptible scale?
+- [ ] Is the word `across` absent, or replaced with `throughout [named exposed zone]`?
+- [ ] Is the word `drift` / `drifting` absent (any conjugation), even with "in place" qualifier?
+- [ ] Is the word `shift` / `shifting` absent (any conjugation), including sneaky uses like `intensity shifting` / `colour shifting`?
 - [ ] Are `runs down`, `runs up`, `slides down`, `slides up` absent?
-- [ ] Are `reaching toward`, `before reaching`, `toward the` absent from motion descriptions?
+- [ ] Are `reaching toward`, `before reaching`, `toward the`, `from above`, `from below` absent from motion descriptions?
 - [ ] Are `through the [space]` patterns absent?
 - [ ] Does the prompt end with `Nothing else moves.`?
 
 #### Proven prompt template
 
 ```
-Locked-off tripod shot, zero camera movement throughout. [Element 1] [safe-verb] vertically in place [spatial-bounds], [what it does within that position]. [Element 2] [safe-verb] gently in place [spatial-bounds], [character]. Nothing else moves. [Mood], [pacing], seamless loop.
+Locked-off tripod shot, zero camera movement throughout. [Weather element] [safe-verb] vertically in place in [named exposed zone — e.g. the garden beyond the veranda], [what it does within that zone]. [Sheltered-zone element] [safe-verb] gently in place [spatial-bounds], [character]. No [weather] reaches [the sheltered zone — e.g. the interior side of the screen]; [the sheltered area] stays dry and still. Nothing else moves. [Mood], [pacing], seamless loop.
 ```
+
+If the entire frame is exposed (open forest, open beach — no roof, no interior), there is no sheltered zone: drop the exclusion sentence and you may use `throughout the open [location]`.
 
 **✅ Examples that work:**
+
+Interior-out through a window — rain stays outside and on the glass, never in the room:
 ```
-Locked-off tripod shot, zero camera movement throughout. Rain droplets trickle vertically in place along the glass surface at varying speeds, each droplet within its own column. Steam rises vertically in place from the teacup, dissipating in place before leaving the upper frame. Candle flame flickers softly in place. Nothing else moves. Hypnotic, slow, sleep-friendly loop.
-```
-```
-Locked-off tripod shot, zero camera movement throughout. Wisps of warm mist rise vertically in place from the forest floor, dissolving in place at mid-height. Fern fronds quiver very gently in place, each leaf tip trembling within its fixed position. Nothing else moves. Meditative, seamless loop.
-```
-```
-Locked-off tripod shot, zero camera movement throughout. Rain falls vertically in place throughout the visible frame, each droplet lit by the diffuse overcast light above. Low ground mist rises vertically in place at forest floor level, dissolving in place before mid-height. Tropical leaves tremble gently in place as rain impacts their surface, each tip quivering within its fixed position. Nothing else moves. Meditative, unhurried, seamless loop.
+Locked-off tripod shot, zero camera movement throughout. Rain falls vertically in place in the street outside the window, each droplet within its fixed column. On the glass itself, droplets trickle vertically in place down the pane at varying speeds. Steam rises vertically in place from the teacup on the sill, dissipating in place before mid-frame. Candle flame flickers softly in place. No rain falls on the interior side of the glass; the room stays dry and still. Nothing else moves. Hypnotic, slow, sleep-friendly loop.
 ```
 
-**❌ Examples that break static camera — do not use:**
+Engawa porch + garden — rain confined to the garden, the sheltered porch stays dry:
+```
+Locked-off tripod shot, zero camera movement throughout. Rain falls vertically in place in the garden beyond the engawa edge, each droplet within its fixed column, stopping at the eave line. A single eave drip falls vertically in place at the roof edge. No rain reaches the engawa floorboards; the sheltered porch stays completely dry and still. Nothing else moves. Deeply meditative, seamless sleep loop.
+```
+
+Fully exposed jungle clearing — no roof, no interior, so `throughout the open jungle clearing` is safe and no exclusion sentence is needed:
+```
+Locked-off tripod shot, zero camera movement throughout. Rain falls vertically in place throughout the open jungle clearing, each droplet lit by the diffuse overcast light above. Low ground mist rises vertically in place at forest floor level, dissolving in place before mid-height. Tropical leaves tremble gently in place as rain impacts their surface, each tip quivering within its fixed position. Nothing else moves. Meditative, unhurried, seamless loop.
+```
+
+**❌ Examples that break — do not use:**
 ```
 Foreground leaves sway in a gentle breeze. Mist drifts subtly across mid-ground. Camera holds completely still.
 ```
@@ -396,6 +516,11 @@ Foreground leaves sway in a gentle breeze. Mist drifts subtly across mid-ground.
 Mist dissolving gently into the canopy light. Static camera.
 ```
 → `dissolving into` implies upward camera tilt; `Static camera` too late to override.
+
+```
+Rain falls vertically in place throughout the visible frame.   [scene = an engawa porch looking at a garden]
+```
+→ `throughout the visible frame` includes the sheltered porch — Runway renders rain falling on the floorboards. Name the exposed zone (`in the garden beyond the engawa edge`) and add a shelter-exclusion sentence. See the Environment Physics Rule above.
 
 Then include the Runway settings as a separate block:
 ```
