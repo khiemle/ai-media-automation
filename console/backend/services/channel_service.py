@@ -36,6 +36,7 @@ class ChannelService:
             credential_id=data.get("credential_id"),
             account_email=data.get("account_email"),
             category=data.get("category"),
+            channel_url=data.get("channel_url"),
             default_language=data.get("default_language", "vi"),
             monetized=data.get("monetized", False),
             status=data.get("status", "active"),
@@ -51,7 +52,7 @@ class ChannelService:
     def update_channel(self, channel_id: int, data: dict) -> dict:
         ch = self._ch_or_404(channel_id)
         for field in ("name", "platform", "credential_id", "account_email",
-                      "category", "default_language", "monetized", "status",
+                      "category", "channel_url", "default_language", "monetized", "status",
                       "subscriber_count", "video_count"):
             if field in data:
                 setattr(ch, field, data[field])
@@ -107,6 +108,7 @@ class ChannelService:
             "credential_id":    c.credential_id,
             "account_email":    c.account_email,
             "category":         c.category,
+            "channel_url":      c.channel_url,
             "default_language": c.default_language,
             "monetized":        c.monetized,
             "status":           c.status,

@@ -16,6 +16,7 @@ class ChannelBody(BaseModel):
     credential_id: int | None = None
     account_email: str | None = None
     category: str | None = None
+    channel_url: str | None = None
     default_language: str = "vi"
     monetized: bool = False
     status: str = "active"
@@ -29,6 +30,7 @@ class ChannelUpdateBody(BaseModel):
     credential_id: int | None = None
     account_email: str | None = None
     category: str | None = None
+    channel_url: str | None = None
     default_language: str | None = None
     monetized: bool | None = None
     status: str | None = None

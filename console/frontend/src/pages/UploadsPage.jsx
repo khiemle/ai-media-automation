@@ -827,7 +827,7 @@ function ChannelsTab({ onChannelsLoaded }) {
 
   const openCreate = () => {
     setEditing(null)
-    setForm({ name: '', platform: 'youtube', status: 'active', default_language: 'en', monetized: false, credential_id: null })
+    setForm({ name: '', platform: 'youtube', status: 'active', default_language: 'en', monetized: false, credential_id: null, channel_url: '' })
     setModal(true)
   }
 
@@ -922,6 +922,12 @@ function ChannelsTab({ onChannelsLoaded }) {
           </Select>
           <Input label="Account Email" value={form.account_email || ''} onChange={e => setForm(f => ({ ...f, account_email: e.target.value }))} />
           <Input label="Category" value={form.category || ''} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} />
+          <Input
+            label="Channel URL"
+            placeholder="https://www.youtube.com/@AmbientEarth-n9h"
+            value={form.channel_url || ''}
+            onChange={e => setForm(f => ({ ...f, channel_url: e.target.value }))}
+          />
           <Select label="Language" value={form.default_language || 'vi'} onChange={e => setForm(f => ({ ...f, default_language: e.target.value }))}>
             <option value="vi">Vietnamese</option>
             <option value="en">English</option>

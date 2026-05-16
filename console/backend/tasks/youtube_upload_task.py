@@ -2,9 +2,30 @@
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime, timezone
 
 from cryptography.fernet import Fernet
+
+
+_YOUR_CHANNEL_PLACEHOLDER_RE = re.compile(r"\[[^\]]*your channel[^\]]*\]", re.IGNORECASE)
+
+
+def substitute_channel_placeholders(description: str | None, channel_url: str | None) -> str:
+    """Replace bracketed 'your channel' placeholders with the channel URL.
+
+    LLM-generated SEO descriptions often include instructions like
+    "[Add links to other work ambience videos in your channel here]" that
+    expect the editor to insert a channel link. When a channel.channel_url
+    is configured, we substitute these placeholders automatically at upload
+    time. If channel_url is unset, the placeholder stays so the editor can
+    notice and fill it in.
+    """
+    if not description:
+        return description or ""
+    if not channel_url:
+        return description
+    return _YOUR_CHANNEL_PLACEHOLDER_RE.sub(channel_url, description)
 
 from console.backend.celery_app import celery_app
 from console.backend.config import settings
@@ -65,9 +86,12 @@ def upload_youtube_video_task(self, youtube_video_id: int, channel_id: int, uplo
         }
 
         template = db.get(VideoTemplate, video.template_id) if video.template_id else None
+        description = substitute_channel_placeholders(
+            video.seo_description or "", channel.channel_url
+        )
         video_meta = {
             "title":          video.seo_title or video.title,
-            "description":    video.seo_description or "",
+            "description":    description,
             "tags":           video.seo_tags or [],
             "language":       channel.default_language or "en",
             "privacy_status": "unlisted",

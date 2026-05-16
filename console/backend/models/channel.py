@@ -14,6 +14,7 @@ class Channel(Base):
     credential_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("platform_credentials.id"), nullable=True)
     account_email: Mapped[str | None] = mapped_column(String, nullable=True)
     category: Mapped[str | None] = mapped_column(String, nullable=True)
+    channel_url: Mapped[str | None] = mapped_column(String, nullable=True)
     default_language: Mapped[str] = mapped_column(String, default="vi")
     monetized: Mapped[bool] = mapped_column(Boolean, default=False)
     status: Mapped[str] = mapped_column(String, default="active")   # active | paused
