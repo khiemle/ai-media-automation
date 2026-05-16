@@ -99,5 +99,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r console/requirements.txt
 
+      - name: Run alembic migrations
+        # Some render tests use the `db` fixture from tests/conftest.py.
+        # Running alembic first ensures the schema exists with the same
+        # column defaults backend uses, so Base.metadata.create_all is a no-op.
+        working-directory: console/backend
+        run: alembic upgrade head
+
       - name: Run render tests
         run: pytest -m "render and not slow" tests/ -v
