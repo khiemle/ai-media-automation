@@ -37,13 +37,19 @@ jobs:
         with:
           python-version: '3.11'
           cache: pip
-          cache-dependency-path: requirements.mcp.txt
+          cache-dependency-path: |
+            console/requirements.txt
+            requirements.pipeline.txt
+            requirements.mcp.txt
 
       - name: Install dependencies
+        # MCP tests transitively import from console.backend (fastapi) and
+        # mock redis via fakeredis, so the slim requirements.mcp.txt isn't
+        # enough — install the full console + pipeline stack plus test extras.
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.mcp.txt
-          pip install pytest pytest-asyncio respx
+          pip install -r console/requirements.txt
+          pip install pytest pytest-asyncio respx fakeredis
 
       - name: Run MCP tests
         run: pytest console/mcp/tests/ -v
