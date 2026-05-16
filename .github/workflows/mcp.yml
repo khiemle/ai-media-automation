@@ -1,0 +1,49 @@
+name: MCP Tests
+
+on:
+  pull_request:
+    paths:
+      - 'console/mcp/**'
+      - 'requirements.mcp.txt'
+      - '.github/workflows/mcp.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'console/mcp/**'
+      - 'requirements.mcp.txt'
+      - '.github/workflows/mcp.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      MCP_API_TOKEN: test-token
+      MCP_CONSOLE_API_BASE: http://test
+      MCP_LOG_LEVEL: debug
+      MCP_IDEMPOTENCY_TTL_S: '3600'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: requirements.mcp.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.mcp.txt
+          pip install pytest pytest-asyncio respx
+
+      - name: Run MCP tests
+        run: pytest console/mcp/tests/ -v
