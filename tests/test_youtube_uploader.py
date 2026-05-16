@@ -3,29 +3,70 @@ from unittest.mock import MagicMock, patch
 from uploader.youtube_uploader import _build_tags, _build_description, _niche_to_category, set_thumbnail
 
 
-def test_build_tags_always_has_shorts_first():
-    tags = _build_tags({"hashtags": ["running", "fitness"], "niche": "running"})
+def test_build_tags_shorts_first_when_portrait_short():
+    tags = _build_tags({
+        "output_format": "portrait_short",
+        "hashtags": ["running", "fitness"], "niche": "running",
+    })
     assert tags[0] == "Shorts"
 
 
 def test_build_tags_no_duplicate_shorts():
-    tags = _build_tags({"hashtags": ["Shorts", "running"], "niche": "running"})
+    tags = _build_tags({
+        "output_format": "portrait_short",
+        "hashtags": ["Shorts", "running"], "niche": "running",
+    })
     assert tags.count("Shorts") == 1
 
 
-def test_build_tags_empty_metadata():
-    tags = _build_tags({})
-    assert tags[0] == "Shorts"
+def test_build_tags_empty_metadata_with_short_flag():
+    tags = _build_tags({"output_format": "portrait_short"})
+    assert tags == ["Shorts"]
 
 
-def test_build_description_appends_shorts_hashtag():
+def test_build_tags_omits_shorts_for_landscape_long():
+    """Long-form uploads must not carry the Shorts tag — YouTube ignores it
+    and it pollutes the searchable tag list."""
+    tags = _build_tags({
+        "output_format": "landscape_long",
+        "hashtags": ["ambient", "study"], "niche": "lifestyle",
+    })
+    assert "Shorts" not in tags
+    assert tags == ["ambient", "study", "lifestyle"]
+
+
+def test_build_tags_omits_shorts_when_output_format_missing():
+    """Defensive: missing output_format must not bring back the Shorts tag."""
+    tags = _build_tags({"hashtags": ["running"], "niche": "running"})
+    assert "Shorts" not in tags
+
+
+def test_build_description_appends_shorts_hashtag_for_portrait_short():
+    desc = _build_description({
+        "output_format": "portrait_short",
+        "description": "Great run!", "hashtags": ["running"],
+    })
+    assert "#Shorts" in desc
+
+
+def test_build_description_shorts_appended_when_no_hashtags_for_portrait_short():
+    desc = _build_description({"output_format": "portrait_short", "description": "Great run!"})
+    assert "#Shorts" in desc
+
+
+def test_build_description_omits_shorts_hashtag_for_landscape_long():
+    """Long-form uploads must not have #Shorts in the description."""
+    desc = _build_description({
+        "output_format": "landscape_long",
+        "description": "8 hours of ambient music.",
+        "hashtags": ["ambient", "study"],
+    })
+    assert "#Shorts" not in desc
+
+
+def test_build_description_omits_shorts_hashtag_when_output_format_missing():
     desc = _build_description({"description": "Great run!", "hashtags": ["running"]})
-    assert "#Shorts" in desc
-
-
-def test_build_description_shorts_appended_when_no_hashtags():
-    desc = _build_description({"description": "Great run!"})
-    assert "#Shorts" in desc
+    assert "#Shorts" not in desc
 
 
 def test_niche_to_category_running():

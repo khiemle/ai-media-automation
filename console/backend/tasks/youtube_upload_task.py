@@ -64,12 +64,14 @@ def upload_youtube_video_task(self, youtube_video_id: int, channel_id: int, uplo
             "refresh_token": _decrypt(cred.refresh_token),
         }
 
+        template = db.get(VideoTemplate, video.template_id) if video.template_id else None
         video_meta = {
             "title":          video.seo_title or video.title,
             "description":    video.seo_description or "",
             "tags":           video.seo_tags or [],
             "language":       channel.default_language or "en",
             "privacy_status": "unlisted",
+            "output_format":  template.output_format if template else None,
         }
 
         from console.backend.services.youtube_video_service import YoutubeVideoService

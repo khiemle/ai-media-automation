@@ -212,6 +212,7 @@ def _build_description(metadata: dict, chapters: list[dict] | None = None) -> st
     desc      = metadata.get("description", "")
     hashtags  = metadata.get("hashtags", [])
     affiliate = metadata.get("affiliate_links", [])
+    is_short  = metadata.get("output_format") == "portrait_short"
 
     # Build the body portion (description + affiliate links)
     body_parts = [desc]
@@ -219,9 +220,9 @@ def _build_description(metadata: dict, chapters: list[dict] | None = None) -> st
         body_parts.append("\n🔗 Links:\n" + "\n".join(affiliate))
     body = "\n\n".join(p for p in body_parts if p).strip()
 
-    # Build hashtag line — always include #Shorts
+    # Build hashtag line — include #Shorts only for portrait_short uploads
     ht_tags = [f"#{h.lstrip('#')}" for h in hashtags[:14]]
-    if "#Shorts" not in ht_tags:
+    if is_short and "#Shorts" not in ht_tags:
         ht_tags.append("#Shorts")
     ht_line = " ".join(ht_tags)
 
@@ -235,11 +236,13 @@ def _build_description(metadata: dict, chapters: list[dict] | None = None) -> st
 
 
 def _build_tags(metadata: dict) -> list[str]:
-    # Shorts must be first so YouTube reliably classifies the video
-    tags = ["Shorts"]
+    # "Shorts" tag is only meaningful for portrait_short uploads; YouTube ignores
+    # it on long-form videos and it pollutes the searchable tag list.
+    is_short = metadata.get("output_format") == "portrait_short"
+    tags: list[str] = ["Shorts"] if is_short else []
     for h in metadata.get("hashtags", []):
         tag = h.lstrip("#")
-        if tag != "Shorts":
+        if tag != "Shorts" and tag not in tags:
             tags.append(tag)
     niche = metadata.get("niche", "")
     if niche and niche not in tags:
