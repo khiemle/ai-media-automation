@@ -51,6 +51,10 @@ console/frontend/.vite/
 .claude/cache/
 # `*-workspace/` directories are scratch space from the writing-skills tool
 .claude/skills/*-workspace/
+# Symlinks into skills/ — WSL2 can't opendir through these on NTFS
+.claude/skills/relax-music-visual-prompt
+.claude/skills/suno-relax-music
+.claude/skills/visual-video
 /assets
 models/kokoro/kokoro.onnx
 models/kokoro/voices
