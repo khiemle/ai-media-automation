@@ -13,6 +13,7 @@ def _make_db():
     channel = MagicMock()
     channel.default_language = "en"
     channel.credential_id = 5
+    channel.channel_url = None
 
     cred = MagicMock()
     cred.client_id = "cid"
@@ -42,6 +43,10 @@ def _make_db():
     return db, video, channel, cred, upload
 
 
+# 1 GB — below the 12 GB auto-compress threshold
+_SMALL_FILE_STAT = MagicMock(st_size=1 * 1024 ** 3)
+
+
 def test_upload_task_sets_uploading_then_done():
     db, video, channel, cred, upload = _make_db()
 
@@ -51,6 +56,7 @@ def test_upload_task_sets_uploading_then_done():
         patch("console.backend.tasks.youtube_upload_task.Fernet") as mock_fernet_cls,
         patch("console.backend.tasks.youtube_upload_task._youtube_upload", return_value="yt_xyz"),
         patch("console.backend.services.youtube_video_service.YoutubeVideoService.build_chapters", return_value=None),
+        patch("pathlib.Path.stat", return_value=_SMALL_FILE_STAT),
     ):
         mock_settings.FERNET_KEY = "a" * 44  # valid base64 length for Fernet
         mock_fernet_cls.return_value.decrypt.return_value = b"decrypted"
@@ -73,6 +79,7 @@ def test_upload_task_sets_failed_on_error():
         patch("console.backend.tasks.youtube_upload_task.Fernet") as mock_fernet_cls,
         patch("console.backend.tasks.youtube_upload_task._youtube_upload", side_effect=RuntimeError("API error")),
         patch("console.backend.services.youtube_video_service.YoutubeVideoService.build_chapters", return_value=None),
+        patch("pathlib.Path.stat", return_value=_SMALL_FILE_STAT),
     ):
         mock_settings.FERNET_KEY = "a" * 44
         mock_fernet_cls.return_value.decrypt.return_value = b"decrypted"
@@ -101,6 +108,7 @@ def test_upload_task_calls_set_thumbnail_when_path_set():
         patch("console.backend.tasks.youtube_upload_task._youtube_upload", return_value="yt_xyz"),
         patch("console.backend.services.youtube_video_service.YoutubeVideoService.build_chapters", return_value=None),
         patch("console.backend.tasks.youtube_upload_task.set_thumbnail") as mock_set_thumb,
+        patch("pathlib.Path.stat", return_value=_SMALL_FILE_STAT),
     ):
         mock_settings.FERNET_KEY = "a" * 44
         mock_fernet_cls.return_value.decrypt.return_value = b"decrypted"
@@ -125,6 +133,7 @@ def test_upload_task_skips_set_thumbnail_when_no_path():
         patch("console.backend.tasks.youtube_upload_task._youtube_upload", return_value="yt_xyz"),
         patch("console.backend.services.youtube_video_service.YoutubeVideoService.build_chapters", return_value=None),
         patch("console.backend.tasks.youtube_upload_task.set_thumbnail") as mock_set_thumb,
+        patch("pathlib.Path.stat", return_value=_SMALL_FILE_STAT),
     ):
         mock_settings.FERNET_KEY = "a" * 44
         mock_fernet_cls.return_value.decrypt.return_value = b"decrypted"
@@ -146,6 +155,7 @@ def test_upload_task_thumbnail_failure_does_not_fail_upload():
         patch("console.backend.tasks.youtube_upload_task._youtube_upload", return_value="yt_xyz"),
         patch("console.backend.services.youtube_video_service.YoutubeVideoService.build_chapters", return_value=None),
         patch("console.backend.tasks.youtube_upload_task.set_thumbnail", side_effect=RuntimeError("API error")),
+        patch("pathlib.Path.stat", return_value=_SMALL_FILE_STAT),
     ):
         mock_settings.FERNET_KEY = "a" * 44
         mock_fernet_cls.return_value.decrypt.return_value = b"decrypted"
