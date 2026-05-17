@@ -843,14 +843,18 @@ def _render_landscape_music(
     cmd += ["-t", str(target_dur)]
 
     # Encoder — same params as legacy path (keyed off full duration for chunk-concat compat)
+    _maxrate, _bufsize = ("35M", "70M") if scale == "3840:2160" else ("8M", "16M")
     if _nvenc_available():
-        cmd += ["-c:v", "h264_nvenc", "-preset", "p1", "-rc", "vbr", "-cq", "23"]
+        cmd += ["-c:v", "h264_nvenc", "-preset", "p1", "-rc", "vbr", "-cq", "23",
+                "-maxrate", _maxrate, "-bufsize", _bufsize]
     else:
         preset = "ultrafast" if full_duration_s > 600 else "slow"
         if is_image:
-            cmd += ["-c:v", "libx264", "-preset", preset, "-tune", "stillimage", "-crf", "23"]
+            cmd += ["-c:v", "libx264", "-preset", preset, "-tune", "stillimage", "-crf", "23",
+                    "-maxrate", _maxrate, "-bufsize", _bufsize]
         else:
-            cmd += ["-c:v", "libx264", "-preset", preset, "-crf", "23"]
+            cmd += ["-c:v", "libx264", "-preset", preset, "-crf", "23",
+                    "-maxrate", _maxrate, "-bufsize", _bufsize]
     cmd += [
         "-c:a", "aac", "-b:a", "192k", "-ar", "44100",
         "-movflags", "+faststart",
@@ -1035,14 +1039,18 @@ def render_landscape(
     # Preset is keyed off FULL video duration (not chunk size) so all chunks of
     # the same video share encoder params. Otherwise a 500s tail chunk would
     # pick "slow" while earlier chunks used "ultrafast", breaking -c copy concat.
+    _maxrate, _bufsize = ("35M", "70M") if scale == "3840:2160" else ("8M", "16M")
     if _nvenc_available():
-        cmd += ["-c:v", "h264_nvenc", "-preset", "p1", "-rc", "vbr", "-cq", "23"]
+        cmd += ["-c:v", "h264_nvenc", "-preset", "p1", "-rc", "vbr", "-cq", "23",
+                "-maxrate", _maxrate, "-bufsize", _bufsize]
     else:
         preset = "ultrafast" if full_duration_s > 600 else "slow"
         if is_image:
-            cmd += ["-c:v", "libx264", "-preset", preset, "-tune", "stillimage", "-crf", "23"]
+            cmd += ["-c:v", "libx264", "-preset", preset, "-tune", "stillimage", "-crf", "23",
+                    "-maxrate", _maxrate, "-bufsize", _bufsize]
         else:
-            cmd += ["-c:v", "libx264", "-preset", preset, "-crf", "23"]
+            cmd += ["-c:v", "libx264", "-preset", preset, "-crf", "23",
+                    "-maxrate", _maxrate, "-bufsize", _bufsize]
     cmd += ["-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-movflags", "+faststart",
             str(output_path)]
 

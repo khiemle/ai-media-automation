@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import logging
 import re
+import subprocess
 from datetime import datetime, timezone
+from pathlib import Path
 
 from cryptography.fernet import Fernet
 
@@ -39,6 +41,33 @@ from console.backend.models.youtube_video_upload import YoutubeVideoUpload
 from uploader.youtube_uploader import set_thumbnail, upload as _youtube_upload
 
 logger = logging.getLogger(__name__)
+
+_COMPRESS_THRESHOLD_GB = 12  # re-encode if file exceeds this before uploading
+_UPLOAD_MAXRATE = "8M"
+_UPLOAD_BUFSIZE = "16M"
+
+
+def _compress_for_upload(src: Path) -> Path:
+    """Re-encode a large MP4 at 8 Mbps max so the upload is manageable.
+
+    Outputs a sibling file named <stem>_compressed.mp4.  Audio is stream-copied
+    to avoid a second decode/encode pass.
+    """
+    dst = src.with_name(src.stem + "_compressed.mp4")
+    logger.info("[YouTube] Compressing %s (%.1f GB) → %s", src, src.stat().st_size / 1e9, dst)
+    cmd = [
+        "ffmpeg", "-y", "-i", str(src),
+        "-c:v", "libx264", "-preset", "faster", "-crf", "23",
+        "-maxrate", _UPLOAD_MAXRATE, "-bufsize", _UPLOAD_BUFSIZE,
+        "-c:a", "copy",
+        "-movflags", "+faststart",
+        str(dst),
+    ]
+    result = subprocess.run(cmd, capture_output=True, timeout=7200)
+    if result.returncode != 0:
+        raise RuntimeError(f"Compression failed: {(result.stderr or b'')[-600:].decode()}")
+    logger.info("[YouTube] Compressed to %.1f GB", dst.stat().st_size / 1e9)
+    return dst
 
 
 @celery_app.task(
@@ -100,7 +129,17 @@ def upload_youtube_video_task(self, youtube_video_id: int, channel_id: int, uplo
 
         from console.backend.services.youtube_video_service import YoutubeVideoService
         chapters = YoutubeVideoService(db).build_chapters(video)
-        platform_id = _youtube_upload(video.output_path, video_meta, credentials_dict, chapters=chapters)
+
+        upload_path = Path(video.output_path)
+        size_gb = upload_path.stat().st_size / 1e9
+        if size_gb > _COMPRESS_THRESHOLD_GB:
+            logger.info(
+                "[YouTube] File is %.1f GB (> %s GB threshold) — compressing before upload",
+                size_gb, _COMPRESS_THRESHOLD_GB,
+            )
+            upload_path = _compress_for_upload(upload_path)
+
+        platform_id = _youtube_upload(str(upload_path), video_meta, credentials_dict, chapters=chapters)
 
         if video.thumbnail_path:
             try:
