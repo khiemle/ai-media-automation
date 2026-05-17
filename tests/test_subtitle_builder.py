@@ -1,6 +1,9 @@
 from pathlib import Path
 import pytest
 
+pytestmark = pytest.mark.render
+
+
 
 def test_fmt_ass_time_zero():
     from pipeline.subtitle_builder import _fmt_ass_time

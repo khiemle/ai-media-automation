@@ -1,4 +1,8 @@
 from pipeline.sfx_scheduler import schedule_sfx, schedule_sfx_layer
+import pytest
+
+pytestmark = pytest.mark.render
+
 
 
 def test_same_seed_reproduces_schedule():

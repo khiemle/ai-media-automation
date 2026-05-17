@@ -4,6 +4,8 @@ No libass / ffmpeg subtitle filter required.
 """
 import pytest
 
+pytestmark = pytest.mark.render
+
 
 WORD_TIMINGS = [
     (0.0, [

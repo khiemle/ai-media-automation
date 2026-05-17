@@ -2,6 +2,9 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 import pytest
 
+pytestmark = pytest.mark.render
+
+
 
 def _make_raw(tmp_path):
     raw = tmp_path / "raw_video.mp4"

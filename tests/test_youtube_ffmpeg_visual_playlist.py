@@ -1,4 +1,8 @@
 from unittest.mock import MagicMock
+import pytest
+
+pytestmark = pytest.mark.render
+
 
 
 def _make_video(visual_asset_ids=None, visual_clip_durations_s=None,

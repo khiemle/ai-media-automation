@@ -16,7 +16,15 @@ def engine():
     eng = create_engine(TEST_DB_URL)
     Base.metadata.create_all(eng)
     yield eng
-    Base.metadata.drop_all(eng)
+    # drop_all topo-sort can fail when Alembic-only FKs aren't declared on the
+    # Base.metadata models. Fall back to DROP SCHEMA CASCADE for reliable cleanup.
+    try:
+        Base.metadata.drop_all(eng)
+    except Exception:
+        from sqlalchemy import text
+        with eng.begin() as conn:
+            conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
+            conn.execute(text("CREATE SCHEMA public"))
 
 
 @pytest.fixture

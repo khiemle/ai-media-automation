@@ -1,4 +1,8 @@
 from pipeline.youtube_ffmpeg import build_spectrum_filter
+import pytest
+
+pytestmark = pytest.mark.render
+
 
 
 def test_disabled_returns_empty():

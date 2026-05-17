@@ -1,0 +1,133 @@
+name: Render Tests
+
+on:
+  pull_request:
+    paths:
+      - 'pipeline/**'
+      - 'tests/pipeline/**'
+      - 'tests/test_composer_*.py'
+      - 'tests/test_renderer_*.py'
+      - 'tests/test_youtube_ffmpeg*.py'
+      - 'tests/test_youtube_render_supersede.py'
+      - 'tests/test_music_*.py'
+      - 'tests/test_chapter_*.py'
+      - 'tests/test_subtitle_*.py'
+      - 'tests/test_caption_*.py'
+      - 'tests/test_spectrum_*.py'
+      - 'tests/test_thumbnail_generation.py'
+      - 'tests/test_tts_router_timing.py'
+      - 'requirements.pipeline.txt'
+      - 'console/requirements.txt'
+      - 'pytest.ini'
+      - '.github/workflows/render.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'pipeline/**'
+      - 'tests/pipeline/**'
+      - 'tests/test_composer_*.py'
+      - 'tests/test_renderer_*.py'
+      - 'tests/test_youtube_ffmpeg*.py'
+      - 'tests/test_youtube_render_supersede.py'
+      - 'tests/test_music_*.py'
+      - 'tests/test_chapter_*.py'
+      - 'tests/test_subtitle_*.py'
+      - 'tests/test_caption_*.py'
+      - 'tests/test_spectrum_*.py'
+      - 'tests/test_thumbnail_generation.py'
+      - 'tests/test_tts_router_timing.py'
+      - 'requirements.pipeline.txt'
+      - 'console/requirements.txt'
+      - 'pytest.ini'
+      - '.github/workflows/render.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: admin
+          POSTGRES_PASSWORD: testpw
+          POSTGRES_DB: ai_media_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U admin"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      TEST_DATABASE_URL: postgresql://admin:testpw@localhost:5432/ai_media_test
+      DATABASE_URL: postgresql://admin:testpw@localhost:5432/ai_media_test
+      GEMINI_API_KEY: test
+      GEMINI_MEDIA_API_KEY: test
+      PEXELS_API_KEY: test
+      ELEVENLABS_API_KEY: test
+      RUNWAY_API_KEY: test
+      YOUTUBE_API_KEY: test
+      FERNET_KEY: 'xSDP9q3SS0jLfBLDhDDJZfaKH5WSoGUlJksXIdoaC_A='
+      JWT_SECRET: test-jwt-secret
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: System deps (ffmpeg + audio libs)
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg libsndfile1 libgomp1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: |
+            console/requirements.txt
+            requirements.pipeline.txt
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r console/requirements.txt
+          pip install pytest-cov
+
+      - name: Run alembic migrations
+        # Some render tests use the `db` fixture from tests/conftest.py.
+        # Running alembic first ensures the schema exists with the same
+        # column defaults backend uses, so Base.metadata.create_all is a no-op.
+        working-directory: console/backend
+        run: alembic upgrade head
+
+      - name: Run render tests
+        run: |
+          pytest -m "render and not slow" tests/ \
+            --cov=pipeline \
+            --cov-report=xml:coverage.xml --cov-report=html:htmlcov --cov-report=term \
+            --junitxml=junit.xml -v
+
+      - name: Generate test report
+        if: always()
+        env:
+          REPORT_NAME: Render Tests
+        run: python3 .github/scripts/report.py
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: render-test-results
+          path: |
+            junit.xml
+            coverage.xml
+            htmlcov/
+          if-no-files-found: warn
+          retention-days: 14

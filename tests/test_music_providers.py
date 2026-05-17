@@ -2,6 +2,9 @@ import json
 import pytest
 from unittest.mock import patch, MagicMock
 
+pytestmark = pytest.mark.render
+
+
 _FAKE_CFG = {
     "suno": {"api_key": "test-suno-key", "model": "V4_5"},
     "gemini": {

@@ -1,3 +1,7 @@
+import pytest
+
+pytestmark = pytest.mark.render
+
 """Regression tests for the render-task supersede guard.
 
 Without the guard, two ffmpeg processes could write to the same output file

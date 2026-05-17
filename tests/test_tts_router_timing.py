@@ -4,6 +4,9 @@ import importlib
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
+pytestmark = pytest.mark.render
+
+
 
 _FAKE_CONFIG = {
     "gemini": {
