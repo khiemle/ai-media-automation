@@ -39,10 +39,35 @@ jobs:
         # npm install (not npm ci) because the lockfile is generated on macOS
         # and CI's Linux runner needs platform-specific optional deps that
         # npm ci would reject as "missing from lock file".
-        run: npm install --no-audit --no-fund
+        run: |
+          npm install --no-audit --no-fund
+          npm install --no-audit --no-fund --save-dev @vitest/coverage-v8
 
       - name: Build
         run: npm run build
 
       - name: Run tests
-        run: npm test
+        run: |
+          npx vitest run \
+            --coverage --coverage.reporter=cobertura --coverage.reporter=html \
+            --reporter=junit --outputFile=junit.xml
+
+      - name: Generate test report
+        if: always()
+        working-directory: ${{ github.workspace }}
+        env:
+          REPORT_NAME: Frontend Tests
+          JUNIT_PATH: console/frontend/junit.xml
+          COVERAGE_PATH: console/frontend/coverage/cobertura-coverage.xml
+        run: python3 .github/scripts/report.py
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-test-results
+          path: |
+            console/frontend/junit.xml
+            console/frontend/coverage/
+          if-no-files-found: warn
+          retention-days: 14
