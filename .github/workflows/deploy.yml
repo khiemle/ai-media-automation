@@ -143,6 +143,38 @@ jobs:
           $text = $json | ConvertTo-Json -Depth 5
           [System.IO.File]::WriteAllText("$PWD\config\api_keys.json", $text, (New-Object System.Text.UTF8Encoding $false))
 
+      # Diagnostic: verify config/api_keys.json was written with non-empty values.
+      # Booleans only — no secret value ever leaves this step.
+      - name: Verify config/api_keys.json (file-side)
+        shell: powershell
+        continue-on-error: true
+        run: |
+          $path = "$PWD\config\api_keys.json"
+          if (-not (Test-Path $path)) {
+            Write-Host "FATAL: $path does not exist"
+            exit 1
+          }
+          $bytes = [System.IO.File]::ReadAllBytes($path)
+          $hash  = (Get-FileHash $path -Algorithm SHA256).Hash
+          $json  = Get-Content -Raw $path | ConvertFrom-Json
+          function NonEmpty($v) {
+            if ($null -eq $v) { return $false }
+            return ($v.ToString().Length -gt 0)
+          }
+          $keys = [ordered]@{
+            'gemini.script' = NonEmpty $json.gemini.script.api_key
+            'gemini.media'  = NonEmpty $json.gemini.media.api_key
+            'gemini.music'  = NonEmpty $json.gemini.music.api_key
+            'elevenlabs'    = NonEmpty $json.elevenlabs.api_key
+            'suno'          = NonEmpty $json.suno.api_key
+            'pexels'        = NonEmpty $json.pexels.api_key
+            'runway'        = NonEmpty $json.runway.api_key
+          }
+          Write-Host "=== file-side keys ==="
+          $keys | ConvertTo-Json
+          Write-Host "file_bytes: $($bytes.Length)"
+          Write-Host "file_sha256: $hash"
+
       # Write pipeline.env from variables (non-sensitive) + secrets
       - name: Write pipeline.env
         shell: powershell
