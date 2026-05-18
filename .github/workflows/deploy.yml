@@ -305,4 +305,5 @@ jobs:
           print('=== container-side keys ===')
           print(json.dumps(out, indent=2))
           "@
-          docker compose exec -T api python -c $py
+          Start-Sleep -Seconds 5
+          docker compose exec -T api python -c "$py"
