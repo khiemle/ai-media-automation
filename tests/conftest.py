@@ -8,6 +8,16 @@ TEST_DB_URL = os.environ.get(
     "postgresql://localhost/ai_media_test"
 )
 
+# Guard: refuse to run destructive fixture teardown against the production DB.
+# The production DB is identified by the DATABASE_URL env var; if TEST_DATABASE_URL
+# resolves to the same host+dbname, abort immediately rather than wipe data.
+_PROD_DB_URL = os.environ.get("DATABASE_URL", "")
+if _PROD_DB_URL and TEST_DB_URL.rstrip("/") == _PROD_DB_URL.rstrip("/"):
+    raise RuntimeError(
+        f"TEST_DATABASE_URL points at the production database ({TEST_DB_URL}). "
+        "Set TEST_DATABASE_URL to a dedicated test database before running tests."
+    )
+
 
 @pytest.fixture(scope="session")
 def engine():
