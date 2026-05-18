@@ -155,7 +155,9 @@ jobs:
             exit 1
           }
           $bytes = [System.IO.File]::ReadAllBytes($path)
-          $hash  = (Get-FileHash $path -Algorithm SHA256).Hash
+          $hash  = (Get-FileHash $path -Algorithm SHA256).Hash.ToLower()
+          Write-Host "file_bytes: $($bytes.Length)"
+          Write-Host "file_sha256: $hash"
           $json  = Get-Content -Raw $path | ConvertFrom-Json
           function NonEmpty($v) {
             if ($null -eq $v) { return $false }
@@ -171,9 +173,7 @@ jobs:
             'runway'        = NonEmpty $json.runway.api_key
           }
           Write-Host "=== file-side keys ==="
-          $keys | ConvertTo-Json
-          Write-Host "file_bytes: $($bytes.Length)"
-          Write-Host "file_sha256: $hash"
+          Write-Host ($keys | ConvertTo-Json)
 
       # Write pipeline.env from variables (non-sensitive) + secrets
       - name: Write pipeline.env
