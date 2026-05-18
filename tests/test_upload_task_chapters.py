@@ -119,6 +119,7 @@ def test_upload_task_passes_chapters_to_uploader():
     fake_channel = MagicMock()
     fake_channel.default_language = "en"
     fake_channel.credential_id = 1
+    fake_channel.channel_url = None
 
     fake_cred = MagicMock()
     fake_cred.client_id = "client"
@@ -155,6 +156,7 @@ def test_upload_task_passes_chapters_to_uploader():
             "console.backend.services.youtube_video_service.YoutubeVideoService.build_chapters",
             mock_build_chapters,
         ),
+        patch("pathlib.Path.stat", return_value=MagicMock(st_size=1 * 1024 ** 3)),
     ):
         from console.backend.tasks.youtube_upload_task import upload_youtube_video_task
 
