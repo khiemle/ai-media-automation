@@ -276,3 +276,33 @@ jobs:
       - name: Start services
         shell: powershell
         run: docker compose up -d --remove-orphans
+
+      # Diagnostic: verify the running api container reads non-empty values
+      # from api_config.get_config(). Compare against file-side booleans
+      # above to localize the bug (file wrong, mount stale, or cache).
+      - name: Verify config/api_keys.json (container-side)
+        shell: powershell
+        continue-on-error: true
+        run: |
+          # Force-flush the api_config 30s cache before reading, so we
+          # see the file content the FastAPI process would see on a
+          # fresh request right now (not what it cached at boot).
+          $py = @"
+          import json
+          import config.api_config as ac
+          ac._cache = {}
+          ac._cache_time = 0
+          c = ac.get_config()
+          out = {
+            'gemini.script': bool(c.get('gemini',{}).get('script',{}).get('api_key')),
+            'gemini.media':  bool(c.get('gemini',{}).get('media',{}).get('api_key')),
+            'gemini.music':  bool(c.get('gemini',{}).get('music',{}).get('api_key')),
+            'elevenlabs':    bool(c.get('elevenlabs',{}).get('api_key')),
+            'suno':          bool(c.get('suno',{}).get('api_key')),
+            'pexels':        bool(c.get('pexels',{}).get('api_key')),
+            'runway':        bool(c.get('runway',{}).get('api_key')),
+          }
+          print('=== container-side keys ===')
+          print(json.dumps(out, indent=2))
+          "@
+          docker compose exec -T api python -c $py
