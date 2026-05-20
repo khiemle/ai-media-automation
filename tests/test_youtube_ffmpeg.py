@@ -353,6 +353,88 @@ def test_render_full_audio_track_uses_full_duration(tmp_path):
     assert cmd[t_idx + 1] == "10800"
 
 
+# ── _build_music_playlist_wav seamless loop ──────────────────────────────────
+
+
+def test_build_music_playlist_seamless_loop_uses_acrossfade_at_boundaries(tmp_path):
+    """The previous implementation used ``aloop`` for single-track playlists,
+    which hard-cuts at every loop boundary (audible click every M seconds
+    for non-broadband / tonal music — the original 5-min glitch root cause).
+
+    The new path probes the track duration, replicates the input N times,
+    and applies ``acrossfade`` between every consecutive pair so loop
+    boundaries are seamless. Verify:
+      * The ffmpeg command repeats the same input path N≥2 times.
+      * ``acrossfade`` appears in the filter graph at least N-1 times.
+      * The legacy ``aloop`` hard-loop directive is NOT used.
+    """
+    fake_track = MagicMock()
+    fake_track.id = 1
+    fake_track.file_path = "/tmp/fake_5min_track.mp3"
+    fake_track.volume = 1.0
+
+    db = MagicMock()
+    # query(...).filter(...).all() returns [fake_track]
+    db.query.return_value.filter.return_value.all.return_value = [fake_track]
+
+    video = _make_video(music_track_ids=[1])
+
+    # Patch:
+    #   - Path.is_file → True (track "exists")
+    #   - _probe_duration → 300.0s (5-minute track)
+    #   - subprocess.run (the ffmpeg run) → success
+    with patch.object(Path, "is_file", return_value=True), \
+         patch("pipeline.youtube_ffmpeg._probe_duration", return_value=300.0), \
+         patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stderr="")
+        from pipeline.youtube_ffmpeg import _build_music_playlist_wav
+        _build_music_playlist_wav(video, db, 10800, tmp_path, start_s=0.0)
+
+    cmd = mock_run.call_args[0][0]
+    cmd_str = " ".join(cmd)
+
+    # Same input path repeated many times (≥ 2 for the loop to make sense;
+    # for a 300s track over a 10800s target we expect dozens).
+    input_count = sum(1 for i, t in enumerate(cmd) if t == "-i" and i + 1 < len(cmd) and cmd[i + 1] == fake_track.file_path)
+    assert input_count >= 2, f"expected multiple -i inputs for seamless loop, got {input_count}"
+
+    # acrossfade applied between every pair of inputs ⇒ at least (input_count - 1)
+    # acrossfade clauses must appear in the filter graph.
+    acrossfade_count = cmd_str.count("acrossfade")
+    assert acrossfade_count >= input_count - 1, (
+        f"expected ≥{input_count - 1} acrossfade clauses, got {acrossfade_count}"
+    )
+
+    # The legacy hard-loop directive must NOT be used in this path.
+    assert "aloop=loop=-1" not in cmd_str, (
+        "seamless-loop path must not fall back to aloop (hard loop boundary)"
+    )
+
+
+def test_build_music_playlist_falls_back_to_aloop_when_probe_fails(tmp_path):
+    """If ffprobe can't determine track duration, we can't compute loop counts;
+    fall back to the legacy aloop path so we still produce output."""
+    fake_track = MagicMock()
+    fake_track.id = 1
+    fake_track.file_path = "/tmp/fake_unprobable.mp3"
+    fake_track.volume = 1.0
+
+    db = MagicMock()
+    db.query.return_value.filter.return_value.all.return_value = [fake_track]
+
+    video = _make_video(music_track_ids=[1])
+
+    with patch.object(Path, "is_file", return_value=True), \
+         patch("pipeline.youtube_ffmpeg._probe_duration", return_value=0.0), \
+         patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stderr="")
+        from pipeline.youtube_ffmpeg import _build_music_playlist_wav
+        _build_music_playlist_wav(video, db, 10800, tmp_path, start_s=0.0)
+
+    cmd_str = " ".join(mock_run.call_args[0][0])
+    assert "aloop=loop=-1" in cmd_str, "expected legacy fallback to use aloop"
+
+
 def test_render_full_audio_track_silence_when_no_music_or_sfx(tmp_path):
     """No music + no sound layers → fall back to anullsrc silence track."""
     output = tmp_path / "audio.m4a"

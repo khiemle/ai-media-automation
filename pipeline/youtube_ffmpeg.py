@@ -299,10 +299,26 @@ def _nvenc_available() -> bool:
 
 
 def _build_music_playlist_wav(video, db, target_duration_s: int, output_dir: Path, start_s: float = 0.0) -> str | None:
-    """Render the multi-track music playlist to a single temp WAV, with crossfade and loop.
+    """Render the multi-track music playlist to a single temp WAV, with seamless loop.
 
     Falls back to single ``music_track_id`` when ``music_track_ids`` is empty.
     Returns path to the temp WAV, or None if no music is configured / files missing.
+
+    Loop boundaries are crossfaded — not hard-cut. ``aloop`` (the previous
+    approach) repeats the audio buffer verbatim, so the last sample of one
+    iteration butts up against the first sample of the next. For music that
+    doesn't start and end at matching zero crossings (i.e. almost any track
+    that wasn't authored as a "loop"), this creates an audible click /
+    discontinuity every M seconds, where M is the track length. Broadband /
+    ambient content masks the click acoustically; tonal / melodic music
+    exposes it as a "weird sound" every loop period — the symptom users
+    report for 3-hour renders where the music track happens to be ~5 min.
+
+    Implementation: probe each track's duration, replicate the sequence N
+    times (with N chosen so the natural sum overshoots target by ≥ one
+    crossfade), pairwise ``acrossfade`` every consecutive pair (within and
+    between iterations), then atrim to the requested window. When a track's
+    duration cannot be probed, falls back to the legacy ``aloop`` path.
     """
     from database.models import MusicTrack
 
@@ -334,11 +350,140 @@ def _build_music_playlist_wav(video, db, target_duration_s: int, output_dir: Pat
 
     CROSSFADE = 1.5
 
+    # Probe each unique track once.
+    durations_by_path: dict[str, float] = {}
+    for path, _vol in paths:
+        if path not in durations_by_path:
+            durations_by_path[path] = _probe_duration(path)
+    can_seamless_loop = all(d > CROSSFADE * 2 for d in durations_by_path.values())
+
+    if not can_seamless_loop:
+        # Fallback: probe failed or a track is shorter than the crossfade.
+        # Use the legacy aloop path (may glitch at loop boundary for tonal music,
+        # but at least it produces output).
+        logger.warning(
+            "[MusicPlaylist] could not probe all track durations; "
+            "falling back to legacy aloop (may click at loop boundary)"
+        )
+        cmd = ["ffmpeg", "-y"]
+        for path, _vol in paths:
+            cmd += ["-i", path]
+
+        parts: list[str] = []
+        for i, (_p, vol) in enumerate(paths):
+            parts.append(f"[{i}:a]volume={vol}[v{i}]")
+
+        if len(paths) == 1:
+            parts.append("[v0]aloop=loop=-1:size=2147483647[looped]")
+        else:
+            prev = "v0"
+            for i in range(1, len(paths)):
+                label = f"x{i}" if i < len(paths) - 1 else "joined"
+                parts.append(f"[{prev}][v{i}]acrossfade=d={CROSSFADE}:c1=tri:c2=tri[{label}]")
+                prev = label
+            parts.append("[joined]aloop=loop=-1:size=2147483647[looped]")
+
+        parts.append(
+            f"[looped]atrim=start={start_s}:end={start_s + target_duration_s},"
+            f"asetpts=PTS-STARTPTS[out]"
+        )
+
+        cmd += [
+            "-filter_complex", ";".join(parts),
+            "-map", "[out]",
+            "-ar", "44100", "-ac", "2", "-c:a", "pcm_s16le",
+            str(out_path),
+        ]
+        _run_ffmpeg(cmd, max(120, target_duration_s + 60))
+        return str(out_path)
+
+    # Seamless loop path: replicate the playlist N times with acrossfade
+    # between every consecutive pair (within and at loop boundaries).
+    target_end = start_s + target_duration_s
+    n_tracks = len(paths)
+    one_iter_natural = sum(durations_by_path[p] for p, _v in paths) - (n_tracks - 1) * CROSSFADE
+
+    if one_iter_natural <= 0:
+        # Pathological — fall back to legacy.
+        return _build_music_playlist_wav_legacy_fallback(
+            paths, target_duration_s, output_dir, start_s, CROSSFADE,
+        )
+
+    # How many full iterations are needed so the cumulative natural length
+    # exceeds target_end? Add one extra to give atrim room for the final
+    # crossfade tail.
+    if one_iter_natural >= target_end:
+        n_iters = 1
+    else:
+        # Each extra iteration adds (one_iter_natural - CROSSFADE) usable seconds
+        # because the boundary between iterations consumes another crossfade.
+        usable_per_extra = one_iter_natural - CROSSFADE
+        if usable_per_extra <= 0:
+            return _build_music_playlist_wav_legacy_fallback(
+                paths, target_duration_s, output_dir, start_s, CROSSFADE,
+            )
+        extra_needed = target_end - one_iter_natural
+        import math as _math
+        n_iters = 1 + _math.ceil(extra_needed / usable_per_extra) + 1  # +1 safety
+
+    # Flatten paths × n_iters into the sequence of inputs.
+    seq: list[tuple[str, float]] = []
+    for _ in range(n_iters):
+        seq.extend(paths)
+
+    cmd = ["ffmpeg", "-y"]
+    for path, _vol in seq:
+        cmd += ["-i", path]
+
+    parts: list[str] = []
+    for i, (_p, vol) in enumerate(seq):
+        parts.append(f"[{i}:a]volume={vol}[v{i}]")
+
+    if len(seq) == 1:
+        parts.append("[v0]anull[looped]")
+    else:
+        prev = "v0"
+        for i in range(1, len(seq)):
+            label = f"x{i}" if i < len(seq) - 1 else "looped"
+            parts.append(f"[{prev}][v{i}]acrossfade=d={CROSSFADE}:c1=tri:c2=tri[{label}]")
+            prev = label
+
+    parts.append(
+        f"[looped]atrim=start={start_s}:end={start_s + target_duration_s},"
+        f"asetpts=PTS-STARTPTS[out]"
+    )
+
+    cmd += [
+        "-filter_complex", ";".join(parts),
+        "-map", "[out]",
+        "-ar", "44100", "-ac", "2", "-c:a", "pcm_s16le",
+        str(out_path),
+    ]
+    logger.info(
+        "[MusicPlaylist] %s tracks × %s iters (one-iter natural=%.1fs) → %ss target",
+        n_tracks, n_iters, one_iter_natural, target_duration_s,
+    )
+    _run_ffmpeg(cmd, max(120, target_duration_s + 60))
+    return str(out_path)
+
+
+def _build_music_playlist_wav_legacy_fallback(
+    paths: list[tuple[str, float]],
+    target_duration_s: int,
+    output_dir: Path,
+    start_s: float,
+    crossfade: float,
+) -> str:
+    """Legacy aloop path — used only when seamless-loop math degenerates.
+
+    May produce an audible click at each loop boundary for non-loopable music;
+    kept as a backstop to ensure we always produce *some* output.
+    """
+    out_path = output_dir / "music_playlist.wav"
     cmd = ["ffmpeg", "-y"]
     for path, _vol in paths:
         cmd += ["-i", path]
 
-    # Per-track volume, then chain via acrossfade pairwise
     parts: list[str] = []
     for i, (_p, vol) in enumerate(paths):
         parts.append(f"[{i}:a]volume={vol}[v{i}]")
@@ -349,7 +494,7 @@ def _build_music_playlist_wav(video, db, target_duration_s: int, output_dir: Pat
         prev = "v0"
         for i in range(1, len(paths)):
             label = f"x{i}" if i < len(paths) - 1 else "joined"
-            parts.append(f"[{prev}][v{i}]acrossfade=d={CROSSFADE}:c1=tri:c2=tri[{label}]")
+            parts.append(f"[{prev}][v{i}]acrossfade=d={crossfade}:c1=tri:c2=tri[{label}]")
             prev = label
         parts.append("[joined]aloop=loop=-1:size=2147483647[looped]")
 
