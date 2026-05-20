@@ -1,4 +1,5 @@
 """Tests for cancel-all-tasks: revoke all chunk + concat Celery task IDs on cancel/delete."""
+import pytest
 from unittest.mock import MagicMock, patch
 
 
@@ -274,3 +275,160 @@ def test_orchestrator_skips_when_video_is_failed():
 
     mock_chord.assert_not_called()
     assert result["status"] == "skipped"
+
+
+def test_orchestrator_invalidates_legacy_chunks_without_video_suffix():
+    """Pre-v1.2.1 chunks (file_path ends with .mp4, not .video.mp4) had
+    embedded AAC audio. The orchestrator must NOT preserve them — it must
+    mark them pending so they get re-rendered as video-only.
+    """
+    from unittest.mock import patch, MagicMock
+
+    video = MagicMock()
+    video.id = 42
+    video.celery_task_id = "old-orch-id"
+    video.sfx_seed = 1
+    video.target_duration_h = 1 / 60 * 3  # 180s → 1 chunk of ≤300s
+    video.status = "rendering"
+    # Existing render_parts: one "completed" chunk pointing to LEGACY filename
+    video.render_parts = [{
+        "idx": 0, "start_s": 0, "end_s": 180,
+        "status": "completed",
+        "file_path": "/tmp/youtube_42/chunk_0/chunk.mp4",  # legacy (no .video.mp4)
+    }]
+
+    db = MagicMock()
+    db.get.return_value = video
+
+    with patch("console.backend.database.SessionLocal", return_value=db), \
+         patch("console.backend.tasks.youtube_render_task._is_superseded", return_value=False), \
+         patch("celery.chord", MagicMock()), \
+         patch("celery.group", MagicMock()), \
+         patch("sqlalchemy.orm.attributes.flag_modified"):
+        from console.backend.tasks.youtube_render_task import render_youtube_chunked_orchestrator_task
+        render_youtube_chunked_orchestrator_task.apply(args=[42])
+
+    # The single existing chunk must be invalidated (status pending, file_path None)
+    parts = video.render_parts
+    assert len(parts) == 1
+    assert parts[0]["status"] == "pending", \
+        f"legacy chunk should be invalidated, got status={parts[0]['status']!r}"
+    assert parts[0]["file_path"] is None, \
+        f"legacy chunk file_path should be cleared, got {parts[0]['file_path']!r}"
+
+
+def test_orchestrator_preserves_post_v121_video_only_chunks():
+    """Post-v1.2.1 chunks (file_path ends with .video.mp4) are video-only and
+    safe to preserve across resume."""
+    from unittest.mock import patch, MagicMock
+
+    video = MagicMock()
+    video.id = 42
+    video.celery_task_id = "old-orch-id"
+    video.sfx_seed = 1
+    video.target_duration_h = 1 / 60 * 3  # 180s → 1 chunk
+    video.status = "rendering"
+    video.render_parts = [{
+        "idx": 0, "start_s": 0, "end_s": 180,
+        "status": "completed",
+        "file_path": "/tmp/youtube_42/chunk_0/chunk.video.mp4",  # post-v1.2.1
+    }]
+
+    db = MagicMock()
+    db.get.return_value = video
+
+    with patch("console.backend.database.SessionLocal", return_value=db), \
+         patch("console.backend.tasks.youtube_render_task._is_superseded", return_value=False), \
+         patch("celery.chord", MagicMock()), \
+         patch("celery.group", MagicMock()), \
+         patch("sqlalchemy.orm.attributes.flag_modified"):
+        from console.backend.tasks.youtube_render_task import render_youtube_chunked_orchestrator_task
+        render_youtube_chunked_orchestrator_task.apply(args=[42])
+
+    parts = video.render_parts
+    assert len(parts) == 1
+    assert parts[0]["status"] == "completed", \
+        f"post-v1.2.1 chunk should be preserved, got status={parts[0]['status']!r}"
+    assert parts[0]["file_path"].endswith(".video.mp4")
+
+
+def test_chunk_task_writes_to_video_suffix_path():
+    """render_youtube_chunk_task must persist chunks as chunk.video.mp4 so the
+    orchestrator's legacy-detection logic can recognise them as audio-free."""
+    from unittest.mock import patch, MagicMock
+
+    video = MagicMock()
+    video.id = 42
+    video.status = "rendering"
+
+    db = MagicMock()
+    db.get.return_value = video
+
+    captured_path = {}
+
+    def fake_render_landscape(_video, out_path, _db, **_kwargs):
+        captured_path["path"] = str(out_path)
+        # Simulate a successful render so the chunk gets marked completed.
+        from pathlib import Path
+        Path(out_path).parent.mkdir(parents=True, exist_ok=True)
+        Path(out_path).write_bytes(b"fake")
+
+    with patch("console.backend.database.SessionLocal", return_value=db), \
+         patch("console.backend.tasks.youtube_render_task._update_chunk_status"), \
+         patch("console.backend.tasks.youtube_render_task._publish_youtube_render_event"), \
+         patch("pipeline.youtube_ffmpeg.render_landscape", side_effect=fake_render_landscape):
+        from console.backend.tasks.youtube_render_task import render_youtube_chunk_task
+        render_youtube_chunk_task.apply(args=[42, 0, 0.0, 300.0]).get()
+
+    assert captured_path["path"].endswith("chunk.video.mp4"), \
+        f"chunk must be written as chunk.video.mp4, got {captured_path['path']!r}"
+
+
+def test_concat_task_rejects_chunks_with_embedded_audio(tmp_path):
+    """concat_youtube_chunks_task must ffprobe each chunk and abort if any
+    still has an audio stream (defensive against partially-stale render_parts)."""
+    import subprocess
+    import shutil
+    from unittest.mock import patch, MagicMock
+
+    if shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None:
+        pytest.skip("ffmpeg/ffprobe not installed")
+
+    # Build one chunk WITH audio (simulating a legacy pre-v1.2.1 chunk).
+    legacy_chunk = tmp_path / "legacy_chunk.mp4"
+    subprocess.run([
+        "ffmpeg", "-y", "-f", "lavfi",
+        "-i", "color=c=black:s=320x180:d=2:r=30",
+        "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
+        "-c:a", "aac", "-b:a", "128k", "-shortest",
+        "-pix_fmt", "yuv420p", "-r", "30",
+        str(legacy_chunk),
+    ], check=True, capture_output=True)
+
+    video = MagicMock()
+    video.id = 42
+    video.status = "rendering"
+    video.render_parts = [{
+        "idx": 0, "status": "completed",
+        "file_path": str(legacy_chunk),
+    }]
+
+    db = MagicMock()
+    db.get.return_value = video
+
+    with patch("console.backend.database.SessionLocal", return_value=db), \
+         patch("pipeline.youtube_ffmpeg.render_full_audio_track") as mock_audio, \
+         patch("pipeline.concat.concat_video_and_mux_audio") as mock_mux:
+        from console.backend.tasks.youtube_render_task import concat_youtube_chunks_task
+        # Force run; expect failure.
+        with pytest.raises(Exception) as exc_info:
+            concat_youtube_chunks_task.apply(
+                args=[[], 42], throw=True,
+            ).get()
+
+    msg = str(exc_info.value)
+    assert "embedded audio" in msg or "still contain embedded" in msg, \
+        f"expected explicit error about embedded audio, got: {msg!r}"
+    mock_audio.assert_not_called()
+    mock_mux.assert_not_called()

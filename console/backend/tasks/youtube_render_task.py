@@ -316,10 +316,16 @@ def render_youtube_chunk_task(self, youtube_video_id: int, chunk_idx: int, start
         })
         _publish_youtube_render_event(youtube_video_id)
 
-        # Per-chunk subdirectory so parallel chunks don't collide on temp files
+        # Per-chunk subdirectory so parallel chunks don't collide on temp files.
+        # ``.video.mp4`` suffix is intentional: chunks are now video-only and
+        # this distinct filename also busts any preserved render_parts from
+        # before v1.2.1 that point to ``chunk.mp4`` files containing embedded
+        # AAC audio. The orchestrator's resume logic only re-uses entries
+        # whose ``file_path`` ends with ``.video.mp4`` — see CHUNK_SUFFIX in
+        # render_youtube_chunked_orchestrator_task.
         chunk_dir = OUTPUT_DIR / f"youtube_{youtube_video_id}" / f"chunk_{chunk_idx}"
         chunk_dir.mkdir(parents=True, exist_ok=True)
-        chunk_path = chunk_dir / "chunk.mp4"
+        chunk_path = chunk_dir / "chunk.video.mp4"
 
         render_landscape(
             video, chunk_path, db,
@@ -404,6 +410,36 @@ def concat_youtube_chunks_task(self, _chunk_results, youtube_video_id: int):
         missing = [p for p in parts if p.get("status") != "completed" or not p.get("file_path")]
         if missing:
             raise RuntimeError(f"Cannot concat: {len(missing)} chunks not completed")
+
+        # Safety net: refuse to mux if any chunk still has an audio stream.
+        # The orchestrator's resume logic should already have invalidated any
+        # legacy (pre-v1.2.1) chunks, but ffprobe each one to be sure — mixing
+        # audio-bearing chunks into the new mux pipeline silently re-introduces
+        # the every-N-seconds glitch the v1.2.1 fix exists to eliminate.
+        import subprocess as _subprocess
+        bad_chunks = []
+        for p in parts:
+            try:
+                res = _subprocess.run(
+                    ["ffprobe", "-v", "error", "-select_streams", "a",
+                     "-show_entries", "stream=codec_type",
+                     "-of", "default=noprint_wrappers=1:nokey=1",
+                     p["file_path"]],
+                    capture_output=True, text=True, timeout=30,
+                )
+                if (res.stdout or "").strip():
+                    bad_chunks.append(p["idx"])
+            except Exception as exc:
+                logger.warning(
+                    "YoutubeVideo %s ffprobe failed on chunk %s (%s): %s",
+                    youtube_video_id, p.get("idx"), p.get("file_path"), exc,
+                )
+        if bad_chunks:
+            raise RuntimeError(
+                f"Refusing to concat: chunks {bad_chunks} still contain embedded "
+                "audio (legacy from before v1.2.1). Restart the render so the "
+                "orchestrator invalidates and re-renders them as video-only."
+            )
 
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         out_dir = OUTPUT_DIR / f"youtube_{youtube_video_id}"
@@ -491,15 +527,31 @@ def render_youtube_chunked_orchestrator_task(self, youtube_video_id: int):
         chunk_size = math.ceil(full_dur / n_chunks)
 
         # Build / replace render_parts. Preserve completed entries (resume case).
+        # Legacy chunks from before v1.2.1 had embedded AAC audio and a filename
+        # of just "chunk.mp4". Preserving those would re-introduce the per-seam
+        # glitch every chunk boundary, so we treat any entry whose file_path
+        # doesn't end with ".video.mp4" as stale and force a fresh render.
         existing = {p["idx"]: p for p in (video.render_parts or [])}
         new_parts = []
         for i in range(n_chunks):
             start = i * chunk_size
             end = min(full_dur, start + chunk_size)
             prev = existing.get(i, {})
-            if prev.get("status") == "completed" and prev.get("file_path"):
+            prev_path = prev.get("file_path") or ""
+            is_post_v121_chunk = prev_path.endswith(".video.mp4")
+            if (
+                prev.get("status") == "completed"
+                and prev_path
+                and is_post_v121_chunk
+            ):
                 new_parts.append(prev)
             else:
+                if prev.get("status") == "completed" and not is_post_v121_chunk:
+                    logger.info(
+                        "YoutubeVideo %s chunk %s: invalidating legacy chunk %r "
+                        "(pre-v1.2.1, contains embedded audio) — will re-render",
+                        youtube_video_id, i, prev_path,
+                    )
                 new_parts.append({
                     "idx": i, "start_s": start, "end_s": end, "status": "pending",
                     "file_path": None, "started_at": None, "completed_at": None,
