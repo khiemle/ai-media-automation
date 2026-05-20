@@ -275,13 +275,19 @@ def render_youtube_video_preview_task(self, youtube_video_id: int):
     default_retry_delay=60,
 )
 def render_youtube_chunk_task(self, youtube_video_id: int, chunk_idx: int, start_s: float, end_s: float):
-    """Render a single chunk of a YouTube video.
+    """Render a single chunk of a YouTube video — VIDEO ONLY.
 
-    All chunks MUST use identical encoder settings (codec, fps, resolution,
-    audio sample rate) so the final concat with -c copy works. The youtube_ffmpeg
-    render_landscape function enforces this via fixed encoder params keyed off
-    the FULL video duration (not chunk duration) — see the preset selection in
-    render_landscape.
+    Audio is intentionally omitted from chunks (``include_audio=False``).
+    Independently AAC-encoded chunks introduce ~46ms of priming samples at
+    every chunk seam when stream-copy concatenated, producing an audible
+    glitch every chunk_size seconds (default 300s = 5 min). Instead, the
+    full audio is rendered in a single ffmpeg pass by the concat task and
+    muxed into the final output.
+
+    All video chunks MUST use identical encoder settings (codec, fps,
+    resolution) so the final concat with ``-c copy`` works. The
+    ``render_landscape`` function enforces this via fixed encoder params
+    keyed off the FULL video duration (not chunk duration).
     """
     from console.backend.database import SessionLocal
     from console.backend.models.youtube_video import YoutubeVideo
@@ -315,7 +321,11 @@ def render_youtube_chunk_task(self, youtube_video_id: int, chunk_idx: int, start
         chunk_dir.mkdir(parents=True, exist_ok=True)
         chunk_path = chunk_dir / "chunk.mp4"
 
-        render_landscape(video, chunk_path, db, start_s=start_s, end_s=end_s)
+        render_landscape(
+            video, chunk_path, db,
+            start_s=start_s, end_s=end_s,
+            include_audio=False,
+        )
 
         # Mark completed (atomic)
         _update_chunk_status(db, youtube_video_id, chunk_idx, {
@@ -358,14 +368,22 @@ def render_youtube_chunk_task(self, youtube_video_id: int, chunk_idx: int, start
     queue="render_q",
 )
 def concat_youtube_chunks_task(self, _chunk_results, youtube_video_id: int):
-    """Concatenate all rendered chunks into the final video.
+    """Concatenate video-only chunks and mux in a single full-duration audio track.
+
+    Chunks are rendered video-only by render_youtube_chunk_task (see its
+    docstring for why). This task:
+
+      1. Renders the full-duration audio mix in ONE ffmpeg pass — a single
+         continuous AAC encode with no chunk boundaries.
+      2. Concat-copies the video chunks together and muxes the audio in.
 
     Receives the chord header's results as the first arg (we don't use them
     individually — we re-read render_parts from the DB to handle resume cases).
     """
     from console.backend.database import SessionLocal
     from console.backend.models.youtube_video import YoutubeVideo
-    from pipeline.concat import concat_parts
+    from pipeline.concat import concat_video_and_mux_audio
+    from pipeline.youtube_ffmpeg import render_full_audio_track
 
     db = SessionLocal()
     video = None
@@ -391,8 +409,23 @@ def concat_youtube_chunks_task(self, _chunk_results, youtube_video_id: int):
         out_dir = OUTPUT_DIR / f"youtube_{youtube_video_id}"
         out_dir.mkdir(parents=True, exist_ok=True)
         final_path = out_dir / f"final_v{int(time.time())}.mp4"
+        audio_path = out_dir / f"audio_full_v{int(time.time())}.m4a"
 
-        concat_parts([p["file_path"] for p in parts], final_path)
+        # 1) Render the full-duration audio mix in a single ffmpeg pass.
+        render_full_audio_track(video, audio_path, db)
+
+        # 2) Stream-copy concat video chunks and mux in the single audio track.
+        concat_video_and_mux_audio(
+            [p["file_path"] for p in parts],
+            audio_path,
+            final_path,
+        )
+
+        # Best-effort cleanup of the intermediate audio file.
+        try:
+            audio_path.unlink(missing_ok=True)
+        except OSError:
+            pass
 
         video.output_path = str(final_path)
         video.status = "done"

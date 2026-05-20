@@ -63,3 +63,107 @@ def test_concat_no_reencode(two_color_clips, tmp_path):
     )
     assert "codec_name=h264" in res.stdout
     assert "r_frame_rate=30/1" in res.stdout
+
+
+# ── concat_video_and_mux_audio ───────────────────────────────────────────────
+
+
+@pytest.fixture
+def two_video_only_clips(tmp_path):
+    """Two 5-second video-only clips with identical encoder params (no audio)."""
+    clips = []
+    for i, color in enumerate(["black", "blue"]):
+        out = tmp_path / f"vpart_{i}.mp4"
+        subprocess.run([
+            "ffmpeg", "-y", "-f", "lavfi",
+            "-i", f"color=c={color}:s=320x180:d=5:r=30",
+            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
+            "-pix_fmt", "yuv420p", "-r", "30",
+            "-an",
+            str(out),
+        ], check=True, capture_output=True)
+        clips.append(out)
+    return clips
+
+
+@pytest.fixture
+def ten_second_aac_audio(tmp_path):
+    """A single 10-second AAC-in-MP4 audio file (continuous encode, no chunk seams)."""
+    out = tmp_path / "audio_full.m4a"
+    subprocess.run([
+        "ffmpeg", "-y",
+        "-f", "lavfi", "-i", "sine=frequency=440:duration=10:sample_rate=44100",
+        "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
+        "-vn",
+        str(out),
+    ], check=True, capture_output=True)
+    return out
+
+
+def test_concat_video_and_mux_produces_file(two_video_only_clips, ten_second_aac_audio, tmp_path):
+    from pipeline.concat import concat_video_and_mux_audio
+    out = tmp_path / "final.mp4"
+    concat_video_and_mux_audio(two_video_only_clips, ten_second_aac_audio, out)
+    assert out.exists() and out.stat().st_size > 0
+
+
+def test_concat_video_and_mux_has_both_streams(
+    two_video_only_clips, ten_second_aac_audio, tmp_path,
+):
+    from pipeline.concat import concat_video_and_mux_audio
+    out = tmp_path / "final.mp4"
+    concat_video_and_mux_audio(two_video_only_clips, ten_second_aac_audio, out)
+
+    res = subprocess.run(
+        ["ffprobe", "-v", "error",
+         "-show_entries", "stream=codec_type,codec_name",
+         "-of", "default=noprint_wrappers=1", str(out)],
+        capture_output=True, text=True, check=True,
+    )
+    assert "codec_type=video" in res.stdout
+    assert "codec_type=audio" in res.stdout
+    assert "codec_name=h264" in res.stdout
+    assert "codec_name=aac" in res.stdout
+
+
+def test_concat_video_and_mux_audio_is_single_continuous_encode(
+    two_video_only_clips, ten_second_aac_audio, tmp_path,
+):
+    """Regression for the long-form chunk audio glitch.
+
+    The whole point of routing audio through ``concat_video_and_mux_audio``
+    is that the audio stream in the final file is the *exact* AAC bitstream
+    produced by a single continuous encode — no per-chunk priming samples
+    glued at the seams. Probe both files and confirm the byte count of the
+    AAC payload matches.
+    """
+    from pipeline.concat import concat_video_and_mux_audio
+    out = tmp_path / "final.mp4"
+    concat_video_and_mux_audio(two_video_only_clips, ten_second_aac_audio, out)
+
+    def _audio_packet_count(path: Path) -> int:
+        res = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "a:0",
+             "-count_packets", "-show_entries", "stream=nb_read_packets",
+             "-of", "default=noprint_wrappers=1:nokey=1", str(path)],
+            capture_output=True, text=True, check=True,
+        )
+        return int(res.stdout.strip())
+
+    # The muxed file should have the same number of AAC packets as the source
+    # audio (stream-copy: no re-encoding, no extra priming inserted).
+    assert _audio_packet_count(out) == _audio_packet_count(ten_second_aac_audio)
+
+
+def test_concat_video_and_mux_rejects_empty_parts(ten_second_aac_audio, tmp_path):
+    from pipeline.concat import concat_video_and_mux_audio
+    with pytest.raises(ValueError):
+        concat_video_and_mux_audio([], ten_second_aac_audio, tmp_path / "x.mp4")
+
+
+def test_concat_video_and_mux_rejects_missing_audio(two_video_only_clips, tmp_path):
+    from pipeline.concat import concat_video_and_mux_audio
+    with pytest.raises(FileNotFoundError):
+        concat_video_and_mux_audio(
+            two_video_only_clips, tmp_path / "no_such_audio.m4a", tmp_path / "x.mp4",
+        )

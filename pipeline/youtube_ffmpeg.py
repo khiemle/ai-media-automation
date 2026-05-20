@@ -618,12 +618,18 @@ def _render_landscape_music(
     db,
     start_s: float,
     end_s: float | None,
+    include_audio: bool = True,
 ) -> None:
     """Music-template branch of render_landscape.
 
     Total duration comes from the natural sum of track durations (no looping).
     No SFX layers, no blackout overlay. Spectrum visualiser and now-playing
     PNG overlays are optional and applied as filtergraph stages.
+
+    When ``include_audio`` is False, the audio stream is omitted (``-an``).
+    The caller is responsible for muxing in a full-duration audio track
+    later (see ``render_full_audio_track`` and the chunked render path) —
+    this avoids AAC priming/concat artifacts at chunk seams.
     """
     if not shutil.which("ffmpeg"):
         raise RuntimeError("ffmpeg not found in PATH")
@@ -680,14 +686,21 @@ def _render_landscape_music(
         is_image = visual_path is not None and Path(visual_path).suffix.lower() in IMAGE_EXTS
 
     # ── Music WAV (exact-duration, no looping) ────────────────────────────────
-    music_wav = build_music_playlist_wav_with_transitions(
-        tracks=music_tracks,
-        total_duration_s=total_dur_s,
-        transition=video.track_transition,
-        transition_s=video.track_transition_seconds,
-        output_dir=output_dir,
-        start_s=start_s,
-    )
+    # We still need this WAV when include_audio=False if the spectrum
+    # visualiser is enabled — the visualiser is video output but reads the
+    # audio waveform as input. When neither audio nor spectrum is needed,
+    # skip the build entirely to save I/O on each chunk.
+    spectrum_enabled_early = bool(getattr(video, "spectrum_enabled", False))
+    music_wav: str | None = None
+    if include_audio or spectrum_enabled_early:
+        music_wav = build_music_playlist_wav_with_transitions(
+            tracks=music_tracks,
+            total_duration_s=total_dur_s,
+            transition=video.track_transition,
+            transition_s=video.track_transition_seconds,
+            output_dir=output_dir,
+            start_s=start_s,
+        )
 
     # ── Now-playing overlay segments ──────────────────────────────────────────
     overlay_segments = []
@@ -728,18 +741,10 @@ def _render_landscape_music(
         legacy_pos = getattr(video, "spectrum_align_vertical", "bottom")
         if legacy_pos == "top":
             legacy_pos = "center"
-        spec_chain, _ = build_spectrum_filter(
-            enabled=True,
-            position=legacy_pos,
-            height_pct=getattr(video, "spectrum_height_pct", 0.12),
-            color=getattr(video, "spectrum_color", "#ffffff"),
-            opacity=getattr(video, "spectrum_opacity", 0.6),
-            canvas_w=w,
-            canvas_h=h,
-            audio_input_label="[1:a]",
-            base_label="[base]",
-            out_label="[v_after_spec]",
-        )
+        # spec_chain is built below once music_input_idx is known.
+        _classic_spec_pos = legacy_pos
+    else:
+        _classic_spec_pos = None
 
     # ── Build ffmpeg command ──────────────────────────────────────────────────
     cmd = ["ffmpeg", "-y"]
@@ -763,21 +768,43 @@ def _render_landscape_music(
     else:
         cmd += ["-f", "lavfi", "-i", f"color=c=black:s={w}x{h}:r=30"]
 
-    # Input 1: music WAV (exact duration — no loop flag)
-    cmd += ["-i", str(music_wav)]
+    # Input 1: music WAV (exact duration — no loop flag).
+    # Always added when music_wav exists (needed for classic spectrum's
+    # inline [1:a] filter even when audio is omitted from output).
+    next_input_idx = 1
+    music_input_idx: int | None = None
+    if music_wav is not None:
+        cmd += ["-i", str(music_wav)]
+        music_input_idx = next_input_idx
+        next_input_idx += 1
 
     # Optional: bars spectrum input (only present when spectrum_style == 'bars' and enabled)
     if spectrum_video_path is not None:
         cmd += ["-i", str(spectrum_video_path)]
-        bars_input_idx = 2
-        overlay_input_start = 3
+        bars_input_idx = next_input_idx
+        next_input_idx += 1
     else:
         bars_input_idx = None
-        overlay_input_start = 2
+    overlay_input_start = next_input_idx
 
     # Inputs overlay_input_start+: overlay PNGs (one still per track)
     for seg in overlay_segments:
         cmd += ["-loop", "1", "-i", seg.png_path]
+
+    # Build classic spec_chain now that we know the music input index.
+    if _classic_spec_pos is not None and music_input_idx is not None:
+        spec_chain, _ = build_spectrum_filter(
+            enabled=True,
+            position=_classic_spec_pos,
+            height_pct=getattr(video, "spectrum_height_pct", 0.12),
+            color=getattr(video, "spectrum_color", "#ffffff"),
+            opacity=getattr(video, "spectrum_opacity", 0.6),
+            canvas_w=w,
+            canvas_h=h,
+            audio_input_label=f"[{music_input_idx}:a]",
+            base_label="[base]",
+            out_label="[v_after_spec]",
+        )
 
     # ── Filtergraph ───────────────────────────────────────────────────────────
     base_vf = (
@@ -837,8 +864,9 @@ def _render_landscape_music(
     cmd += [
         "-filter_complex", filter_complex,
         "-map", "[vout]",
-        "-map", "1:a",
     ]
+    if include_audio and music_input_idx is not None:
+        cmd += ["-map", f"{music_input_idx}:a"]
 
     cmd += ["-t", str(target_dur)]
 
@@ -855,15 +883,18 @@ def _render_landscape_music(
         else:
             cmd += ["-c:v", "libx264", "-preset", preset, "-crf", "23",
                     "-maxrate", _maxrate, "-bufsize", _bufsize]
+    if include_audio:
+        cmd += ["-c:a", "aac", "-b:a", "192k", "-ar", "44100"]
+    else:
+        cmd += ["-an"]
     cmd += [
-        "-c:a", "aac", "-b:a", "192k", "-ar", "44100",
         "-movflags", "+faststart",
         str(output_path),
     ]
 
     logger.info(
-        "ffmpeg landscape music cmd (window [%s,%s)): %s",
-        start_s, end_s, " ".join(cmd),
+        "ffmpeg landscape music cmd (window [%s,%s), audio=%s): %s",
+        start_s, end_s, include_audio, " ".join(cmd),
     )
     _run_ffmpeg(cmd, max(120, target_dur * 2))
 
@@ -874,11 +905,19 @@ def render_landscape(
     db,
     start_s: float = 0.0,
     end_s: float | None = None,
+    include_audio: bool = True,
 ) -> None:
     """Render a landscape long-form YouTube video.
 
     For chunked render: pass ``start_s`` and ``end_s``. Each chunk uses identical encoder
     params so concat-demuxer with ``-c copy`` joins seamlessly.
+
+    When ``include_audio`` is False, the chunk is encoded video-only (``-an``).
+    A full-duration audio track is built separately by
+    ``render_full_audio_track`` and muxed in after the video chunks are
+    concatenated — this eliminates AAC priming/concat artifacts that would
+    otherwise produce audible glitches at every chunk seam (e.g. every 5
+    minutes for the default 300s chunk size).
 
     When the video's template slug is ``"music"``, rendering is delegated to
     ``_render_landscape_music``, which derives total duration from the playlist
@@ -892,7 +931,7 @@ def render_landscape(
     from console.backend.models.video_template import VideoTemplate
     _template = db.get(VideoTemplate, video.template_id) if video.template_id else None
     if _template and getattr(_template, "slug", None) == "music":
-        return _render_landscape_music(video, output_path, db, start_s, end_s)
+        return _render_landscape_music(video, output_path, db, start_s, end_s, include_audio=include_audio)
 
     full_duration_s = int((video.target_duration_h or 3.0) * 3600)
     if end_s is None:
@@ -935,15 +974,20 @@ def render_landscape(
             visual_path = resolve_visual(video, db)
             is_image = visual_path is not None and Path(visual_path).suffix.lower() in IMAGE_EXTS
 
-    # Pre-render music playlist + sound layers to temp WAVs (separate ffmpeg passes)
-    music_wav = _build_music_playlist_wav(video, db, target_dur, output_dir, start_s=start_s)
-    sound_layers_wav = _build_sound_layers_wav(video, db, target_dur, start_s, output_dir)
-
+    # Pre-render music playlist + sound layers to temp WAVs (separate ffmpeg passes).
+    # In include_audio=False mode (chunked render) we skip these entirely — audio
+    # is built in one continuous pass and muxed in after concat to avoid AAC
+    # priming/boundary artifacts at chunk seams.
+    music_wav: str | None = None
+    sound_layers_wav: str | None = None
     audio_inputs: list[tuple[str, float]] = []
-    if music_wav:
-        audio_inputs.append((music_wav, 1.0))
-    if sound_layers_wav:
-        audio_inputs.append((sound_layers_wav, 1.0))
+    if include_audio:
+        music_wav = _build_music_playlist_wav(video, db, target_dur, output_dir, start_s=start_s)
+        sound_layers_wav = _build_sound_layers_wav(video, db, target_dur, start_s, output_dir)
+        if music_wav:
+            audio_inputs.append((music_wav, 1.0))
+        if sound_layers_wav:
+            audio_inputs.append((sound_layers_wav, 1.0))
 
     base_vf = (
         f"scale={w}:{h}:force_original_aspect_ratio=decrease,"
@@ -979,27 +1023,28 @@ def render_landscape(
     else:
         cmd += ["-f", "lavfi", "-i", f"color=c=black:s={w}x{h}:r=30"]
 
-    # Audio inputs
-    if audio_inputs:
-        for path, _ in audio_inputs:
-            # music_wav and sound_layers_wav are exact-duration WAVs — don't loop them
-            if path in (music_wav, sound_layers_wav):
-                cmd += ["-i", path]
-            else:
-                if start_s > 0.5:
-                    sfx_dur = _probe_duration(path)
-                    effective_seek = (start_s % sfx_dur) if sfx_dur > 1.0 else 0.0
-                    if effective_seek > 0.5:
-                        cmd += ["-stream_loop", "-1", "-ss", str(int(effective_seek)), "-i", path]
+    # Audio inputs (only added when include_audio=True)
+    if include_audio:
+        if audio_inputs:
+            for path, _ in audio_inputs:
+                # music_wav and sound_layers_wav are exact-duration WAVs — don't loop them
+                if path in (music_wav, sound_layers_wav):
+                    cmd += ["-i", path]
+                else:
+                    if start_s > 0.5:
+                        sfx_dur = _probe_duration(path)
+                        effective_seek = (start_s % sfx_dur) if sfx_dur > 1.0 else 0.0
+                        if effective_seek > 0.5:
+                            cmd += ["-stream_loop", "-1", "-ss", str(int(effective_seek)), "-i", path]
+                        else:
+                            cmd += ["-stream_loop", "-1", "-i", path]
                     else:
                         cmd += ["-stream_loop", "-1", "-i", path]
-                else:
-                    cmd += ["-stream_loop", "-1", "-i", path]
-    else:
-        cmd += ["-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo"]
+        else:
+            cmd += ["-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo"]
 
     # Build filter graph
-    if audio_inputs:
+    if include_audio and audio_inputs:
         audio_parts: list[str] = []
         audio_labels: list[str] = []
         for i, (_, vol) in enumerate(audio_inputs):
@@ -1023,12 +1068,20 @@ def render_landscape(
             "-filter_complex", ";".join(audio_parts) + ";" + video_chain,
             "-map", video_map, "-map", audio_map,
         ]
-    else:
+    elif include_audio:  # silence-only path
         if blackout:
             # Need filter_complex for the overlay even with silence
             cmd += [
                 "-filter_complex", f"[0:v]{base_vf}[v_main]{blackout}",
                 "-map", "[vout]", "-map", "1:a",
+            ]
+        else:
+            cmd += ["-vf", base_vf]
+    else:  # include_audio=False — video-only chunk
+        if blackout:
+            cmd += [
+                "-filter_complex", f"[0:v]{base_vf}[v_main]{blackout}",
+                "-map", "[vout]",
             ]
         else:
             cmd += ["-vf", base_vf]
@@ -1051,10 +1104,16 @@ def render_landscape(
         else:
             cmd += ["-c:v", "libx264", "-preset", preset, "-crf", "23",
                     "-maxrate", _maxrate, "-bufsize", _bufsize]
-    cmd += ["-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-movflags", "+faststart",
-            str(output_path)]
+    if include_audio:
+        cmd += ["-c:a", "aac", "-b:a", "192k", "-ar", "44100"]
+    else:
+        cmd += ["-an"]
+    cmd += ["-movflags", "+faststart", str(output_path)]
 
-    logger.info("ffmpeg landscape cmd (window [%s,%s)): %s", start_s, end_s, " ".join(cmd))
+    logger.info(
+        "ffmpeg landscape cmd (window [%s,%s), audio=%s): %s",
+        start_s, end_s, include_audio, " ".join(cmd),
+    )
     _run_ffmpeg(cmd, max(120, target_dur * 2))
 
 
@@ -1130,3 +1189,111 @@ def _get_cta_text(video, template) -> str:
         or getattr(template, "short_cta_text", None)
         or "Watch the full video — link in description!"
     )
+
+
+def render_full_audio_track(video, output_path: Path, db) -> Path:
+    """Render the full-duration audio mix as a single AAC-in-MP4 (.m4a) file.
+
+    Used by the chunked render pipeline: after video chunks (encoded with
+    ``include_audio=False``) are concat-copied together, this single
+    continuous AAC encode is muxed in. Doing all audio in one encoder pass
+    eliminates the AAC priming/concat artifacts that produce audible
+    glitches at every chunk seam when each chunk is independently AAC
+    encoded and then ``-c copy`` joined.
+
+    Branches on template slug just like ``render_landscape`` does:
+      * music template → music playlist with transitions, no SFX.
+      * everything else → music playlist (looped) + sound_layers WAV mix.
+
+    Returns the path to the rendered audio file.
+    """
+    if not shutil.which("ffmpeg"):
+        raise RuntimeError("ffmpeg not found in PATH")
+
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    from console.backend.models.video_template import VideoTemplate
+
+    _template = db.get(VideoTemplate, video.template_id) if video.template_id else None
+    is_music_template = bool(_template and getattr(_template, "slug", None) == "music")
+
+    output_dir = output_path.parent
+
+    if is_music_template:
+        # Total duration is the natural playlist sum, not target_duration_h.
+        from console.backend.services.youtube_video_service import (
+            _resolve_music_tracks,
+            _compute_music_total_duration,
+        )
+        from pipeline.music_audio import build_music_playlist_wav_with_transitions
+
+        music_tracks = _resolve_music_tracks(video, db)
+        if not music_tracks:
+            raise RuntimeError("Music template requires at least one music track")
+
+        total_dur_s, _boundaries = _compute_music_total_duration(
+            music_tracks,
+            video.track_transition,
+            video.track_transition_seconds,
+        )
+        full_duration_s = int(round(total_dur_s))
+
+        music_wav = build_music_playlist_wav_with_transitions(
+            tracks=music_tracks,
+            total_duration_s=total_dur_s,
+            transition=video.track_transition,
+            transition_s=video.track_transition_seconds,
+            output_dir=output_dir,
+            start_s=0.0,
+        )
+        audio_inputs = [(music_wav, 1.0)]
+    else:
+        full_duration_s = int((video.target_duration_h or 3.0) * 3600)
+        music_wav = _build_music_playlist_wav(
+            video, db, full_duration_s, output_dir, start_s=0.0
+        )
+        sound_layers_wav = _build_sound_layers_wav(
+            video, db, full_duration_s, 0.0, output_dir
+        )
+        audio_inputs = []
+        if music_wav:
+            audio_inputs.append((music_wav, 1.0))
+        if sound_layers_wav:
+            audio_inputs.append((sound_layers_wav, 1.0))
+
+    cmd = ["ffmpeg", "-y"]
+
+    if audio_inputs:
+        for path, _ in audio_inputs:
+            cmd += ["-i", path]
+        parts: list[str] = []
+        labels: list[str] = []
+        for i, (_p, vol) in enumerate(audio_inputs):
+            parts.append(f"[{i}:a]volume={vol}[a{i}]")
+            labels.append(f"[a{i}]")
+        if len(audio_inputs) == 1:
+            audio_map = "[a0]"
+        else:
+            parts.append(
+                f"{''.join(labels)}amix=inputs={len(audio_inputs)}:duration=first:normalize=0[aout]"
+            )
+            audio_map = "[aout]"
+        cmd += ["-filter_complex", ";".join(parts), "-map", audio_map]
+    else:
+        # No music or SFX configured — emit silence of full_duration_s.
+        cmd += ["-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo"]
+
+    cmd += [
+        "-t", str(full_duration_s),
+        "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2",
+        "-vn",
+        str(output_path),
+    ]
+
+    logger.info(
+        "ffmpeg full audio track (duration=%ss, music_template=%s): %s",
+        full_duration_s, is_music_template, " ".join(cmd),
+    )
+    _run_ffmpeg(cmd, max(300, full_duration_s + 120))
+    return output_path

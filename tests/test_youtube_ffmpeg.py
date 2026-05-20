@@ -261,6 +261,117 @@ def test_probe_duration_returns_zero_on_timeout():
     assert result == 0.0
 
 
+def test_render_landscape_video_only_chunk_omits_audio_inputs(tmp_path):
+    """Chunked render with include_audio=False must skip music/SFX wav builders
+    and add -an to the ffmpeg command — no audio in chunks (avoids per-chunk
+    AAC priming at concat seams).
+    """
+    output = tmp_path / "chunk.mp4"
+    with patch("shutil.which", return_value="/usr/bin/ffmpeg"), \
+         patch("pipeline.youtube_ffmpeg.resolve_visual_playlist", return_value=[]), \
+         patch("pipeline.youtube_ffmpeg.resolve_visual", return_value=None), \
+         patch("pipeline.youtube_ffmpeg._build_music_playlist_wav") as mock_music, \
+         patch("pipeline.youtube_ffmpeg._build_sound_layers_wav") as mock_sl, \
+         patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stderr="")
+        from pipeline.youtube_ffmpeg import render_landscape
+        render_landscape(
+            _make_video(), output, MagicMock(),
+            start_s=300.0, end_s=600.0,
+            include_audio=False,
+        )
+
+    # Builders for music + sound layers must NOT have been called.
+    mock_music.assert_not_called()
+    mock_sl.assert_not_called()
+
+    cmd = mock_run.call_args[0][0]
+    assert "-an" in cmd, "video-only chunks must use -an"
+    # No AAC encoding should appear when audio is omitted.
+    cmd_str = " ".join(cmd)
+    assert "-c:a aac" not in cmd_str
+
+
+def test_render_landscape_default_still_includes_audio(tmp_path):
+    """Default include_audio=True path keeps building audio + AAC encoder."""
+    output = tmp_path / "out.mp4"
+    with patch("shutil.which", return_value="/usr/bin/ffmpeg"), \
+         patch("pipeline.youtube_ffmpeg.resolve_visual_playlist", return_value=[]), \
+         patch("pipeline.youtube_ffmpeg.resolve_visual", return_value=None), \
+         patch("pipeline.youtube_ffmpeg._build_music_playlist_wav", return_value=None), \
+         patch("pipeline.youtube_ffmpeg._build_sound_layers_wav", return_value=None), \
+         patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stderr="")
+        from pipeline.youtube_ffmpeg import render_landscape
+        render_landscape(_make_video(), output, MagicMock())
+
+    cmd = mock_run.call_args[0][0]
+    assert "-an" not in cmd
+    assert "-c:a" in cmd
+    assert "aac" in cmd
+
+
+def test_render_full_audio_track_uses_full_duration(tmp_path):
+    """render_full_audio_track should pass full_duration_s (= target_duration_h * 3600)
+    to _build_music_playlist_wav and _build_sound_layers_wav with start_s=0."""
+    output = tmp_path / "audio.m4a"
+    video = _make_video(target_duration_h=3.0)
+
+    # template_id None to skip the music-template branch
+    video.template_id = None
+
+    music_path = tmp_path / "music.wav"
+    music_path.write_bytes(b"fake")
+    sl_path = tmp_path / "sl.wav"
+    sl_path.write_bytes(b"fake")
+
+    with patch("shutil.which", return_value="/usr/bin/ffmpeg"), \
+         patch("pipeline.youtube_ffmpeg._build_music_playlist_wav",
+               return_value=str(music_path)) as mock_music, \
+         patch("pipeline.youtube_ffmpeg._build_sound_layers_wav",
+               return_value=str(sl_path)) as mock_sl, \
+         patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stderr="")
+        from pipeline.youtube_ffmpeg import render_full_audio_track
+        render_full_audio_track(video, output, MagicMock())
+
+    # full duration = 3.0 * 3600 = 10800 seconds
+    music_args = mock_music.call_args
+    assert music_args.args[2] == 10800
+    assert music_args.kwargs.get("start_s") == 0.0
+
+    sl_args = mock_sl.call_args
+    assert sl_args.args[2] == 10800
+    assert sl_args.args[3] == 0.0
+
+    cmd = mock_run.call_args[0][0]
+    cmd_str = " ".join(cmd)
+    assert "-vn" in cmd
+    assert "-c:a aac" in cmd_str
+    # Duration must be the full video length, not a chunk slice.
+    t_idx = cmd.index("-t")
+    assert cmd[t_idx + 1] == "10800"
+
+
+def test_render_full_audio_track_silence_when_no_music_or_sfx(tmp_path):
+    """No music + no sound layers → fall back to anullsrc silence track."""
+    output = tmp_path / "audio.m4a"
+    video = _make_video(target_duration_h=1.0)
+    video.template_id = None
+
+    with patch("shutil.which", return_value="/usr/bin/ffmpeg"), \
+         patch("pipeline.youtube_ffmpeg._build_music_playlist_wav", return_value=None), \
+         patch("pipeline.youtube_ffmpeg._build_sound_layers_wav", return_value=None), \
+         patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stderr="")
+        from pipeline.youtube_ffmpeg import render_full_audio_track
+        render_full_audio_track(video, output, MagicMock())
+
+    cmd = mock_run.call_args[0][0]
+    cmd_str = " ".join(cmd)
+    assert "anullsrc" in cmd_str
+
+
 def test_render_landscape_chunk_places_ss_before_visual_input(tmp_path):
     """start_s=300, file_dur=120 → effective_seek=60 → -ss 60 is BEFORE -i visual_path"""
     output = tmp_path / "chunk.mp4"
