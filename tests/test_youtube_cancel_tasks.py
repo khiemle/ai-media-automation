@@ -162,7 +162,12 @@ def test_delete_video_revokes_all_render_jobs():
 
 
 def test_orchestrator_writes_task_ids_before_chord_dispatch():
-    """render_parts must have task_id populated and committed BEFORE chord dispatch."""
+    """render_parts must have task_id populated and committed BEFORE chord dispatch.
+
+    Forces ``YOUTUBE_RENDER_FORCE_SINGLE_PASS=false`` since v1.2.5 made
+    single-pass the default and chord dispatch only happens on the chunked
+    path.
+    """
     from unittest.mock import patch, MagicMock
 
     video = MagicMock()
@@ -191,7 +196,8 @@ def test_orchestrator_writes_task_ids_before_chord_dispatch():
 
     # chord, group and SessionLocal are imported inside the function body,
     # so patch them at their source modules, not at the task module level.
-    with patch("console.backend.database.SessionLocal", return_value=db), \
+    with patch.dict("os.environ", {"YOUTUBE_RENDER_FORCE_SINGLE_PASS": "false"}), \
+         patch("console.backend.database.SessionLocal", return_value=db), \
          patch("console.backend.tasks.youtube_render_task._is_superseded", return_value=False), \
          patch("celery.chord", mock_chord_cls), \
          patch("celery.group", MagicMock()), \
@@ -277,11 +283,68 @@ def test_orchestrator_skips_when_video_is_failed():
     assert result["status"] == "skipped"
 
 
+def test_orchestrator_delegates_to_single_pass_when_env_var_default():
+    """v1.2.5: with YOUTUBE_RENDER_FORCE_SINGLE_PASS unset (default true),
+    the chunked orchestrator MUST bypass chunking entirely and call the
+    single-pass helper. Otherwise the whole-video A/V drift bug that
+    survived v1.2.1..v1.2.4 would still affect new renders.
+    """
+    from unittest.mock import patch, MagicMock
+
+    with patch.dict("os.environ", {}, clear=False) as env, \
+         patch("console.backend.tasks.youtube_render_task._render_single_pass") as mock_sp, \
+         patch("console.backend.database.SessionLocal") as mock_session:
+        env.pop("YOUTUBE_RENDER_FORCE_SINGLE_PASS", None)
+        mock_sp.return_value = {"status": "done"}
+        from console.backend.tasks.youtube_render_task import render_youtube_chunked_orchestrator_task
+        render_youtube_chunked_orchestrator_task.apply(args=[42])
+
+    mock_sp.assert_called_once()
+    assert mock_sp.call_args.args[1] == 42, "video_id must be forwarded"
+    mock_session.assert_not_called(), \
+        "single-pass delegation must short-circuit before opening a DB session"
+
+
+def test_orchestrator_runs_chunked_path_when_env_var_disables_single_pass():
+    """The chunked path is preserved as an opt-out for workers that need
+    resume / parallelism. Setting YOUTUBE_RENDER_FORCE_SINGLE_PASS=false
+    re-enables it.
+    """
+    from unittest.mock import patch, MagicMock
+
+    video = MagicMock()
+    video.id = 42
+    video.celery_task_id = "orch-id"
+    video.sfx_seed = 1
+    video.target_duration_h = 1 / 60 * 3
+    video.status = "rendering"
+    video.render_parts = []
+    db = MagicMock()
+    db.get.return_value = video
+
+    with patch.dict("os.environ", {"YOUTUBE_RENDER_FORCE_SINGLE_PASS": "false"}), \
+         patch("console.backend.tasks.youtube_render_task._render_single_pass") as mock_sp, \
+         patch("console.backend.database.SessionLocal", return_value=db), \
+         patch("console.backend.tasks.youtube_render_task._is_superseded", return_value=False), \
+         patch("celery.chord", MagicMock()), \
+         patch("celery.group", MagicMock()), \
+         patch("sqlalchemy.orm.attributes.flag_modified"):
+        from console.backend.tasks.youtube_render_task import render_youtube_chunked_orchestrator_task
+        render_youtube_chunked_orchestrator_task.apply(args=[42])
+
+    mock_sp.assert_not_called(), \
+        "single-pass MUST NOT run when env var explicitly disables it"
+
+
 def test_orchestrator_invalidates_legacy_chunks_without_video_suffix():
     """Pre-v1.2.4 chunks (any filename other than chunk.video.cfr.mp4) have the
     wrong on-disk encoder timing. The orchestrator must NOT preserve them — it
     must mark them pending so they get re-rendered with the v1.2.4 CFR /
     fixed-timescale flags.
+
+    Forces ``YOUTUBE_RENDER_FORCE_SINGLE_PASS=false`` since v1.2.5 made
+    single-pass the default — without the opt-out the orchestrator never
+    reaches the chunk invalidation path being tested here.
     """
     from unittest.mock import patch, MagicMock
 
@@ -301,7 +364,8 @@ def test_orchestrator_invalidates_legacy_chunks_without_video_suffix():
     db = MagicMock()
     db.get.return_value = video
 
-    with patch("console.backend.database.SessionLocal", return_value=db), \
+    with patch.dict("os.environ", {"YOUTUBE_RENDER_FORCE_SINGLE_PASS": "false"}), \
+         patch("console.backend.database.SessionLocal", return_value=db), \
          patch("console.backend.tasks.youtube_render_task._is_superseded", return_value=False), \
          patch("celery.chord", MagicMock()), \
          patch("celery.group", MagicMock()), \
@@ -342,7 +406,8 @@ def test_orchestrator_invalidates_v121_chunks_lacking_cfr_suffix():
     db = MagicMock()
     db.get.return_value = video
 
-    with patch("console.backend.database.SessionLocal", return_value=db), \
+    with patch.dict("os.environ", {"YOUTUBE_RENDER_FORCE_SINGLE_PASS": "false"}), \
+         patch("console.backend.database.SessionLocal", return_value=db), \
          patch("console.backend.tasks.youtube_render_task._is_superseded", return_value=False), \
          patch("celery.chord", MagicMock()), \
          patch("celery.group", MagicMock()), \
@@ -378,7 +443,8 @@ def test_orchestrator_preserves_v124_cfr_chunks():
     db = MagicMock()
     db.get.return_value = video
 
-    with patch("console.backend.database.SessionLocal", return_value=db), \
+    with patch.dict("os.environ", {"YOUTUBE_RENDER_FORCE_SINGLE_PASS": "false"}), \
+         patch("console.backend.database.SessionLocal", return_value=db), \
          patch("console.backend.tasks.youtube_render_task._is_superseded", return_value=False), \
          patch("celery.chord", MagicMock()), \
          patch("celery.group", MagicMock()), \

@@ -9,6 +9,20 @@ from pathlib import Path
 from console.backend.celery_app import celery_app
 from console.backend.utils.file_naming import make_filename, make_unique_path
 
+
+def _force_single_pass_enabled() -> bool:
+    """Whether the chunked orchestrator should bypass chunking entirely.
+
+    v1.2.5 escape hatch from the long-standing chunked-render A/V drift bug
+    that survived v1.2.1–v1.2.4 (see docs/render-glitch-investigation.md).
+    Default true — single-pass is the safe, well-tested code path. Set the
+    env var to "false" / "0" to opt back into chunked behaviour on workers
+    where mid-render resume / per-chunk parallelism matters more than
+    eliminating the drift symptom.
+    """
+    val = os.environ.get("YOUTUBE_RENDER_FORCE_SINGLE_PASS", "true").strip().lower()
+    return val not in ("false", "0", "no", "off", "")
+
 # Import models at module load so SQLAlchemy resolves all YoutubeVideo FKs
 # before any task flushes a YoutubeVideo update.  Without this the mapper's
 # _sorted_tables raises NoReferencedTableError for video_templates or
@@ -487,13 +501,101 @@ def concat_youtube_chunks_task(self, _chunk_results, youtube_video_id: int):
         db.close()
 
 
+def _render_single_pass(task, youtube_video_id: int) -> dict:
+    """Render a long-form YouTube video in one ffmpeg pass — no chunks, no concat.
+
+    Direct port of ``render_youtube_video_task`` body, called inline from the
+    chunked-orchestrator entry point when the v1.2.5 single-pass escape hatch
+    is active. Inlining (vs. dispatching the standalone task) preserves the
+    orchestrator's ``celery_task_id`` on the video row so cancel / supersede
+    semantics still work — the chunked path's only Celery surface stays
+    intact for callers that don't know we've swapped implementations.
+
+    Resume is intentionally absent: a one-pass render either finishes or
+    starts over. For sub-hour videos the trade is fine; for 3 h+ 4K renders
+    a worker crash means re-rendering from zero. The chunked path remains
+    available via ``YOUTUBE_RENDER_FORCE_SINGLE_PASS=false``.
+    """
+    import random
+    from console.backend.database import SessionLocal
+    from console.backend.models.youtube_video import YoutubeVideo
+    from pipeline.youtube_ffmpeg import render_landscape
+
+    db = SessionLocal()
+    video = None
+    render_completed = False
+    try:
+        video = db.get(YoutubeVideo, youtube_video_id)
+        if not video:
+            return {"status": "failed", "reason": "video not found"}
+        if _is_superseded(task, video):
+            return {"status": "superseded"}
+        if video.status == "failed":
+            logger.info(
+                "YoutubeVideo %s single-pass skipped — video is failed/cancelled",
+                youtube_video_id,
+            )
+            return {"status": "skipped", "reason": "video cancelled"}
+
+        if video.sfx_seed is None:
+            video.sfx_seed = random.randint(1, 2**31 - 1)
+
+        # Clear any pre-existing render_parts: single-pass doesn't use them
+        # and leaving stale entries around would confuse a future toggle back
+        # to chunked mode (orchestrator would think the render had partial
+        # progress).
+        video.render_parts = []
+        video.status = "rendering"
+        db.commit()
+        _publish_youtube_render_event(youtube_video_id)
+
+        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        output_path = make_unique_path(video.title, ".mp4", OUTPUT_DIR)
+
+        render_landscape(video, output_path, db)
+        render_completed = True
+
+        video.status = "done"
+        video.output_path = str(output_path)
+        db.commit()
+        _publish_youtube_render_event(youtube_video_id)
+
+        logger.info(
+            "YoutubeVideo %s single-pass render done: %s",
+            youtube_video_id, output_path,
+        )
+        return {"status": "done", "output_path": str(output_path)}
+    except Exception as exc:
+        logger.exception(
+            "YoutubeVideo %s single-pass render failed: %s",
+            youtube_video_id, exc,
+        )
+        if video is not None and not render_completed:
+            try:
+                video.status = "failed"
+                db.commit()
+                _publish_youtube_render_event(youtube_video_id)
+            except Exception:
+                db.rollback()
+        raise
+    finally:
+        db.close()
+
+
 @celery_app.task(
     bind=True,
     name="tasks.render_youtube_chunked_orchestrator",
     queue="render_q",
 )
 def render_youtube_chunked_orchestrator_task(self, youtube_video_id: int):
-    """Plan chunks, persist render_parts, and dispatch a chord(group(chunks), concat)."""
+    """Plan chunks, persist render_parts, and dispatch a chord(group(chunks), concat).
+
+    When ``YOUTUBE_RENDER_FORCE_SINGLE_PASS`` is set (the v1.2.5 default), this
+    bypasses chunking entirely and runs a single ffmpeg pass via
+    ``_render_single_pass``. Resume + parallelism are lost; in exchange the
+    whole-video A/V drift the chunked path has been chasing through
+    v1.2.1–v1.2.4 cannot happen because there are no chunk boundaries.
+    """
     import math
     import random
     from celery import chord, group
@@ -502,6 +604,14 @@ def render_youtube_chunked_orchestrator_task(self, youtube_video_id: int):
     from sqlalchemy.orm.attributes import flag_modified
 
     from uuid import uuid4
+
+    if _force_single_pass_enabled():
+        logger.info(
+            "YoutubeVideo %s — chunked orchestrator delegating to single-pass "
+            "render (YOUTUBE_RENDER_FORCE_SINGLE_PASS active)",
+            youtube_video_id,
+        )
+        return _render_single_pass(self, youtube_video_id)
 
     db = SessionLocal()
     video = None

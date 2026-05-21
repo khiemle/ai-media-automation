@@ -1,9 +1,14 @@
 # Render Glitch Investigation — "audio glitch from 5 min, sustained"
 
-> Active investigation. Four fixes (v1.2.1–v1.2.4) shipped to prod, symptom
-> persists. This doc captures everything we know, what we've ruled out, the
-> current hypothesis, and the exact diagnostic commands to run on the
-> production Windows host to confirm or rule out the next theory.
+> Active investigation. Four targeted fixes (v1.2.1–v1.2.4) failed; v1.2.5
+> ships the §8 fallback (single-pass render via
+> ``YOUTUBE_RENDER_FORCE_SINGLE_PASS=true``, now default) to remove the
+> chunked-concat code path from the failure surface entirely while we
+> continue to chase the actual root cause.
+>
+> If v1.2.5 also fails to resolve the symptom, the bug is **not** in the
+> chunked render path at all — it's in the audio pipeline shared between
+> single-pass and chunked. See §11 for the v1.2.5 follow-up investigation.
 
 ---
 
@@ -36,12 +41,13 @@ further progress. See §6 for the commands to run.
 | v1.2.1 | Video-only chunks (`include_audio=False`) + `render_full_audio_track` + `concat_video_and_mux_audio` | AAC priming gap at each chunk seam | No |
 | v1.2.2 | Chunk filename suffix `.video.mp4` + orchestrator invalidates legacy chunks + concat-task ffprobe safety net | Stale `chunk.mp4` from before v1.2.1 being re-used | No |
 | v1.2.3 | `_build_music_playlist_wav` replicates the playlist N times with `acrossfade` at every boundary instead of `aloop=-1` | Hard music loop boundary at track length | No |
-| v1.2.4 | Frame- and container-exact chunks (`-r 30 -vsync cfr -frames:v {dur*30} -video_track_timescale 30000`) + concat `-fflags +genpts -avoid_negative_ts make_zero`; bumps chunk suffix to `.video.cfr.mp4` so the orchestrator invalidates pre-v1.2.4 chunks on resume | §5 chunk-timing drift across `-c copy` seams (this doc's leading hypothesis) | Pending verification on prod render |
+| v1.2.4 | Frame- and container-exact chunks (`-r 30 -vsync cfr -frames:v {dur*30} -video_track_timescale 30000`) + concat `-fflags +genpts -avoid_negative_ts make_zero`; bumps chunk suffix to `.video.cfr.mp4` so the orchestrator invalidates pre-v1.2.4 chunks on resume | §5 chunk-timing drift across `-c copy` seams (this doc's leading hypothesis) | **No** — user reproduced the symptom on a fresh 10-min render against v1.2.4-deployed code |
+| v1.2.5 | `YOUTUBE_RENDER_FORCE_SINGLE_PASS` env var (default true) makes `render_youtube_chunked_orchestrator_task` delegate to the existing single-pass `render_landscape` path. No chunks, no concat, no mux — sidesteps the entire chunked render surface | §8 fallback: stop chasing the chunked path, take the working code path that has no chunk boundaries by construction | Pending — if symptom persists, the bug is in the audio pipeline (shared between chunked and single-pass) and the v1.2.1 / v1.2.3 work is the right place to look next |
 
-The v1.2.4 fix is the §7-row-1 patch the diagnostic matrix prescribes. Ship
-checklist: confirm a fresh render produces chunks whose `format.duration` is
-**exactly** `300.000000` (the §6.2 ffprobe). If yes and the glitch persists,
-§7 row 1 is refuted and the investigation moves to §7 row 4 / row 6 / row 7.
+v1.2.4's frame-exact chunks are confirmed correct in isolation (the matrix
+§7-row-1 fix is technically right) but it didn't move the symptom — strong
+evidence the §5 hypothesis was misaimed at chunk timing when the real cause
+is upstream of concat.
 
 ---
 
@@ -310,3 +316,34 @@ After running the diagnostics on the production host:
 This file is meant to survive across sessions / contributors — every fact
 should be falsifiable, every claim should cite either the MCP data, the
 git history, or a specific ffprobe output.
+
+---
+
+## 11 · v1.2.5 follow-up — if single-pass also reproduces the glitch
+
+If a fresh render under v1.2.5 (single-pass active) **still** glitches at
+~5:00, the bug is conclusively NOT in the chunked render path. The audio
+pipeline is shared between chunked and single-pass; that is now where to
+look. The smoking-gun test:
+
+```cmd
+ffmpeg -y -i "<final.mp4>" -vn -c:a copy audio_only.m4a
+```
+
+Play `audio_only.m4a`. If the glitch is present, the `audio_full.m4a`
+produced by `render_full_audio_track` (or the WAVs that feed it from
+`_build_music_playlist_wav` / `_build_sound_layers_wav`) is itself
+glitchy. Likely suspects in that case:
+
+- **`amix=dropout_transition`** in `_build_sound_layers_wav`: default 2s
+  rescale-on-end produces low-frequency volume modulation that is masked
+  by broadband content but audible against tonal music. The first SFX
+  events end ~5 min in for an interval-25 midground layer.
+- **AAC encoder behaviour at the 5-min mark** for a 10800 s input (very
+  long single encode): unlikely but probe `audio_full.m4a` with
+  `-show_packets` for any discontinuity at ~5:00.
+- **Sample-rate / channel mismatch** between the music WAV and the
+  sound-layers WAV that auto-resamples mid-stream.
+
+Until v1.2.5 results are in, that's speculation — record what the user
+hears in `audio_only.m4a` before picking the next fix.
