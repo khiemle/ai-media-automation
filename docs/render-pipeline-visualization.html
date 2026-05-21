@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Render Pipeline — Visualization</title>
+<style>
+  :root {
+    --bg:        #0d0d0f;
+    --surface:   #16161a;
+    --card:      #1c1c22;
+    --border:    #2a2a32;
+    --text:      #e8e8f0;
+    --text-mute: #9090a8;
+    --text-dim:  #5a5a70;
+    --accent:    #7c6af7;
+    --green:     #34d399;
+    --red:       #f87171;
+    --yellow:    #fbbf24;
+    --blue:      #4a9eff;
+    --orange:    #fb923c;
+    --pink:      #ec4899;
+    --cyan:      #06b6d4;
+    --mono:      "IBM Plex Mono", "JetBrains Mono", "Menlo", "Consolas", monospace;
+    --sans:      "IBM Plex Sans", -apple-system, "Segoe UI", "Helvetica Neue", sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: var(--sans); }
+  body { padding: 32px 40px 80px; max-width: 1400px; margin: 0 auto; line-height: 1.55; }
+
+  h1 { font-size: 28px; margin: 0 0 6px; font-weight: 600; }
+  h2 { font-size: 18px; margin: 36px 0 14px; color: var(--text); font-weight: 600; letter-spacing: 0.2px; }
+  h3 { font-size: 13px; margin: 18px 0 8px; color: var(--text-mute); text-transform: uppercase; letter-spacing: 1.4px; font-weight: 600; }
+  p  { margin: 6px 0 14px; color: var(--text-mute); font-size: 14px; }
+  code { font-family: var(--mono); font-size: 12px; background: var(--card); padding: 2px 6px; border-radius: 4px; color: var(--text); }
+  .tag {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    background: var(--card);
+    color: var(--text-mute);
+    border: 1px solid var(--border);
+  }
+  .tag.accent { background: rgba(124,106,247,.15); color: var(--accent); border-color: rgba(124,106,247,.3); }
+  .tag.green  { background: rgba(52,211,153,.13); color: var(--green); border-color: rgba(52,211,153,.3); }
+  .tag.red    { background: rgba(248,113,113,.13); color: var(--red); border-color: rgba(248,113,113,.3); }
+  .tag.yellow { background: rgba(251,191,36,.13); color: var(--yellow); border-color: rgba(251,191,36,.3); }
+
+  .subtitle { color: var(--text-mute); font-size: 14px; margin: 0 0 28px; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 22px;
+    margin: 16px 0;
+  }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 14px 22px; margin: 8px 0 4px; font-size: 12px; }
+  .legend > div { display: flex; align-items: center; gap: 6px; color: var(--text-mute); }
+  .legend .swatch { width: 12px; height: 12px; border-radius: 3px; }
+
+  /* ── Timeline ────────────────────────────────────────────────────── */
+  .timeline {
+    position: relative;
+    background: var(--card);
+    border-radius: 8px;
+    padding: 14px 0;
+    margin: 8px 0;
+    overflow-x: auto;
+  }
+  .timeline-row {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 18px;
+    min-height: 28px;
+  }
+  .timeline-row .label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-mute);
+    text-align: right;
+    padding-right: 4px;
+  }
+  .timeline-row .label .sub {
+    color: var(--text-dim);
+    font-size: 10px;
+    display: block;
+  }
+  .timeline-track {
+    position: relative;
+    height: 22px;
+    background: rgba(0,0,0,.25);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .timeline-track.tall { height: 36px; }
+
+  /* Chunk blocks */
+  .chunk-bar { display: flex; height: 100%; gap: 1px; }
+  .chunk {
+    flex: 1;
+    background: linear-gradient(180deg, rgba(74,158,255,.35), rgba(74,158,255,.18));
+    border: 1px solid rgba(74,158,255,.5);
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 9px;
+    color: rgba(255,255,255,.6);
+    transition: background 120ms;
+    cursor: default;
+  }
+  .chunk:hover { background: linear-gradient(180deg, rgba(74,158,255,.55), rgba(74,158,255,.32)); }
+  .chunk.glitch { border-right: 2px solid var(--red); position: relative; }
+
+  /* Continuous audio bar */
+  .continuous {
+    height: 100%;
+    border-radius: 3px;
+    position: relative;
+  }
+  .continuous.music   { background: linear-gradient(90deg, rgba(124,106,247,.6), rgba(124,106,247,.35)); border: 1px solid rgba(124,106,247,.5); }
+  .continuous.bg-sfx  { background: linear-gradient(90deg, rgba(52,211,153,.5), rgba(52,211,153,.3)); border: 1px solid rgba(52,211,153,.5); }
+  .continuous.silent  { background: repeating-linear-gradient(45deg, var(--card), var(--card) 6px, rgba(255,255,255,.05) 6px, rgba(255,255,255,.05) 12px); }
+
+  /* SFX dots overlaid on a track */
+  .sfx-events {
+    position: relative;
+    height: 100%;
+  }
+  .sfx-events .event {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 18px;
+    width: 4px;
+    border-radius: 2px;
+  }
+  .sfx-events.midground  .event { background: var(--orange); }
+  .sfx-events.foreground .event { background: var(--pink); }
+  .sfx-events.random     .event { background: var(--cyan); }
+
+  /* Blackout overlay */
+  .blackout {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(0,0,0,.85));
+    border-radius: 0 3px 3px 0;
+    pointer-events: none;
+  }
+  .blackout::before {
+    content: "fade-to-black";
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    left: 12px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: rgba(255,255,255,.55);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  /* Chunk-boundary glitch markers (used in "before v1.2.1" diagram) */
+  .glitch-markers {
+    display: flex;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 100%;
+    pointer-events: none;
+  }
+  .glitch-markers > div {
+    flex: 1;
+    border-right: 2px solid var(--red);
+  }
+  .glitch-markers > div:last-child { border-right: 0; }
+
+  /* Loop-boundary glitch markers (used in music aloop diagram) */
+  .loop-markers {
+    display: flex;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 100%;
+    pointer-events: none;
+  }
+  .loop-markers .marker {
+    width: 2px;
+    background: var(--yellow);
+    box-shadow: 0 0 6px var(--yellow);
+  }
+
+  /* Time axis */
+  .timeaxis {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    gap: 12px;
+    padding: 6px 18px 2px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+  }
+  .timeaxis .ticks {
+    display: flex;
+    justify-content: space-between;
+  }
+
+  /* ── Flowchart (SVG-based) ─────────────────────────────────────────── */
+  .flowchart {
+    background: var(--card);
+    border-radius: 8px;
+    padding: 22px;
+    margin: 8px 0;
+    overflow-x: auto;
+  }
+  .flowchart svg { display: block; margin: 0 auto; max-width: 100%; }
+
+  /* ── Side-by-side comparison ──────────────────────────────────────── */
+  .comparison {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 900px) { .comparison { grid-template-columns: 1fr; } }
+  .comparison .pane {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 18px;
+  }
+  .comparison h4 { font-size: 13px; margin: 0 0 4px; }
+  .comparison .pane.broken { border-color: rgba(248,113,113,.3); }
+  .comparison .pane.fixed  { border-color: rgba(52,211,153,.3); }
+
+  /* ── Small notes ──────────────────────────────────────────────────── */
+  .note { font-size: 12px; color: var(--text-dim); font-family: var(--mono); margin-top: 4px; }
+  .pill { font-family: var(--mono); font-size: 11px; padding: 2px 6px; border-radius: 3px; background: var(--card); color: var(--text-mute); }
+  ul.compact { font-size: 13px; color: var(--text-mute); padding-left: 18px; margin: 4px 0 8px; }
+  ul.compact li { margin-bottom: 4px; }
+
+  hr { border: 0; border-top: 1px solid var(--border); margin: 36px 0; }
+</style>
+</head>
+<body>
+
+<h1>Long-Form Render Pipeline</h1>
+<p class="subtitle">
+  Interactive visualization of how a 3-hour 4K render is built — chunks, audio layers,
+  music loop, blackout, and the seams that used to glitch.
+  Companion to <code>docs/render-pipeline.md</code>.
+</p>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>1 · Orchestrator flow</h2>
+<p>
+  User clicks "render" → service routes to <code>render_youtube_chunked_orchestrator_task</code>.
+  The orchestrator plans <strong>N chunks of 300 s each</strong>, persists them to
+  <code>render_parts</code>, and dispatches a Celery <code>chord</code>: parallel
+  chunk tasks with the concat task as the callback.
+</p>
+
+<div class="flowchart">
+<svg viewBox="0 0 1100 360" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;font-family:var(--mono);font-size:11px">
+  <!-- arrows defs -->
+  <defs>
+    <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+      <polygon points="0 0, 8 4, 0 8" fill="#5a5a70"/>
+    </marker>
+  </defs>
+
+  <!-- User -->
+  <g>
+    <rect x="20" y="20" width="160" height="40" rx="6" fill="#1c1c22" stroke="#7c6af7" stroke-width="1.5"/>
+    <text x="100" y="38" text-anchor="middle" fill="#e8e8f0">User clicks render</text>
+    <text x="100" y="52" text-anchor="middle" fill="#9090a8" font-size="9">UI / API</text>
+  </g>
+
+  <!-- Service -->
+  <g>
+    <rect x="220" y="20" width="220" height="40" rx="6" fill="#1c1c22" stroke="#2a2a32"/>
+    <text x="330" y="38" text-anchor="middle" fill="#e8e8f0">dispatch_render() / start_chunked_render</text>
+    <text x="330" y="52" text-anchor="middle" fill="#9090a8" font-size="9">YoutubeVideoService</text>
+  </g>
+
+  <!-- Orchestrator -->
+  <g>
+    <rect x="480" y="20" width="240" height="40" rx="6" fill="#1c1c22" stroke="#2a2a32"/>
+    <text x="600" y="38" text-anchor="middle" fill="#e8e8f0">render_youtube_chunked_orchestrator_task</text>
+    <text x="600" y="52" text-anchor="middle" fill="#9090a8" font-size="9">plans N chunks, persists render_parts</text>
+  </g>
+
+  <!-- DB -->
+  <g>
+    <rect x="760" y="20" width="160" height="40" rx="6" fill="#1c1c22" stroke="#2a2a32"/>
+    <text x="840" y="38" text-anchor="middle" fill="#e8e8f0">render_parts (JSONB)</text>
+    <text x="840" y="52" text-anchor="middle" fill="#9090a8" font-size="9">postgres</text>
+  </g>
+
+  <!-- arrows row 1 -->
+  <line x1="180" y1="40" x2="218" y2="40" stroke="#5a5a70" marker-end="url(#arrowhead)"/>
+  <line x1="440" y1="40" x2="478" y2="40" stroke="#5a5a70" marker-end="url(#arrowhead)"/>
+  <line x1="720" y1="40" x2="758" y2="40" stroke="#5a5a70" stroke-dasharray="3 3" marker-end="url(#arrowhead)"/>
+
+  <!-- Chord dispatch -->
+  <line x1="600" y1="60" x2="600" y2="100" stroke="#5a5a70" marker-end="url(#arrowhead)"/>
+  <text x="610" y="84" fill="#9090a8" font-size="9">chord(group([…]))(concat)</text>
+
+  <!-- Chunks group -->
+  <g>
+    <rect x="80" y="110" width="1040" height="90" rx="6" fill="rgba(74,158,255,.05)" stroke="#2a2a32" stroke-dasharray="4 3"/>
+    <text x="100" y="128" fill="#9090a8" font-size="10">render_youtube_chunk_task × N  (parallel, video-only)</text>
+
+    <!-- 6 chunk boxes (representative) -->
+    <g>
+      <rect x="100"  y="140" width="120" height="40" rx="4" fill="rgba(74,158,255,.18)" stroke="rgba(74,158,255,.5)"/>
+      <text x="160" y="158" text-anchor="middle" fill="#e8e8f0">chunk 0</text>
+      <text x="160" y="170" text-anchor="middle" fill="#9090a8" font-size="9">[0, 300)</text>
+
+      <rect x="240" y="140" width="120" height="40" rx="4" fill="rgba(74,158,255,.18)" stroke="rgba(74,158,255,.5)"/>
+      <text x="300" y="158" text-anchor="middle" fill="#e8e8f0">chunk 1</text>
+      <text x="300" y="170" text-anchor="middle" fill="#9090a8" font-size="9">[300, 600)</text>
+
+      <rect x="380" y="140" width="120" height="40" rx="4" fill="rgba(74,158,255,.18)" stroke="rgba(74,158,255,.5)"/>
+      <text x="440" y="158" text-anchor="middle" fill="#e8e8f0">chunk 2</text>
+      <text x="440" y="170" text-anchor="middle" fill="#9090a8" font-size="9">[600, 900)</text>
+
+      <text x="540" y="164" text-anchor="middle" fill="#9090a8" font-size="14">…</text>
+
+      <rect x="580" y="140" width="120" height="40" rx="4" fill="rgba(74,158,255,.18)" stroke="rgba(74,158,255,.5)"/>
+      <text x="640" y="158" text-anchor="middle" fill="#e8e8f0">chunk 33</text>
+      <text x="640" y="170" text-anchor="middle" fill="#9090a8" font-size="9">[9900, 10200)</text>
+
+      <rect x="720" y="140" width="120" height="40" rx="4" fill="rgba(74,158,255,.18)" stroke="rgba(74,158,255,.5)"/>
+      <text x="780" y="158" text-anchor="middle" fill="#e8e8f0">chunk 34</text>
+      <text x="780" y="170" text-anchor="middle" fill="#9090a8" font-size="9">[10200, 10500)</text>
+
+      <rect x="860" y="140" width="120" height="40" rx="4" fill="rgba(74,158,255,.18)" stroke="rgba(74,158,255,.5)"/>
+      <text x="920" y="158" text-anchor="middle" fill="#e8e8f0">chunk 35</text>
+      <text x="920" y="170" text-anchor="middle" fill="#9090a8" font-size="9">[10500, 10800)</text>
+    </g>
+  </g>
+
+  <!-- Concat task -->
+  <line x1="600" y1="200" x2="600" y2="232" stroke="#5a5a70" marker-end="url(#arrowhead)"/>
+  <g>
+    <rect x="380" y="240" width="440" height="46" rx="6" fill="#1c1c22" stroke="#34d399" stroke-width="1.5"/>
+    <text x="600" y="258" text-anchor="middle" fill="#e8e8f0">concat_youtube_chunks_task  (chord callback)</text>
+    <text x="600" y="274" text-anchor="middle" fill="#34d399" font-size="9">render_full_audio_track  +  concat_video_and_mux_audio</text>
+  </g>
+
+  <!-- Final -->
+  <line x1="600" y1="286" x2="600" y2="316" stroke="#5a5a70" marker-end="url(#arrowhead)"/>
+  <g>
+    <rect x="450" y="320" width="300" height="36" rx="6" fill="#1c1c22" stroke="#7c6af7"/>
+    <text x="600" y="343" text-anchor="middle" fill="#e8e8f0">final.mp4  (h264 video + aac audio, one continuous encode)</text>
+  </g>
+</svg>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>2 · The full audio is rendered ONCE, then muxed</h2>
+<p>
+  This is the v1.2.1 architectural fix. Each video chunk is encoded
+  <code>-an</code> (video only). The full audio mix — music + all sound layers —
+  is encoded in <strong>one continuous ffmpeg pass</strong> after every chunk
+  completes. Then a stream-copy mux glues them together.
+</p>
+
+<div class="legend">
+  <div><span class="swatch" style="background:rgba(74,158,255,.6)"></span>video chunk (video-only mp4)</div>
+  <div><span class="swatch" style="background:rgba(124,106,247,.6)"></span>music playlist (looped)</div>
+  <div><span class="swatch" style="background:rgba(52,211,153,.6)"></span>background SFX (looped)</div>
+  <div><span class="swatch" style="background:var(--orange)"></span>midground SFX events</div>
+  <div><span class="swatch" style="background:var(--pink)"></span>foreground SFX events</div>
+  <div><span class="swatch" style="background:var(--cyan)"></span>random SFX events</div>
+</div>
+
+<div class="timeline">
+
+  <!-- Video chunks row -->
+  <div class="timeline-row">
+    <div class="label">video chunks
+      <span class="sub">36 × 300s</span>
+    </div>
+    <div class="timeline-track tall">
+      <div class="chunk-bar" id="video-chunks"></div>
+    </div>
+  </div>
+
+  <!-- Music -->
+  <div class="timeline-row">
+    <div class="label">music
+      <span class="sub">1 continuous AAC</span>
+    </div>
+    <div class="timeline-track">
+      <div class="continuous music" style="width:100%"></div>
+    </div>
+  </div>
+
+  <!-- Background SFX -->
+  <div class="timeline-row">
+    <div class="label">bg sfx
+      <span class="sub">looped</span>
+    </div>
+    <div class="timeline-track">
+      <div class="continuous bg-sfx" style="width:100%"></div>
+    </div>
+  </div>
+
+  <!-- Midground scheduled -->
+  <div class="timeline-row">
+    <div class="label">midground
+      <span class="sub">int 15–30s</span>
+    </div>
+    <div class="timeline-track">
+      <div class="sfx-events midground" id="ev-midground"></div>
+    </div>
+  </div>
+
+  <!-- Foreground scheduled -->
+  <div class="timeline-row">
+    <div class="label">foreground
+      <span class="sub">int 30–60s</span>
+    </div>
+    <div class="timeline-track">
+      <div class="sfx-events foreground" id="ev-foreground"></div>
+    </div>
+  </div>
+
+  <!-- Random SFX scheduled -->
+  <div class="timeline-row">
+    <div class="label">random sfx
+      <span class="sub">int 60–180s</span>
+    </div>
+    <div class="timeline-track">
+      <div class="sfx-events random" id="ev-random"></div>
+    </div>
+  </div>
+
+  <!-- Blackout overlay row -->
+  <div class="timeline-row">
+    <div class="label">blackout
+      <span class="sub">optional</span>
+    </div>
+    <div class="timeline-track">
+      <div class="continuous silent" style="width:100%"></div>
+      <div class="blackout" id="blackout-overlay" style="left:75%; width:25%"></div>
+    </div>
+  </div>
+
+  <!-- Time axis -->
+  <div class="timeaxis">
+    <div></div>
+    <div class="ticks">
+      <span>0:00</span><span>0:30</span><span>1:00</span><span>1:30</span><span>2:00</span><span>2:30</span><span>3:00</span>
+    </div>
+  </div>
+</div>
+
+<p class="note">
+  The chunks above are visual segmentation only — the AUDIO timeline below has
+  no boundaries that align with chunk seams. That's the whole point.
+</p>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>3 · Mix flow inside <code>render_full_audio_track</code></h2>
+
+<div class="flowchart">
+<svg viewBox="0 0 1100 320" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;font-family:var(--mono);font-size:11px">
+  <defs>
+    <marker id="ar2" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+      <polygon points="0 0, 8 4, 0 8" fill="#5a5a70"/>
+    </marker>
+  </defs>
+
+  <!-- music tracks input -->
+  <g>
+    <rect x="20" y="20" width="200" height="60" rx="6" fill="#1c1c22" stroke="rgba(124,106,247,.5)"/>
+    <text x="120" y="40" text-anchor="middle" fill="#e8e8f0">music_track_ids</text>
+    <text x="120" y="56" text-anchor="middle" fill="#9090a8" font-size="9">[T1, T2, T3]</text>
+    <text x="120" y="70" text-anchor="middle" fill="#9090a8" font-size="9">×N iterations</text>
+  </g>
+
+  <!-- background sfx input -->
+  <g>
+    <rect x="20" y="100" width="200" height="50" rx="6" fill="#1c1c22" stroke="rgba(52,211,153,.5)"/>
+    <text x="120" y="120" text-anchor="middle" fill="#e8e8f0">background sfx</text>
+    <text x="120" y="135" text-anchor="middle" fill="#9090a8" font-size="9">-stream_loop -1 + -ss seek</text>
+  </g>
+
+  <!-- scheduled events inputs -->
+  <g>
+    <rect x="20" y="170" width="200" height="120" rx="6" fill="#1c1c22" stroke="#2a2a32"/>
+    <text x="120" y="190" text-anchor="middle" fill="#e8e8f0">scheduled events</text>
+    <text x="120" y="208" text-anchor="middle" fill="#fb923c" font-size="9">midground × ~400</text>
+    <text x="120" y="222" text-anchor="middle" fill="#ec4899" font-size="9">foreground × ~250</text>
+    <text x="120" y="236" text-anchor="middle" fill="#06b6d4" font-size="9">random_sfx × ~80</text>
+    <text x="120" y="256" text-anchor="middle" fill="#9090a8" font-size="9">schedule_sfx_layer()</text>
+    <text x="120" y="270" text-anchor="middle" fill="#9090a8" font-size="9">deterministic per seed</text>
+    <text x="120" y="284" text-anchor="middle" fill="#9090a8" font-size="9">adelay=ts_ms|ts_ms</text>
+  </g>
+
+  <!-- music playlist stage -->
+  <g>
+    <rect x="290" y="20" width="220" height="60" rx="6" fill="#1c1c22" stroke="rgba(124,106,247,.6)"/>
+    <text x="400" y="40" text-anchor="middle" fill="#e8e8f0">_build_music_playlist_wav</text>
+    <text x="400" y="56" text-anchor="middle" fill="#7c6af7" font-size="9">replicate N times</text>
+    <text x="400" y="70" text-anchor="middle" fill="#7c6af7" font-size="9">acrossfade every pair</text>
+  </g>
+
+  <!-- sound layers stage -->
+  <g>
+    <rect x="290" y="100" width="220" height="190" rx="6" fill="#1c1c22" stroke="#2a2a32"/>
+    <text x="400" y="120" text-anchor="middle" fill="#e8e8f0">_build_sound_layers_wav</text>
+    <text x="400" y="138" text-anchor="middle" fill="#9090a8" font-size="9">~1500–2000 ffmpeg inputs</text>
+    <text x="400" y="152" text-anchor="middle" fill="#9090a8" font-size="9">filter_complex:</text>
+    <text x="400" y="168" text-anchor="middle" fill="#9090a8" font-size="9">[i:a]volume,adelay=ts|ts[evi]</text>
+    <text x="400" y="184" text-anchor="middle" fill="#9090a8" font-size="9">amix=inputs=N+1:longest</text>
+    <text x="400" y="200" text-anchor="middle" fill="#9090a8" font-size="9">apad=whole_dur=10800</text>
+    <text x="400" y="220" text-anchor="middle" fill="#34d399" font-size="9">pcm_s16le wav</text>
+  </g>
+
+  <!-- arrows -->
+  <line x1="220" y1="50" x2="288" y2="50" stroke="#5a5a70" marker-end="url(#ar2)"/>
+  <line x1="220" y1="125" x2="288" y2="160" stroke="#5a5a70" marker-end="url(#ar2)"/>
+  <line x1="220" y1="220" x2="288" y2="180" stroke="#5a5a70" marker-end="url(#ar2)"/>
+
+  <!-- combine -->
+  <g>
+    <rect x="580" y="60" width="220" height="170" rx="6" fill="#1c1c22" stroke="#34d399"/>
+    <text x="690" y="84" text-anchor="middle" fill="#e8e8f0">amix music + sound_layers</text>
+    <text x="690" y="100" text-anchor="middle" fill="#9090a8" font-size="9">single ffmpeg invocation</text>
+    <line x1="600" y1="115" x2="780" y2="115" stroke="#2a2a32"/>
+    <text x="690" y="138" text-anchor="middle" fill="#9090a8" font-size="9">-c:a aac -b:a 192k</text>
+    <text x="690" y="154" text-anchor="middle" fill="#9090a8" font-size="9">-ar 44100 -ac 2 -vn</text>
+    <text x="690" y="172" text-anchor="middle" fill="#9090a8" font-size="9">-t 10800</text>
+    <line x1="600" y1="186" x2="780" y2="186" stroke="#2a2a32"/>
+    <text x="690" y="208" text-anchor="middle" fill="#34d399" font-size="11">→ audio_full.m4a</text>
+  </g>
+
+  <line x1="510" y1="50" x2="578" y2="110" stroke="#5a5a70" marker-end="url(#ar2)"/>
+  <line x1="510" y1="160" x2="578" y2="160" stroke="#5a5a70" marker-end="url(#ar2)"/>
+
+  <!-- mux step -->
+  <g>
+    <rect x="860" y="80" width="220" height="130" rx="6" fill="#1c1c22" stroke="#7c6af7" stroke-width="1.5"/>
+    <text x="970" y="104" text-anchor="middle" fill="#e8e8f0">concat_video_and_mux_audio</text>
+    <text x="970" y="122" text-anchor="middle" fill="#9090a8" font-size="9">ffmpeg -f concat -c copy</text>
+    <text x="970" y="138" text-anchor="middle" fill="#9090a8" font-size="9">-i list.txt -i audio_full.m4a</text>
+    <text x="970" y="154" text-anchor="middle" fill="#9090a8" font-size="9">-map 0:v:0 -map 1:a:0</text>
+    <text x="970" y="170" text-anchor="middle" fill="#9090a8" font-size="9">-c copy -shortest</text>
+    <line x1="880" y1="180" x2="1060" y2="180" stroke="#2a2a32"/>
+    <text x="970" y="200" text-anchor="middle" fill="#7c6af7" font-size="11">→ final.mp4</text>
+  </g>
+
+  <line x1="800" y1="145" x2="858" y2="145" stroke="#5a5a70" marker-end="url(#ar2)"/>
+
+  <!-- video chunks branch -->
+  <g>
+    <rect x="860" y="240" width="220" height="50" rx="6" fill="#1c1c22" stroke="rgba(74,158,255,.5)"/>
+    <text x="970" y="260" text-anchor="middle" fill="#e8e8f0">36 × chunk.video.mp4</text>
+    <text x="970" y="275" text-anchor="middle" fill="#9090a8" font-size="9">-an, stream-copy concat</text>
+  </g>
+  <line x1="970" y1="240" x2="970" y2="212" stroke="#5a5a70" marker-end="url(#ar2)"/>
+</svg>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>4 · Music playlist — seamless loop crossfade <span class="tag accent">v1.2.3</span></h2>
+
+<p>
+  Most music files don't naturally loop. <code>aloop</code> repeats the buffer
+  byte-for-byte, so the last sample butts up against the first sample — a click
+  at every loop boundary. For a 5 min track repeated to 3 hours, that's a click
+  every 5 min. Broadband / ambient music masks it; tonal music exposes it.
+</p>
+
+<div class="comparison">
+
+  <div class="pane broken">
+    <h4><span class="tag red">before v1.2.3</span> hard <code>aloop</code> boundary</h4>
+    <p style="margin-top:8px">
+      Single track of 300 s, looped to 10800 s. 35 hard cuts → 35 audible clicks for tonal music.
+    </p>
+    <div class="timeline" style="background:transparent;padding:8px 0">
+      <div class="timeline-row" style="padding:0">
+        <div class="label" style="grid-column:1; font-size:10px">music<span class="sub">aloop -1</span></div>
+        <div class="timeline-track" style="height:32px">
+          <div class="continuous music" style="width:100%"></div>
+          <div class="loop-markers" id="aloop-markers"></div>
+        </div>
+      </div>
+    </div>
+    <p class="note">↑ yellow lines mark loop boundaries where samples don't match</p>
+  </div>
+
+  <div class="pane fixed">
+    <h4><span class="tag green">after v1.2.3</span> N-copy <code>acrossfade</code></h4>
+    <p style="margin-top:8px">
+      Same 300 s track replicated as 37 ffmpeg inputs. 36 pairwise <code>acrossfade=1.5</code> filters
+      blend every adjacent pair — within iterations and across loop boundaries.
+    </p>
+    <div class="timeline" style="background:transparent;padding:8px 0">
+      <div class="timeline-row" style="padding:0">
+        <div class="label" style="grid-column:1; font-size:10px">music<span class="sub">acrossfade</span></div>
+        <div class="timeline-track" style="height:32px">
+          <div class="continuous music" style="width:100%; opacity:0.9"></div>
+          <div class="loop-markers" id="acrossfade-markers"></div>
+        </div>
+      </div>
+    </div>
+    <p class="note">↑ green pulses are crossfades — no audible discontinuity</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>5 · Sound layer scheduling</h2>
+
+<p>
+  The three scheduled layers (<code>midground</code>, <code>foreground</code>, <code>random_sfx</code>)
+  use the same <code>schedule_sfx_layer(pool, interval_min, interval_max, seed, start_s, end_s)</code>
+  helper with different <strong>seed offsets</strong> so the layers don't collide on the same RNG stream.
+  The schedule is deterministic — same inputs always produce the same timestamps.
+</p>
+
+<div class="card">
+  <h3>Layer config</h3>
+  <table style="width:100%;border-collapse:collapse;font-size:13px">
+    <thead>
+      <tr style="color:var(--text-mute);text-align:left">
+        <th style="padding:6px 12px;border-bottom:1px solid var(--border)">layer</th>
+        <th style="padding:6px 12px;border-bottom:1px solid var(--border)">interval</th>
+        <th style="padding:6px 12px;border-bottom:1px solid var(--border)">seed offset</th>
+        <th style="padding:6px 12px;border-bottom:1px solid var(--border)">events / 3h (avg)</th>
+        <th style="padding:6px 12px;border-bottom:1px solid var(--border)">typical use</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="padding:6px 12px"><code>background</code></td>
+        <td style="padding:6px 12px">looped continuously (no schedule)</td>
+        <td style="padding:6px 12px">—</td>
+        <td style="padding:6px 12px">1 input × stream_loop -1</td>
+        <td style="padding:6px 12px">rain, stream, white noise</td>
+      </tr>
+      <tr>
+        <td style="padding:6px 12px"><code>midground</code></td>
+        <td style="padding:6px 12px">15–30 s</td>
+        <td style="padding:6px 12px">0</td>
+        <td style="padding:6px 12px">~480</td>
+        <td style="padding:6px 12px">leaves, ambient noises</td>
+      </tr>
+      <tr>
+        <td style="padding:6px 12px"><code>foreground</code></td>
+        <td style="padding:6px 12px">30–60 s</td>
+        <td style="padding:6px 12px">100003</td>
+        <td style="padding:6px 12px">~240</td>
+        <td style="padding:6px 12px">birds, distant animals</td>
+      </tr>
+      <tr>
+        <td style="padding:6px 12px"><code>random_sfx</code></td>
+        <td style="padding:6px 12px">60–180 s</td>
+        <td style="padding:6px 12px">200003</td>
+        <td style="padding:6px 12px">~90</td>
+        <td style="padding:6px 12px">rare events (thunder, owl)</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>6 · The bug that v1.2.x fixed (and the one it didn't)</h2>
+
+<div class="comparison">
+
+  <div class="pane broken">
+    <h4><span class="tag red">before v1.2.1</span> per-chunk AAC encode</h4>
+    <p>
+      Each chunk encoded its own AAC stream. <code>-c copy</code> concat keeps
+      every chunk's ~46 ms priming gap as audible audio. Click at every chunk seam.
+    </p>
+    <div class="timeline" style="background:transparent;padding:8px 0">
+      <div class="timeline-row" style="padding:0">
+        <div class="label" style="grid-column:1; font-size:10px">audio<span class="sub">per-chunk aac</span></div>
+        <div class="timeline-track" style="height:32px;position:relative">
+          <div class="chunk-bar" id="broken-chunks-audio"></div>
+          <div class="glitch-markers" id="broken-chunk-glitches"></div>
+        </div>
+      </div>
+    </div>
+    <p class="note">↑ red lines = priming gaps every chunk_size (5 min)</p>
+  </div>
+
+  <div class="pane fixed">
+    <h4><span class="tag green">v1.2.1+</span> single audio encode + mux</h4>
+    <p>
+      Audio is ONE continuous AAC encode for the full 10800 s. Video chunks are
+      <code>-an</code> (no audio). Stream-copy mux. Zero audio seams.
+    </p>
+    <div class="timeline" style="background:transparent;padding:8px 0">
+      <div class="timeline-row" style="padding:0">
+        <div class="label" style="grid-column:1; font-size:10px">audio<span class="sub">1 continuous</span></div>
+        <div class="timeline-track" style="height:32px">
+          <div class="continuous music" style="width:100%"></div>
+        </div>
+      </div>
+    </div>
+    <p class="note">↑ no boundaries anywhere — masked or not, the click can't exist</p>
+  </div>
+
+</div>
+
+<div class="comparison" style="margin-top:14px">
+  <div class="pane broken">
+    <h4><span class="tag red">before v1.2.3</span> <code>aloop</code> hard music loop</h4>
+    <p>
+      v1.2.1 fixed the chunk seams. But the music itself still hit a hard loop
+      boundary every M seconds (track length). Same "weird sound every 5 min"
+      symptom returned for users whose music tracks were ~5 min long.
+    </p>
+  </div>
+  <div class="pane fixed">
+    <h4><span class="tag green">v1.2.3</span> N-copy <code>acrossfade</code> music loop</h4>
+    <p>
+      Replicate the playlist as N ffmpeg inputs, crossfade every consecutive
+      pair (within and across iteration boundaries), atrim to target. No hard
+      loop boundary anywhere in the music WAV.
+    </p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>7 · Blackout overlay</h2>
+
+<p>
+  <code>video.black_from_seconds</code> tells the renderer to fade to black
+  at that absolute time. Common for "X hours then sleep" videos. Per-chunk logic:
+</p>
+
+<ul class="compact">
+  <li><strong>Chunk entirely before blackout:</strong> normal visual + audio, no overlay.</li>
+  <li><strong>Chunk straddling the blackout point:</strong> visual + audio + a fading-in
+    <code>color=c=black</code> overlay starting at the local timestamp.</li>
+  <li><strong>Chunk entirely after blackout:</strong> visual input replaced by
+    <code>lavfi color=c=black</code> directly — skips expensive video decode for
+    chunks that would just be solid black anyway.</li>
+</ul>
+
+<div class="card" style="padding:16px 18px">
+  <div class="timeline" style="padding:8px 0;background:transparent">
+    <div class="timeline-row" style="padding:0">
+      <div class="label" style="font-size:10px">visual<span class="sub">w/ blackout @ 2h15m</span></div>
+      <div class="timeline-track" style="height:40px">
+        <div class="chunk-bar" id="blackout-chunks"></div>
+        <div class="blackout" style="left:75%; width:25%"></div>
+      </div>
+    </div>
+  </div>
+  <p class="note">
+    Chunks 0–26: rendered normally · Chunk 27: fades to black mid-chunk ·
+    Chunks 28–35: <code>lavfi</code> black source, no visual decode
+  </p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>8 · Resume / cancel</h2>
+
+<div class="card">
+  <h3>render_parts as the source of truth</h3>
+  <p>
+    Every chunk's state lives in <code>youtube_videos.render_parts</code> (JSONB).
+    Each entry has <code>idx</code>, <code>start_s</code>, <code>end_s</code>,
+    <code>status</code>, <code>file_path</code>, <code>task_id</code>, timestamps.
+    Atomic <code>jsonb_set</code> updates so parallel chunk workers don't race.
+  </p>
+
+  <h3>cancel</h3>
+  <p>
+    <code>cancel_chunked_render</code> revokes every chunk's <code>task_id</code>
+    plus the concat callback's task_id. This is why the orchestrator persists
+    task_ids to <code>render_parts</code> BEFORE dispatching the chord.
+  </p>
+
+  <h3>resume</h3>
+  <p>
+    <code>resume_chunked_render</code> resets <code>failed</code>/<code>running</code>
+    entries to <code>pending</code> and re-runs the orchestrator. The orchestrator
+    preserves <code>completed</code> entries — but ONLY if <code>file_path</code>
+    ends in <code>.video.mp4</code> (the v1.2.2 legacy invalidator). Legacy
+    <code>chunk.mp4</code> entries get re-rendered.
+  </p>
+</div>
+
+<hr>
+
+<p style="font-size:12px;color:var(--text-dim);text-align:center">
+  See <code>docs/render-pipeline.md</code> for the line-numbered file map and code references.
+</p>
+
+<script>
+  // ── Render chunks (36 boxes) ─────────────────────────────────────────
+  function makeChunks(containerId, count) {
+    const c = document.getElementById(containerId);
+    if (!c) return;
+    for (let i = 0; i < count; i++) {
+      const el = document.createElement('div');
+      el.className = 'chunk';
+      el.title = `chunk ${i} · [${i*300}s, ${(i+1)*300}s)`;
+      el.textContent = i;
+      c.appendChild(el);
+    }
+  }
+  makeChunks('video-chunks',    36);
+  makeChunks('broken-chunks-audio', 36);
+  makeChunks('blackout-chunks', 36);
+
+  // Glitch markers (red lines between each pair of chunks except last)
+  function makeGlitchMarkers(containerId, count) {
+    const c = document.getElementById(containerId);
+    if (!c) return;
+    for (let i = 0; i < count; i++) {
+      const d = document.createElement('div');
+      c.appendChild(d);
+    }
+  }
+  makeGlitchMarkers('broken-chunk-glitches', 36);
+
+  // Loop-boundary markers (yellow) for the aloop diagram — every 300s in a 10800s window
+  function makeLoopMarkers(containerId, periodSec, totalSec) {
+    const c = document.getElementById(containerId);
+    if (!c) return;
+    const count = Math.floor(totalSec / periodSec) - 1;
+    for (let i = 1; i <= count; i++) {
+      const m = document.createElement('div');
+      m.className = 'marker';
+      m.style.position = 'absolute';
+      m.style.top = '0';
+      m.style.bottom = '0';
+      m.style.left = `${(i * periodSec / totalSec) * 100}%`;
+      c.appendChild(m);
+    }
+  }
+  makeLoopMarkers('aloop-markers', 300, 10800);
+
+  // Green pulses for the acrossfade version — same positions but blended
+  function makeAcrossfadeMarkers(containerId, periodSec, totalSec) {
+    const c = document.getElementById(containerId);
+    if (!c) return;
+    const count = Math.floor(totalSec / periodSec) - 1;
+    for (let i = 1; i <= count; i++) {
+      const m = document.createElement('div');
+      m.style.position = 'absolute';
+      m.style.top = '0';
+      m.style.bottom = '0';
+      m.style.width = '8px';
+      m.style.transform = 'translateX(-4px)';
+      m.style.left = `${(i * periodSec / totalSec) * 100}%`;
+      m.style.background = 'radial-gradient(circle, rgba(52,211,153,.5), transparent 70%)';
+      c.appendChild(m);
+    }
+  }
+  makeAcrossfadeMarkers('acrossfade-markers', 300, 10800);
+
+  // ── Scheduled SFX events — deterministic-ish positions in [0, 10800] ─
+  function seeded(seed) {
+    let s = seed;
+    return function() {
+      s = (s * 9301 + 49297) % 233280;
+      return s / 233280;
+    };
+  }
+  function makeEvents(containerId, intervalMin, intervalMax, seed, totalSec) {
+    const c = document.getElementById(containerId);
+    if (!c) return;
+    const rnd = seeded(seed);
+    let t = 0;
+    while (true) {
+      t += intervalMin + rnd() * (intervalMax - intervalMin);
+      if (t >= totalSec) break;
+      const e = document.createElement('div');
+      e.className = 'event';
+      e.style.left = `${(t / totalSec) * 100}%`;
+      e.title = `${(t / 60).toFixed(1)} min`;
+      c.appendChild(e);
+    }
+  }
+  makeEvents('ev-midground',  15,  30,  17, 10800);
+  makeEvents('ev-foreground', 30,  60,  31, 10800);
+  makeEvents('ev-random',     60, 180,  53, 10800);
+</script>
+
+</body>
+</html>
