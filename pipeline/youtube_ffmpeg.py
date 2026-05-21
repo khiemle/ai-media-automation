@@ -17,6 +17,37 @@ QUALITY_SCALE = {
 DEFAULT_SCALE = "1920:1080"
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 
+# Output frame rate used for every long-form chunk. Must match the fps=30 filter
+# in the video chain. Anything else makes chunks non-frame-exact and the concat
+# demuxer accumulates drift across seams.
+CHUNK_FPS = 30
+# Video timescale picked so 1/CHUNK_FPS lands on an integer number of ticks
+# (30000 / 30 = 1000 ticks per frame). Without this, NVENC may pick a default
+# timescale where frame duration is non-integer (e.g. 12800/30 = 426.66…) and
+# tkhd duration drifts off N*target_dur by a few ms per chunk.
+CHUNK_TIMESCALE = 30000
+
+
+def _chunk_exact_output_args(target_dur: int) -> list[str]:
+    """Output args that force a frame- and container-exact chunk.
+
+    Plain ``-t target_dur`` is not enough: with NVENC's default timescale
+    (which is not a clean multiple of 30) the resulting tkhd / mdhd duration
+    can land on ``target_dur + ε``. After ``-c copy`` concat that ε accumulates
+    across the seam, the visible result is the whole-video A/V drift the
+    chunked render path has been chasing through v1.2.1–v1.2.3.
+
+    Use this on every chunk render and only on chunk renders — for the
+    audio-bearing single-pass renderer (no concat downstream) it is a no-op
+    waste of CPU.
+    """
+    return [
+        "-r", str(CHUNK_FPS),
+        "-vsync", "cfr",
+        "-frames:v", str(int(target_dur) * CHUNK_FPS),
+        "-video_track_timescale", str(CHUNK_TIMESCALE),
+    ]
+
 
 def build_spectrum_filter(
     enabled: bool,
@@ -1031,7 +1062,9 @@ def _render_landscape_music(
     if include_audio:
         cmd += ["-c:a", "aac", "-b:a", "192k", "-ar", "44100"]
     else:
-        cmd += ["-an"]
+        # See render_landscape: chunked path needs frame-exact output so the
+        # downstream concat does not drift relative to the muxed audio.
+        cmd += ["-an", *_chunk_exact_output_args(target_dur)]
     cmd += [
         "-movflags", "+faststart",
         str(output_path),
@@ -1252,7 +1285,10 @@ def render_landscape(
     if include_audio:
         cmd += ["-c:a", "aac", "-b:a", "192k", "-ar", "44100"]
     else:
-        cmd += ["-an"]
+        # Chunked render path: force a frame- and container-exact chunk so
+        # ``-c copy`` concat doesn't accumulate ε-per-seam drift between video
+        # and the separately-rendered audio track.
+        cmd += ["-an", *_chunk_exact_output_args(target_dur)]
     cmd += ["-movflags", "+faststart", str(output_path)]
 
     logger.info(

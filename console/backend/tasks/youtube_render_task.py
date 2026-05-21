@@ -317,15 +317,16 @@ def render_youtube_chunk_task(self, youtube_video_id: int, chunk_idx: int, start
         _publish_youtube_render_event(youtube_video_id)
 
         # Per-chunk subdirectory so parallel chunks don't collide on temp files.
-        # ``.video.mp4`` suffix is intentional: chunks are now video-only and
-        # this distinct filename also busts any preserved render_parts from
-        # before v1.2.1 that point to ``chunk.mp4`` files containing embedded
-        # AAC audio. The orchestrator's resume logic only re-uses entries
-        # whose ``file_path`` ends with ``.video.mp4`` — see CHUNK_SUFFIX in
-        # render_youtube_chunked_orchestrator_task.
+        # ``.video.cfr.mp4`` suffix is intentional: chunks are video-only AND
+        # encoded with the v1.2.4 frame-exact / CFR / fixed-timescale flags so
+        # ``-c copy`` concat doesn't accumulate ε-per-seam timing drift. The
+        # ``.cfr`` segment busts any preserved render_parts produced before
+        # v1.2.4 — they had the right shape (video-only ``.video.mp4``) but
+        # the wrong encoder args. The orchestrator's resume logic only re-uses
+        # entries whose ``file_path`` ends with ``.video.cfr.mp4``.
         chunk_dir = OUTPUT_DIR / f"youtube_{youtube_video_id}" / f"chunk_{chunk_idx}"
         chunk_dir.mkdir(parents=True, exist_ok=True)
-        chunk_path = chunk_dir / "chunk.video.mp4"
+        chunk_path = chunk_dir / "chunk.video.cfr.mp4"
 
         render_landscape(
             video, chunk_path, db,
@@ -527,10 +528,16 @@ def render_youtube_chunked_orchestrator_task(self, youtube_video_id: int):
         chunk_size = math.ceil(full_dur / n_chunks)
 
         # Build / replace render_parts. Preserve completed entries (resume case).
-        # Legacy chunks from before v1.2.1 had embedded AAC audio and a filename
-        # of just "chunk.mp4". Preserving those would re-introduce the per-seam
-        # glitch every chunk boundary, so we treat any entry whose file_path
-        # doesn't end with ".video.mp4" as stale and force a fresh render.
+        #
+        # The chunk filename encodes the render-pipeline generation:
+        #   * pre-v1.2.1: "chunk.mp4"          — embedded AAC audio (per-seam click)
+        #   * v1.2.1..v1.2.3: "chunk.video.mp4" — video-only but non-CFR (whole-video drift)
+        #   * v1.2.4+: "chunk.video.cfr.mp4"   — video-only AND frame/timescale exact
+        #
+        # Only the latest generation can be safely re-used. Older completed
+        # chunks have the wrong on-disk timing for the new concat path and
+        # would re-introduce the very drift v1.2.4 exists to eliminate.
+        CURRENT_CHUNK_SUFFIX = ".video.cfr.mp4"
         existing = {p["idx"]: p for p in (video.render_parts or [])}
         new_parts = []
         for i in range(n_chunks):
@@ -538,18 +545,18 @@ def render_youtube_chunked_orchestrator_task(self, youtube_video_id: int):
             end = min(full_dur, start + chunk_size)
             prev = existing.get(i, {})
             prev_path = prev.get("file_path") or ""
-            is_post_v121_chunk = prev_path.endswith(".video.mp4")
+            is_current_gen_chunk = prev_path.endswith(CURRENT_CHUNK_SUFFIX)
             if (
                 prev.get("status") == "completed"
                 and prev_path
-                and is_post_v121_chunk
+                and is_current_gen_chunk
             ):
                 new_parts.append(prev)
             else:
-                if prev.get("status") == "completed" and not is_post_v121_chunk:
+                if prev.get("status") == "completed" and not is_current_gen_chunk:
                     logger.info(
-                        "YoutubeVideo %s chunk %s: invalidating legacy chunk %r "
-                        "(pre-v1.2.1, contains embedded audio) — will re-render",
+                        "YoutubeVideo %s chunk %s: invalidating stale chunk %r "
+                        "(pre-v1.2.4, wrong encoder timing) — will re-render",
                         youtube_video_id, i, prev_path,
                     )
                 new_parts.append({

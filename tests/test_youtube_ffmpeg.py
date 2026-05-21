@@ -292,6 +292,64 @@ def test_render_landscape_video_only_chunk_omits_audio_inputs(tmp_path):
     assert "-c:a aac" not in cmd_str
 
 
+def test_render_landscape_chunk_uses_frame_exact_output(tmp_path):
+    """Regression for the v1.2.0-1.2.3 whole-video A/V drift.
+
+    Chunked render (include_audio=False) MUST emit the encoder args that keep
+    each chunk's container duration exactly equal to its target window:
+    explicit fps, CFR, frame-count cap, fixed timescale. Anything else lets
+    NVENC pick a default timescale that's a non-multiple of 30 and the
+    container duration drifts off by milliseconds — drift the concat demuxer
+    then accumulates across every seam starting at the first chunk boundary
+    (5:00 for the default 300s chunks).
+    """
+    output = tmp_path / "chunk.mp4"
+    with patch("shutil.which", return_value="/usr/bin/ffmpeg"), \
+         patch("pipeline.youtube_ffmpeg.resolve_visual_playlist", return_value=[]), \
+         patch("pipeline.youtube_ffmpeg.resolve_visual", return_value=None), \
+         patch("pipeline.youtube_ffmpeg._build_music_playlist_wav"), \
+         patch("pipeline.youtube_ffmpeg._build_sound_layers_wav"), \
+         patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stderr="")
+        from pipeline.youtube_ffmpeg import render_landscape
+        render_landscape(
+            _make_video(), output, MagicMock(),
+            start_s=0.0, end_s=300.0,
+            include_audio=False,
+        )
+
+    cmd = mock_run.call_args[0][0]
+    cmd_str = " ".join(cmd)
+    # 300s chunk × 30 fps == 9000 frames; encoder must cap at exactly that.
+    assert "-frames:v" in cmd and "9000" in cmd
+    assert "-r 30" in cmd_str
+    assert "-vsync cfr" in cmd_str
+    # Timescale 30000 → 1000 ticks/frame at 30fps (integer, no drift).
+    assert "-video_track_timescale 30000" in cmd_str
+
+
+def test_render_landscape_audio_pass_omits_chunk_exact_flags(tmp_path):
+    """Single-pass renders (include_audio=True) own their own audio track and
+    are not downstream-concatenated. The chunk-exact flags would still be
+    correct but cost CPU on a fps-converter pass for no benefit — keep them
+    scoped to the chunked path so the audio-bearing renderer stays untouched.
+    """
+    output = tmp_path / "out.mp4"
+    with patch("shutil.which", return_value="/usr/bin/ffmpeg"), \
+         patch("pipeline.youtube_ffmpeg.resolve_visual_playlist", return_value=[]), \
+         patch("pipeline.youtube_ffmpeg.resolve_visual", return_value=None), \
+         patch("pipeline.youtube_ffmpeg._build_music_playlist_wav", return_value=None), \
+         patch("pipeline.youtube_ffmpeg._build_sound_layers_wav", return_value=None), \
+         patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stderr="")
+        from pipeline.youtube_ffmpeg import render_landscape
+        render_landscape(_make_video(), output, MagicMock())
+
+    cmd_str = " ".join(mock_run.call_args[0][0])
+    assert "-frames:v" not in cmd_str
+    assert "-video_track_timescale" not in cmd_str
+
+
 def test_render_landscape_default_still_includes_audio(tmp_path):
     """Default include_audio=True path keeps building audio + AAC encoder."""
     output = tmp_path / "out.mp4"

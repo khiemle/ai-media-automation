@@ -113,14 +113,25 @@ def concat_video_and_mux_audio(
     # One ffmpeg invocation: input 0 is the concat demuxer reading the video
     # chunks, input 1 is the audio file. Stream-copy both, -shortest trims to
     # the shorter stream (defends against audio slightly longer than video).
+    #
+    # ``-fflags +genpts`` regenerates PTS from DTS at the concat boundary; if
+    # any chunk landed a sub-millisecond off from its nominal duration this
+    # keeps the stitched video timeline strictly monotonic instead of carrying
+    # the drift forward into the muxed file. ``-avoid_negative_ts make_zero``
+    # is the corresponding defensive flag on the output side — it prevents the
+    # muxer from rounding small negative DTS values (that concat can emit when
+    # rebasing the second chunk's first packet) into the next chunk's PTS
+    # space.
     cmd = [
         "ffmpeg", "-y",
+        "-fflags", "+genpts",
         "-f", "concat", "-safe", "0",
         "-i", str(listfile_path),
         "-i", str(audio_path),
         "-map", "0:v:0",
         "-map", "1:a:0",
         "-c", "copy",
+        "-avoid_negative_ts", "make_zero",
         "-shortest",
         str(output_path),
     ]

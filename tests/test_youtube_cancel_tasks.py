@@ -278,9 +278,10 @@ def test_orchestrator_skips_when_video_is_failed():
 
 
 def test_orchestrator_invalidates_legacy_chunks_without_video_suffix():
-    """Pre-v1.2.1 chunks (file_path ends with .mp4, not .video.mp4) had
-    embedded AAC audio. The orchestrator must NOT preserve them — it must
-    mark them pending so they get re-rendered as video-only.
+    """Pre-v1.2.4 chunks (any filename other than chunk.video.cfr.mp4) have the
+    wrong on-disk encoder timing. The orchestrator must NOT preserve them — it
+    must mark them pending so they get re-rendered with the v1.2.4 CFR /
+    fixed-timescale flags.
     """
     from unittest.mock import patch, MagicMock
 
@@ -294,7 +295,7 @@ def test_orchestrator_invalidates_legacy_chunks_without_video_suffix():
     video.render_parts = [{
         "idx": 0, "start_s": 0, "end_s": 180,
         "status": "completed",
-        "file_path": "/tmp/youtube_42/chunk_0/chunk.mp4",  # legacy (no .video.mp4)
+        "file_path": "/tmp/youtube_42/chunk_0/chunk.mp4",  # pre-v1.2.1
     }]
 
     db = MagicMock()
@@ -317,9 +318,13 @@ def test_orchestrator_invalidates_legacy_chunks_without_video_suffix():
         f"legacy chunk file_path should be cleared, got {parts[0]['file_path']!r}"
 
 
-def test_orchestrator_preserves_post_v121_video_only_chunks():
-    """Post-v1.2.1 chunks (file_path ends with .video.mp4) are video-only and
-    safe to preserve across resume."""
+def test_orchestrator_invalidates_v121_chunks_lacking_cfr_suffix():
+    """v1.2.1..v1.2.3 chunks (file_path ends with .video.mp4) were video-only
+    but were encoded without the v1.2.4 CFR / frame-count / fixed-timescale
+    flags. Their tkhd duration can be off by ~ms and ``-c copy`` concat
+    accumulates that drift across seams. The orchestrator must invalidate
+    them on resume so they get re-rendered with the v1.2.4 encoder args.
+    """
     from unittest.mock import patch, MagicMock
 
     video = MagicMock()
@@ -331,7 +336,43 @@ def test_orchestrator_preserves_post_v121_video_only_chunks():
     video.render_parts = [{
         "idx": 0, "start_s": 0, "end_s": 180,
         "status": "completed",
-        "file_path": "/tmp/youtube_42/chunk_0/chunk.video.mp4",  # post-v1.2.1
+        "file_path": "/tmp/youtube_42/chunk_0/chunk.video.mp4",  # v1.2.1..v1.2.3
+    }]
+
+    db = MagicMock()
+    db.get.return_value = video
+
+    with patch("console.backend.database.SessionLocal", return_value=db), \
+         patch("console.backend.tasks.youtube_render_task._is_superseded", return_value=False), \
+         patch("celery.chord", MagicMock()), \
+         patch("celery.group", MagicMock()), \
+         patch("sqlalchemy.orm.attributes.flag_modified"):
+        from console.backend.tasks.youtube_render_task import render_youtube_chunked_orchestrator_task
+        render_youtube_chunked_orchestrator_task.apply(args=[42])
+
+    parts = video.render_parts
+    assert len(parts) == 1
+    assert parts[0]["status"] == "pending", \
+        f"v1.2.1..v1.2.3 chunk should be invalidated, got status={parts[0]['status']!r}"
+    assert parts[0]["file_path"] is None
+
+
+def test_orchestrator_preserves_v124_cfr_chunks():
+    """v1.2.4+ chunks (file_path ends with .video.cfr.mp4) carry the
+    frame-exact / CFR / fixed-timescale encoder args and are safe to preserve
+    across resume."""
+    from unittest.mock import patch, MagicMock
+
+    video = MagicMock()
+    video.id = 42
+    video.celery_task_id = "old-orch-id"
+    video.sfx_seed = 1
+    video.target_duration_h = 1 / 60 * 3  # 180s → 1 chunk
+    video.status = "rendering"
+    video.render_parts = [{
+        "idx": 0, "start_s": 0, "end_s": 180,
+        "status": "completed",
+        "file_path": "/tmp/youtube_42/chunk_0/chunk.video.cfr.mp4",  # v1.2.4+
     }]
 
     db = MagicMock()
@@ -348,13 +389,14 @@ def test_orchestrator_preserves_post_v121_video_only_chunks():
     parts = video.render_parts
     assert len(parts) == 1
     assert parts[0]["status"] == "completed", \
-        f"post-v1.2.1 chunk should be preserved, got status={parts[0]['status']!r}"
-    assert parts[0]["file_path"].endswith(".video.mp4")
+        f"v1.2.4 chunk should be preserved, got status={parts[0]['status']!r}"
+    assert parts[0]["file_path"].endswith(".video.cfr.mp4")
 
 
-def test_chunk_task_writes_to_video_suffix_path():
-    """render_youtube_chunk_task must persist chunks as chunk.video.mp4 so the
-    orchestrator's legacy-detection logic can recognise them as audio-free."""
+def test_chunk_task_writes_to_cfr_suffix_path():
+    """render_youtube_chunk_task must persist chunks as chunk.video.cfr.mp4 so
+    the orchestrator's invalidator can recognise them as the current
+    encoder-args generation."""
     from unittest.mock import patch, MagicMock
 
     video = MagicMock()
@@ -380,8 +422,8 @@ def test_chunk_task_writes_to_video_suffix_path():
         from console.backend.tasks.youtube_render_task import render_youtube_chunk_task
         render_youtube_chunk_task.apply(args=[42, 0, 0.0, 300.0]).get()
 
-    assert captured_path["path"].endswith("chunk.video.mp4"), \
-        f"chunk must be written as chunk.video.mp4, got {captured_path['path']!r}"
+    assert captured_path["path"].endswith("chunk.video.cfr.mp4"), \
+        f"chunk must be written as chunk.video.cfr.mp4, got {captured_path['path']!r}"
 
 
 def test_concat_task_rejects_chunks_with_embedded_audio(tmp_path):

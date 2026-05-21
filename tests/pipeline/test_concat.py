@@ -155,6 +155,41 @@ def test_concat_video_and_mux_audio_is_single_continuous_encode(
     assert _audio_packet_count(out) == _audio_packet_count(ten_second_aac_audio)
 
 
+def test_concat_video_and_mux_uses_pts_normalization_flags(
+    two_video_only_clips, ten_second_aac_audio, tmp_path, monkeypatch,
+):
+    """Regression for the v1.2.0-1.2.3 whole-video A/V drift.
+
+    Even with v1.2.4 frame-exact chunks, the concat+mux step keeps its own
+    defensive flags: ``-fflags +genpts`` regenerates PTS at the seam if a
+    chunk's container drifted by a sub-millisecond, and ``-avoid_negative_ts
+    make_zero`` prevents the muxer from rounding small negative DTS values
+    (which concat can emit when rebasing the next chunk's first packet) into
+    the next chunk's PTS space.
+    """
+    import subprocess as real_subprocess
+    captured_cmd: list[list[str]] = []
+
+    def fake_run(cmd, *args, **kwargs):  # noqa: ARG001
+        captured_cmd.append(list(cmd))
+        return real_subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    from pipeline import concat as concat_mod
+    monkeypatch.setattr(concat_mod.subprocess, "run", fake_run)
+    # Output is never actually written by the fake — stub size/unlink calls.
+    out = tmp_path / "final.mp4"
+    out.write_bytes(b"fake")
+
+    concat_mod.concat_video_and_mux_audio(two_video_only_clips, ten_second_aac_audio, out)
+
+    assert captured_cmd, "ffmpeg was never invoked"
+    cmd_str = " ".join(captured_cmd[0])
+    assert "-fflags +genpts" in cmd_str
+    assert "-avoid_negative_ts make_zero" in cmd_str
+    assert "-c copy" in cmd_str
+    assert "-shortest" in cmd_str
+
+
 def test_concat_video_and_mux_rejects_empty_parts(ten_second_aac_audio, tmp_path):
     from pipeline.concat import concat_video_and_mux_audio
     with pytest.raises(ValueError):
